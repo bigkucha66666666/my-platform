@@ -8,7 +8,7 @@ doc = """
 class C(BaseConstants):
     NAME_IN_URL = 'route_choice'
     PLAYERS_PER_GROUP = None
-    NUM_ROUNDS = 1
+    NUM_ROUNDS = 10
 
     # Route A: free-flow faster but congestion-sensitive.
     TIME_A_FREE = 10

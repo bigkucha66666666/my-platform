@@ -1,0 +1,65 @@
+:root {
+	--blue-100: #eef4ff;
+	--blue-200: #dbe8ff;
+	--blue-600: #1f5fcc;
+	--text-main: #1e2a3a;
+	--text-sub: #5a6b82;
+	--card-bg: #f9fbff;
+}
+
+body {
+	color: var(--text-main);
+}
+
+.card-lite {
+	border: 1px solid var(--blue-200);
+	background: var(--card-bg);
+	border-radius: 12px;
+	padding: 14px;
+	margin-bottom: 12px;
+}
+
+.hint-lite {
+	border-left: 3px solid var(--blue-600);
+	background: var(--blue-100);
+	color: var(--text-sub);
+	border-radius: 8px;
+	padding: 10px 12px;
+	margin-bottom: 12px;
+}
+
+.text-main {
+	font-size: 16px;
+	margin-bottom: 6px;
+}
+
+.text-sub {
+	font-size: 14px;
+	color: var(--text-sub);
+}
+
+.stats-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.stat-card {
+	border: 1px solid var(--blue-200);
+	border-radius: 10px;
+	background: #ffffff;
+	padding: 10px 12px;
+}
+
+.stat-key {
+	font-size: 13px;
+	color: var(--text-sub);
+}
+
+.stat-value {
+	font-size: 20px;
+	line-height: 1.2;
+	color: var(--blue-600);
+	font-weight: 700;
+}

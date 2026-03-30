@@ -1,0 +1,18 @@
+{{ block title }}
+    交通拥堵选择
+{{ endblock }}
+
+{{ block content }}
+    <div class="card-lite">
+        <p class="text-main">你需要前往同一目的地，请在两条路线中选择一条。</p>
+        <p class="text-sub">选择人数越多的路线会更拥堵，通行时间会增加。</p>
+    </div>
+
+    <div class="hint-lite">
+        收益 = 基础分 - 时间成本 - 过路费用
+    </div>
+
+    {{ formfields }}
+
+    {{ next_button }}
+{{ endblock }}

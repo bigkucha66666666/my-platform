@@ -5,13 +5,13 @@ SESSION_CONFIGS = [
     dict(
         name='route_choice_live',
         display_name="交通拥堵分析实验（正式场次）",
-        app_sequence=['route_choice'],
+        app_sequence=['route_choice', 'payment_info'],
         num_demo_participants=1,
     ),
     dict(
         name='route_choice_experiment',
         display_name="交通拥堵分析实验（演示场次）",
-        app_sequence=['route_choice'],
+        app_sequence=['route_choice', 'payment_info'],
         num_demo_participants=1,
     ),
 ]

@@ -90,6 +90,11 @@ class Results(Page):
         travel_time_if_a = route_time('A', player.route_a_count, player.route_b_count)
         travel_time_if_b = route_time('B', player.route_a_count, player.route_b_count)
 
+        # Save final cumulative reward after round 10 for payment page display.
+        if player.round_number == C.NUM_ROUNDS:
+            total_payoff = sum(p.payoff for p in player.in_all_rounds())
+            player.participant.vars['route_choice_total_payoff'] = total_payoff
+
         return dict(
             total_players=total_players,
             route_a_count=player.route_a_count,

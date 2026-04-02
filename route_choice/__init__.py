@@ -1,4 +1,5 @@
 from otree.api import *
+import random
 
 doc = """
 一个极简的交通拥堵分析 demo。
@@ -69,8 +70,14 @@ def set_results(subsession: Subsession):
 
 
 class MyPage(Page):
+    timeout_seconds = 30
     form_model = 'player'
     form_fields = ['route']
+
+    @staticmethod
+    def before_next_page(player: Player, timeout_happened):
+        if timeout_happened and not player.route:
+            player.route = random.choice(['A', 'B'])
 
 
 class ResultsWaitPage(WaitPage):

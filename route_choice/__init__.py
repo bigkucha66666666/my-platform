@@ -21,7 +21,7 @@ class C(BaseConstants):
 
     # Utility/points model.
     BASE_POINTS = 140
-    TIME_COST = 3
+    TIME_COST = 2
     TOLL_A = 8
     TOLL_B = 2
 
@@ -47,22 +47,31 @@ class Player(BasePlayer):
     my_route_count = models.IntegerField(initial=0)
 
 
-def route_time(route: str, route_a_count: int, route_b_count: int) -> int:
+def route_time(route: str, route_a_count: int, route_b_count: int, total_players: int) -> int:
+    route_count = route_a_count if route == 'A' else route_b_count
+    safe_total = max(total_players, 1)
+    congestion_ratio = route_count / safe_total
+    effective_load = route_count * (1 + congestion_ratio)
+
     if route == 'A':
-        return C.TIME_A_FREE + C.TIME_A_CONGESTION * route_a_count
-    return C.TIME_B_FREE + C.TIME_B_CONGESTION * route_b_count
+        time_value = C.TIME_A_FREE + C.TIME_A_CONGESTION * effective_load
+    else:
+        time_value = C.TIME_B_FREE + C.TIME_B_CONGESTION * effective_load
+
+    return int(round(time_value))
 
 
 def set_results(subsession: Subsession):
     players = subsession.get_players()
     route_a_count = sum(p.route == 'A' for p in players)
     route_b_count = sum(p.route == 'B' for p in players)
+    total_players = route_a_count + route_b_count
 
     for p in players:
         p.route_a_count = route_a_count
         p.route_b_count = route_b_count
         p.my_route_count = route_a_count if p.route == 'A' else route_b_count
-        p.travel_time = route_time(p.route, route_a_count, route_b_count)
+        p.travel_time = route_time(p.route, route_a_count, route_b_count, total_players)
 
         toll = C.TOLL_A if p.route == 'A' else C.TOLL_B
         points = C.BASE_POINTS - C.TIME_COST * p.travel_time - toll
@@ -94,8 +103,8 @@ class Results(Page):
         if total_players > 0:
             congestion_ratio = round(player.my_route_count / total_players * 100)
 
-        travel_time_if_a = route_time('A', player.route_a_count, player.route_b_count)
-        travel_time_if_b = route_time('B', player.route_a_count, player.route_b_count)
+        travel_time_if_a = route_time('A', player.route_a_count, player.route_b_count, total_players)
+        travel_time_if_b = route_time('B', player.route_a_count, player.route_b_count, total_players)
 
         # Save final cumulative reward after round 10 for payment page display.
         if player.round_number == C.NUM_ROUNDS:

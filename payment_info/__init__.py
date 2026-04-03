@@ -30,13 +30,6 @@ class Player(BasePlayer):
 # PAGES
 class PaymentInfo(Page):
     @staticmethod
-    def before_next_page(player: Player, timeout_happened):
-        participant = player.participant
-        player.final_total_payoff = participant.vars.get(
-            'route_choice_total_payoff', participant.payoff
-        )
-
-    @staticmethod
     def vars_for_template(player: Player):
         participant = player.participant
         total_payoff = participant.vars.get('route_choice_total_payoff', participant.payoff)

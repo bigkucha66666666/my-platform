@@ -5,6 +5,13 @@
 {{ block content }}
     <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮结果</p>
 
+    <div class="card-lite">
+        <p>我的路线：<b>{{ route_label }}</b></p>
+        <p>我的通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
+        <p>我的收益：<b>{{ my_payoff }}</b></p>
+        <p>同路线人数：<b>{{ my_route_count }}</b>（{{ congestion_ratio }}%）</p>
+    </div>
+
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-key">总参与人数</div>
@@ -18,13 +25,6 @@
             <div class="stat-key">路线 B 人数</div>
             <div class="stat-value">{{ route_b_count }}</div>
         </div>
-    </div>
-
-    <div class="card-lite">
-        <p>我的路线：<b>{{ route_label }}</b></p>
-        <p>同路线人数：<b>{{ my_route_count }}</b>（{{ congestion_ratio }}%）</p>
-        <p>我的通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
-        <p>我的收益：<b>{{ my_payoff }}</b></p>
     </div>
 
     <div class="hint-lite">

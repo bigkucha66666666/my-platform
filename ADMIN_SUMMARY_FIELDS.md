@@ -45,3 +45,19 @@
 1. 以 final_total_payoff 作为最终发放依据。
 2. 先导出并冻结一份原始数据，再生成发放表。
 3. 保留 participant_label、participant_code、final_total_payoff 三列用于审计留痕。
+
+## 五、正式/演示分层运营规则
+
+1. 正式运营会话
+- 会话名称: route_choice_prod
+- 房间名称: prod_room（标签登录）
+- 数据用途: 可用于奖励结算和正式归档
+
+2. 演示测试会话
+- 会话名称: route_choice_demo
+- 房间名称: demo_room（无需标签）
+- 数据用途: 仅用于流程测试，不用于奖励发放
+
+3. 防混用检查
+- 导出前先按 session config 名称筛选，只保留 route_choice_prod。
+- 发放表中禁止混入 route_choice_demo 数据。

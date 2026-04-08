@@ -3,16 +3,18 @@ from os import environ
 
 SESSION_CONFIGS = [
     dict(
-        name='route_choice_live',
-        display_name="交通拥堵分析实验（正式场次）",
+        name='route_choice_prod',
+        display_name="交通拥堵分析实验（正式运营）",
         app_sequence=['route_choice', 'payment_info'],
+        doc='正式场次：用于真实被试与奖励发放。',
         num_demo_participants=1,
     ),
     dict(
-        name='route_choice_experiment',
-        display_name="交通拥堵分析实验（演示场次）",
-        app_sequence=['route_choice', 'payment_info'],
-        num_demo_participants=1,
+        name='route_choice_demo',
+        display_name="交通拥堵分析实验（演示测试）",
+        app_sequence=['route_choice'],
+        doc='演示场次：仅用于测试流程，不用于奖励发放。',
+        num_demo_participants=3,
     ),
 ]
 
@@ -38,11 +40,11 @@ USE_POINTS = True
 
 ROOMS = [
     dict(
-        name='econ101',
-        display_name='实验室房间（标签登录）',
+        name='prod_room',
+        display_name='正式房间（标签登录，P001-P050）',
         participant_label_file='_rooms/econ101.txt',
     ),
-    dict(name='live_demo', display_name='演示房间（无需标签）'),
+    dict(name='demo_room', display_name='演示房间（无需标签）'),
 ]
 
 ADMIN_USERNAME = 'admin'
@@ -50,7 +52,8 @@ ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = environ.get('OTREE_ADMIN_PASSWORD')
 
 DEMO_PAGE_INTRO_HTML = """
-请选择正式场次 route_choice_live，并通过房间标签进入。
+正式运营：请选择 route_choice_prod，并使用 prod_room（标签登录）。
+演示测试：请选择 route_choice_demo，并使用 demo_room（无需标签）。
 """
 
 

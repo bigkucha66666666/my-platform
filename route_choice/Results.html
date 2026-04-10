@@ -1,17 +1,19 @@
 {{ block title }}
-    结果汇总
+    本轮结果汇总
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮结果</p>
+    <p class="text-sub">当前是第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请先查看本轮结果，再继续实验。</p>
 
     <div class="card-lite">
-        <p>我的路线：<b>{{ route_label }}</b></p>
-        <p>我的通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
-        <p>我的收益：<b>{{ my_payoff }}</b></p>
-        <p>同路线人数：<b>{{ my_route_count }}</b>（{{ congestion_ratio }}%）</p>
+        <p><b>你的个人结果</b></p>
+        <p>你本轮选择的路线：<b>{{ route_label }}</b></p>
+        <p>你本轮预计通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
+        <p>与你选择同一路线的人数：<b>{{ my_route_count }}</b>（占总人数 {{ congestion_ratio }}%）</p>
+        <p>你本轮获得的积分奖励：<b>{{ my_payoff }}</b></p>
     </div>
 
+    <p class="text-sub">本轮整体交通情况如下：</p>
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-key">总参与人数</div>
@@ -28,10 +30,16 @@
     </div>
 
     <div class="hint-lite">
-        对比：若选路线 A 为 {{ travel_time_if_a }} 分钟，若选路线 B 为 {{ travel_time_if_b }} 分钟。
+        路线对比参考：在当前拥堵状态下，若选择路线 A，预计为 {{ travel_time_if_a }} 分钟；若选择路线 B，预计为 {{ travel_time_if_b }} 分钟。
     </div>
 
-    <p class="text-sub">本轮结束，感谢参与。</p>
+    {{ if player.round_number < C.NUM_ROUNDS }}
+        <p class="text-sub">本轮已结束。点击下方“下一轮”按钮进入下一轮决策。</p>
+        <button class="otree-btn-next btn btn-primary">下一轮</button>
+    {{ else }}
+        <p class="text-sub">你已完成全部轮次。点击下方按钮进入奖励结算页面。</p>
+        <button class="otree-btn-next btn btn-primary">查看最终奖励</button>
+    {{ endif }}
 {{ endblock }}
 
 

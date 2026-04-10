@@ -3,7 +3,7 @@
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮</p>
+    <p class="text-sub">当前是第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请先选择路线并提交本轮决策。</p>
 
     <div class="card-lite">
         <p class="text-main">你需要前往同一目的地，请在两条路线中选择一条。</p>
@@ -14,9 +14,9 @@
         收益 = 基础分 - 时间成本 - 过路费用
     </div>
 
-    <p class="text-sub">请在 30 秒内完成选择；超时将自动随机分配路线（A/B 各 50%）。</p>
+    <p class="text-sub">请在 30 秒内完成选择；若超时未选择，系统将自动随机分配路线（A/B 各 50%）。</p>
 
     {{ formfields }}
 
-    {{ next_button }}
+    <button class="otree-btn-next btn btn-primary">确认本轮选择</button>
 {{ endblock }}

@@ -1,43 +1,43 @@
 {{ block title }}
-    本轮结果汇总
+    📊 本轮结果
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">当前是第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请先查看本轮结果，再继续实验。</p>
+    <p class="text-sub">🧭 第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮已完成，看看你这轮的表现吧。</p>
 
     <div class="card-lite">
-        <p><b>你的个人结果</b></p>
-        <p>你本轮选择的路线：<b>{{ route_label }}</b></p>
-        <p>你本轮预计通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
-        <p>与你选择同一路线的人数：<b>{{ my_route_count }}</b>（占总人数 {{ congestion_ratio }}%）</p>
-        <p>你本轮获得的积分奖励：<b>{{ my_payoff }}</b></p>
+        <p><b>🙋 你的本轮表现</b></p>
+        <p>🛣 本轮路线：<b>{{ route_label }}</b></p>
+        <p>⏱ 通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
+        <p>👥 同路线人数：<b>{{ my_route_count }}</b>（占总人数 {{ congestion_ratio }}%）</p>
+        <p>🏅 本轮积分：<b>{{ my_payoff }}</b></p>
     </div>
 
-    <p class="text-sub">本轮整体交通情况如下：</p>
+    <p class="text-sub">🌐 本轮整体路况快照：</p>
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-key">总参与人数</div>
+            <div class="stat-key">👤 总参与人数</div>
             <div class="stat-value">{{ total_players }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-key">路线 A 人数</div>
+            <div class="stat-key">🅰 路线 A 人数</div>
             <div class="stat-value">{{ route_a_count }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-key">路线 B 人数</div>
+            <div class="stat-key">🅱 路线 B 人数</div>
             <div class="stat-value">{{ route_b_count }}</div>
         </div>
     </div>
 
     <div class="hint-lite">
-        路线对比参考：在当前拥堵状态下，若选择路线 A，预计为 {{ travel_time_if_a }} 分钟；若选择路线 B，预计为 {{ travel_time_if_b }} 分钟。
+        📌 路线参考：在当前拥堵状态下，选择路线 A 预计 {{ travel_time_if_a }} 分钟，选择路线 B 预计 {{ travel_time_if_b }} 分钟。
     </div>
 
     {{ if player.round_number < C.NUM_ROUNDS }}
-        <p class="text-sub">本轮已结束。点击下方“下一轮”按钮进入下一轮决策。</p>
+        <p class="text-sub">✅ 本轮结束，点击“下一轮”继续挑战。</p>
         <button class="otree-btn-next btn btn-primary">下一轮</button>
     {{ else }}
-        <p class="text-sub">你已完成全部轮次。点击下方按钮进入奖励结算页面。</p>
+        <p class="text-sub">🎉 你已完成全部轮次，点击下方按钮查看最终奖励。</p>
         <button class="otree-btn-next btn btn-primary">查看最终奖励</button>
     {{ endif }}
 {{ endblock }}

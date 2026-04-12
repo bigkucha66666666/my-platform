@@ -61,3 +61,46 @@
 3. 防混用检查
 - 导出前先按 session config 名称筛选，只保留 route_choice_prod。
 - 发放表中禁止混入 route_choice_demo 数据。
+
+## 六、新的数据获取方式（按 Session 分层导出）
+
+你现在可以在 oTree 的 Data 页面使用 route_choice 的自定义导出，直接获得“按 session 分层”的统一数据。
+
+1. 导出步骤
+- 进入 Data 页面，选择 route_choice 应用。
+- 使用 Custom Export（自定义导出）。
+- 下载后按 `session_config_name` 或 `data_tier` 过滤。
+
+2. 新增分层字段
+- session_config_name: 会话配置名（route_choice_prod / route_choice_demo）。
+- data_tier: 运营分层标签（prod / demo / other）。
+
+3. 导出内容范围
+- route_choice 每轮行为字段（round_number、route、travel_time、route_a_count、route_b_count、payoff）。
+- 最终奖励字段 final_total_payoff（来自参与者累计奖励）。
+
+4. 推荐使用方式
+- 发放时只保留 `session_config_name = route_choice_prod` 或 `data_tier = prod`。
+- 演示数据（demo）仅用于测试，不用于发放。
+
+## 七、密码保护与安全配置
+
+当前项目已启用分层密码保护：
+
+1. 管理员后台保护
+- `OTREE_ADMIN_PASSWORD`: 管理员后台密码（必须设置）。
+- `OTREE_AUTH_LEVEL`: 建议设为 `STUDY`。
+
+2. 正式参与者入口口令
+- `OTREE_PROD_PARTICIPANT_PASSWORD`: 正式会话统一实验口令。
+- 正式会话会先进入 access_gate 验证页面，通过后才能进入 route_choice。
+
+3. 演示会话策略
+- 演示会话保持开放，不要求统一口令，便于测试和课堂演示。
+
+4. 密钥管理
+- `OTREE_SECRET_KEY` 必须在部署环境中设置，不应使用默认开发值。
+
+5. 运维建议
+- 每次正式实验前更换一次 `OTREE_PROD_PARTICIPANT_PASSWORD`。
+- 实验结束后可立即轮换口令，防止旧链接被重复访问。

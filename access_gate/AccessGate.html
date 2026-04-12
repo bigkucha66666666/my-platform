@@ -1,0 +1,14 @@
+{{ block title }}
+    正式实验入口验证
+{{ endblock }}
+
+{{ block content }}
+    <div class="card-lite">
+        <p class="text-main">为保证正式实验安全，请先输入统一实验口令。</p>
+        <p class="text-sub">口令验证通过后，系统将自动进入实验页面。</p>
+    </div>
+
+    {{ formfields }}
+
+    <button class="otree-btn-next btn btn-primary">验证并进入实验</button>
+{{ endblock }}

@@ -78,10 +78,20 @@ def set_results(subsession: Subsession):
         p.payoff = cu(max(0, points))
 
 
+def access_allowed(player: Player):
+    if player.session.config.get('name') != 'route_choice_prod':
+        return True
+    return bool(player.participant.vars.get('access_granted', False))
+
+
 class MyPage(Page):
     timeout_seconds = 30
     form_model = 'player'
     form_fields = ['route']
+
+    @staticmethod
+    def is_displayed(player: Player):
+        return access_allowed(player)
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
@@ -93,8 +103,16 @@ class ResultsWaitPage(WaitPage):
     wait_for_all_groups = True
     after_all_players_arrive = set_results
 
+    @staticmethod
+    def is_displayed(player: Player):
+        return access_allowed(player)
+
 
 class Results(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return access_allowed(player)
+
     @staticmethod
     def vars_for_template(player: Player):
         total_players = player.route_a_count + player.route_b_count
@@ -123,6 +141,52 @@ class Results(Page):
             travel_time_if_b=travel_time_if_b,
             my_payoff=player.payoff,
         )
+
+
+def custom_export(players):
+    yield [
+        'session_code',
+        'session_config_name',
+        'data_tier',
+        'participant_code',
+        'participant_label',
+        'round_number',
+        'route',
+        'travel_time',
+        'route_a_count',
+        'route_b_count',
+        'my_route_count',
+        'payoff',
+        'final_total_payoff',
+    ]
+
+    for p in players:
+        session_config_name = p.session.config.get('name', '')
+        if session_config_name == 'route_choice_prod':
+            data_tier = 'prod'
+        elif session_config_name == 'route_choice_demo':
+            data_tier = 'demo'
+        else:
+            data_tier = 'other'
+
+        participant = p.participant
+        final_total_payoff = participant.vars.get('route_choice_total_payoff', '')
+
+        yield [
+            p.session.code,
+            session_config_name,
+            data_tier,
+            participant.code,
+            participant.label,
+            p.round_number,
+            p.route,
+            p.travel_time,
+            p.route_a_count,
+            p.route_b_count,
+            p.my_route_count,
+            p.payoff,
+            final_total_payoff,
+        ]
 
 
 page_sequence = [MyPage, ResultsWaitPage, Results]

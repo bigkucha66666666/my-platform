@@ -33,6 +33,8 @@
         📌 路线参考：在当前拥堵状态下，选择路线 A 预计 {{ travel_time_if_a }} 分钟，选择路线 B 预计 {{ travel_time_if_b }} 分钟。
     </div>
 
+    <p class="text-sub">⏭ 该页面会在 {{ auto_advance_seconds }} 秒后自动继续。</p>
+
     {{ if player.round_number < C.NUM_ROUNDS }}
         <p class="text-sub">✅ 本轮结束，点击“下一轮”继续挑战。</p>
         <button class="otree-btn-next btn btn-primary">下一轮</button>

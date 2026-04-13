@@ -29,6 +29,7 @@ SESSION_CONFIGS = [
         app_sequence=['access_gate', 'route_choice', 'payment_info'],
         doc='正式场次：用于真实被试与奖励发放。',
         participant_password=PROD_PARTICIPANT_PASSWORD,
+        cohort_size=5,
         num_demo_participants=1,
     ),
     dict(
@@ -36,6 +37,7 @@ SESSION_CONFIGS = [
         display_name="交通拥堵分析实验（演示测试）",
         app_sequence=['route_choice'],
         doc='演示场次：仅用于测试流程，不用于奖励发放。',
+        cohort_size=3,
         num_demo_participants=3,
     ),
 ]
@@ -49,7 +51,7 @@ SESSION_CONFIG_DEFAULTS = dict(
     real_world_currency_per_point=1.00, participation_fee=0.00, doc=""
 )
 
-PARTICIPANT_FIELDS = []
+PARTICIPANT_FIELDS = ['is_dropout', 'finished']
 SESSION_FIELDS = []
 
 # ISO-639 code

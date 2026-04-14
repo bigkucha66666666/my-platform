@@ -7,6 +7,11 @@
 - participant_label: 参与者标签（例如 P001-P050），用于和发放名单对齐。
 - participant_code: 系统参与者唯一编码，作为兜底唯一标识。
 - session_code: 会话标识，用于区分不同实验批次。
+- grouping_enabled: 是否启用手动分组（0/1）。
+- manual_grouping_spec: 创建 session 时填写的手动分组配置。
+- assigned_group_id: 参与者所属分组编号（如 1、2、3）。
+- assigned_group_label: 参与者所属分组标签（如 G01、G02）。
+- assigned_group_members: 该参与者所在组的成员标签串。
 - round_number: 轮次编号（1-10）。
 - route: 本轮路线选择（A 或 B）。
 - travel_time: 本轮通行时间。
@@ -20,6 +25,7 @@
 1. 身份核对
 - 先用 participant_label 作为主键。
 - 如果标签缺失或重复，使用 participant_code 进行二次核对。
+- 如需核对手动分组是否生效，可结合 assigned_group_label 与 assigned_group_members 检查。
 
 2. 过程核对
 - 按 participant_label + round_number 排序。
@@ -35,6 +41,8 @@
   - my_platform/route_choice/__init__.py
 - 10轮累计奖励写入 participant.vars：
   - my_platform/route_choice/__init__.py
+- 手动分组解析、校验与分组元数据写入：
+  - my_platform/route_choice/__init__.py
 - 最终奖励字段 final_total_payoff（可导出）：
   - my_platform/payment_info/__init__.py
 - 最终奖励展示页面：
@@ -44,14 +52,16 @@
 
 1. 以 final_total_payoff 作为最终发放依据。
 2. 先导出并冻结一份原始数据，再生成发放表。
-3. 保留 participant_label、participant_code、final_total_payoff 三列用于审计留痕。
+3. 保留 participant_label、participant_code、assigned_group_label、final_total_payoff 四列用于审计留痕。
 
 ## 五、正式/演示分层运营规则
 
 1. 正式运营会话
 - 会话名称: route_choice_prod
-- 房间名称: prod_room（标签登录）
+- 房间名称: prod_room（标签分配 + 安全链接）
 - 数据用途: 可用于奖励结算和正式归档
+- 进入方式: 必须使用系统生成的安全链接进入，不要手动拼接或修改 URL 中的参与者标识
+- 可选能力: 支持在创建 session 时启用手动分组，并按 participant_label 精确指定组成员
 
 2. 演示测试会话
 - 会话名称: route_choice_demo
@@ -70,20 +80,51 @@
 - 进入 Data 页面，选择 route_choice 应用。
 - 使用 Custom Export（自定义导出）。
 - 下载后按 `session_config_name` 或 `data_tier` 过滤。
+- 如启用了手动分组，可继续按 `assigned_group_label` 或 `grouping_enabled` 过滤。
 
 2. 新增分层字段
 - session_config_name: 会话配置名（route_choice_prod / route_choice_demo）。
 - data_tier: 运营分层标签（prod / demo / other）。
+- grouping_enabled: 是否启用手动分组。
+- manual_grouping_spec: 创建 session 时填写的原始分组配置。
+- assigned_group_id / assigned_group_label / assigned_group_members: 参与者所属分组信息。
 
 3. 导出内容范围
 - route_choice 每轮行为字段（round_number、route、travel_time、route_a_count、route_b_count、payoff）。
 - 最终奖励字段 final_total_payoff（来自参与者累计奖励）。
+- 分组字段（grouping_enabled、manual_grouping_spec、assigned_group_id、assigned_group_label、assigned_group_members）。
 
 4. 推荐使用方式
 - 发放时只保留 `session_config_name = route_choice_prod` 或 `data_tier = prod`。
 - 演示数据（demo）仅用于测试，不用于发放。
+- 如果正式场次启用了手动分组，建议先按 `assigned_group_label` 抽样核对 1-2 组，再进入正式分析。
 
-## 七、密码保护与安全配置
+## 七、创建 Session 时的手动分组填写说明
+
+在 `route_choice_prod` 创建 session 时，可通过以下两个字段控制手动分组：
+
+1. `grouping_enabled`
+- `0`：关闭手动分组，系统按默认 `cohort_size` 自动切组。
+- `1`：启用手动分组，必须同时填写 `manual_grouping_spec`。
+
+2. `manual_grouping_spec`
+- 组之间使用 `|` 分隔。
+- 组内成员使用 `,` 分隔。
+- 成员标识必须使用 `participant_label`。
+- 示例：`P001,P003|P002,P004|P005`
+
+3. 校验规则
+- 不允许空配置。
+- 不允许重复标签。
+- 不允许未知标签。
+- 不允许漏掉任何正式房间中的参与者标签。
+- 若填写不合法，session 创建阶段会直接报错并阻止开始。
+
+4. 适用范围
+- 手动分组仅支持 `route_choice_prod`。
+- `route_choice_demo` 不支持按 `participant_label` 手动分组。
+
+## 八、密码保护与安全配置
 
 当前项目已启用分层密码保护：
 
@@ -93,7 +134,7 @@
 
 2. 正式参与者入口口令
 - `OTREE_PROD_PARTICIPANT_PASSWORD`: 正式会话统一实验口令。
-- 正式会话会先进入 access_gate 验证页面，通过后才能进入 route_choice。
+- 正式会话应通过 `prod_room` 生成的安全链接进入，并先进入 access_gate 验证页面，通过后才能进入 route_choice。
 
 3. 演示会话策略
 - 演示会话保持开放，不要求统一口令，便于测试和课堂演示。

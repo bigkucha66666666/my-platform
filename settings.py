@@ -27,9 +27,17 @@ SESSION_CONFIGS = [
         name='route_choice_prod',
         display_name="交通拥堵分析实验（正式运营）",
         app_sequence=['access_gate', 'route_choice', 'payment_info'],
-        doc='正式场次：用于真实被试与奖励发放。',
+        doc=(
+            "正式场次：用于真实被试与奖励发放。\n"
+            "可选参数：\n"
+            "- grouping_enabled：0=关闭手动分组，1=启用手动分组\n"
+            "- manual_grouping_spec：按 participant_label 精确分组，"
+            "格式如 P001,P003|P002,P004|P005"
+        ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
         cohort_size=5,
+        grouping_enabled=0,
+        manual_grouping_spec='',
         num_demo_participants=1,
     ),
     dict(
@@ -38,6 +46,8 @@ SESSION_CONFIGS = [
         app_sequence=['route_choice'],
         doc='演示场次：仅用于测试流程，不用于奖励发放。',
         cohort_size=3,
+        grouping_enabled=0,
+        manual_grouping_spec='',
         num_demo_participants=3,
     ),
 ]
@@ -48,7 +58,11 @@ SESSION_CONFIGS = [
 # e.g. self.session.config['participation_fee']
 
 SESSION_CONFIG_DEFAULTS = dict(
-    real_world_currency_per_point=1.00, participation_fee=0.00, doc=""
+    real_world_currency_per_point=1.00,
+    participation_fee=0.00,
+    doc="",
+    grouping_enabled=0,
+    manual_grouping_spec="",
 )
 
 PARTICIPANT_FIELDS = ['is_dropout', 'finished']
@@ -67,6 +81,7 @@ ROOMS = [
         name='prod_room',
         display_name='正式房间（标签登录，P001-P050）',
         participant_label_file='_rooms/econ101.txt',
+        use_secure_urls=True,
     ),
     dict(name='demo_room', display_name='演示房间（无需标签）'),
 ]
@@ -77,7 +92,7 @@ ADMIN_PASSWORD = environ.get('OTREE_ADMIN_PASSWORD')
 AUTH_LEVEL = environ.get('OTREE_AUTH_LEVEL', 'STUDY')
 
 DEMO_PAGE_INTRO_HTML = """
-正式运营：请选择 route_choice_prod，并使用 prod_room（标签登录）。
+正式运营：请选择 route_choice_prod，并使用 prod_room（安全链接进入）。
 演示测试：请选择 route_choice_demo，并使用 demo_room（无需标签）。
 """
 

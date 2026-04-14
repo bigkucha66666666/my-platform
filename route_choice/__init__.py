@@ -50,18 +50,131 @@ class Player(BasePlayer):
     my_route_count = models.IntegerField(initial=0)
 
 
+def config_flag(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return False
+
+
+def participant_display_label(player: Player) -> str:
+    return player.participant.label or player.participant.code
+
+
+def build_auto_group_matrix(players, cohort_size: int):
+    return [
+        players[index:index + cohort_size]
+        for index in range(0, len(players), cohort_size)
+    ]
+
+
+def parse_manual_grouping_spec(spec: str):
+    raw_spec = (spec or '').strip()
+    if not raw_spec:
+        raise ValueError(
+            '启用手动分组时，manual_grouping_spec 不能为空。示例：P001,P003|P002,P004|P005'
+        )
+
+    groups = []
+    for raw_group in raw_spec.split('|'):
+        raw_labels = [label.strip() for label in raw_group.split(',')]
+        if any(not label for label in raw_labels):
+            raise ValueError(
+                'manual_grouping_spec 中存在空标签。请使用格式：P001,P003|P002,P004|P005'
+            )
+        group_labels = raw_labels
+        if not group_labels:
+            raise ValueError(
+                'manual_grouping_spec 存在空分组。请使用格式：P001,P003|P002,P004|P005'
+            )
+        groups.append(group_labels)
+    return groups
+
+
+def validate_manual_groups(players, manual_groups, session_name: str):
+    if session_name != 'route_choice_prod':
+        raise ValueError('仅正式场次 route_choice_prod 支持按 participant_label 手动分组。')
+
+    available_labels = []
+    label_to_player = {}
+    missing_labels = []
+    for player in players:
+        label = player.participant.label
+        if not label:
+            missing_labels.append(player.participant.code)
+            continue
+        if label in label_to_player:
+            raise ValueError(f'participant_label 重复：{label}。请检查房间标签配置。')
+        available_labels.append(label)
+        label_to_player[label] = player
+
+    if missing_labels:
+        raise ValueError(
+            '检测到缺少 participant_label 的参与者，无法执行手动分组：'
+            + ', '.join(missing_labels)
+        )
+
+    configured_labels = [label for group_labels in manual_groups for label in group_labels]
+    duplicate_labels = sorted({label for label in configured_labels if configured_labels.count(label) > 1})
+    if duplicate_labels:
+        raise ValueError(
+            'manual_grouping_spec 中存在重复标签：' + ', '.join(duplicate_labels)
+        )
+
+    unknown_labels = sorted(set(configured_labels) - set(available_labels))
+    if unknown_labels:
+        raise ValueError(
+            'manual_grouping_spec 中存在未知标签：' + ', '.join(unknown_labels)
+        )
+
+    missing_configured = sorted(set(available_labels) - set(configured_labels))
+    if missing_configured:
+        raise ValueError(
+            'manual_grouping_spec 漏掉了以下标签：' + ', '.join(missing_configured)
+        )
+
+    return label_to_player
+
+
+def build_manual_group_matrix(players, spec: str, session_name: str):
+    manual_groups = parse_manual_grouping_spec(spec)
+    label_to_player = validate_manual_groups(players, manual_groups, session_name)
+    return [[label_to_player[label] for label in group_labels] for group_labels in manual_groups]
+
+
+def assign_group_metadata(matrix, grouping_enabled: bool):
+    for group_index, group_players in enumerate(matrix, start=1):
+        member_labels = ','.join(participant_display_label(player) for player in group_players)
+        group_label = f'G{group_index:02d}'
+        for player in group_players:
+            participant = player.participant
+            participant.vars['grouping_enabled'] = grouping_enabled
+            participant.vars['assigned_group_id'] = group_index
+            participant.vars['assigned_group_label'] = group_label
+            participant.vars['assigned_group_members'] = member_labels
+
+
 def creating_session(subsession: Subsession):
     if subsession.round_number == 1:
         players = subsession.get_players()
         for player in players:
             player.participant.is_dropout = False
             player.participant.finished = False
-        cohort_size = max(1, int(subsession.session.config.get('cohort_size', len(players) or 1)))
-        matrix = [
-            players[index:index + cohort_size]
-            for index in range(0, len(players), cohort_size)
-        ]
+        session_name = subsession.session.config.get('name', '')
+        grouping_enabled = config_flag(subsession.session.config.get('grouping_enabled', 0))
+        manual_grouping_spec = subsession.session.config.get('manual_grouping_spec', '')
+        if session_name != 'route_choice_prod' and (grouping_enabled or manual_grouping_spec.strip()):
+            raise ValueError('仅正式场次 route_choice_prod 支持配置 participant_label 手动分组。')
+        if grouping_enabled:
+            matrix = build_manual_group_matrix(players, manual_grouping_spec, session_name)
+        else:
+            cohort_size = max(1, int(subsession.session.config.get('cohort_size', len(players) or 1)))
+            matrix = build_auto_group_matrix(players, cohort_size)
         subsession.set_group_matrix(matrix)
+        assign_group_metadata(matrix, grouping_enabled)
     else:
         subsession.group_like_round(1)
 
@@ -191,6 +304,11 @@ def custom_export(players):
         'session_code',
         'session_config_name',
         'data_tier',
+        'grouping_enabled',
+        'manual_grouping_spec',
+        'assigned_group_id',
+        'assigned_group_label',
+        'assigned_group_members',
         'participant_code',
         'participant_label',
         'round_number',
@@ -207,6 +325,8 @@ def custom_export(players):
 
     for p in players:
         session_config_name = p.session.config.get('name', '')
+        grouping_enabled = config_flag(p.session.config.get('grouping_enabled', 0))
+        manual_grouping_spec = p.session.config.get('manual_grouping_spec', '')
         if session_config_name == 'route_choice_prod':
             data_tier = 'prod'
         elif session_config_name == 'route_choice_demo':
@@ -218,11 +338,19 @@ def custom_export(players):
         final_total_payoff = participant.vars.get('route_choice_total_payoff', '')
         is_dropout = getattr(participant, 'is_dropout', False)
         finished = getattr(participant, 'finished', False)
+        assigned_group_id = participant.vars.get('assigned_group_id', '')
+        assigned_group_label = participant.vars.get('assigned_group_label', '')
+        assigned_group_members = participant.vars.get('assigned_group_members', '')
 
         yield [
             p.session.code,
             session_config_name,
             data_tier,
+            grouping_enabled,
+            manual_grouping_spec,
+            assigned_group_id,
+            assigned_group_label,
+            assigned_group_members,
             participant.code,
             participant.label,
             p.round_number,

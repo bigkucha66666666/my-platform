@@ -1,0 +1,240 @@
+<h3>route_choice Session 数据查看</h3>
+<style>
+  .report-controls,
+  .report-summary,
+  .report-empty,
+  .report-alert {
+    margin-bottom: 16px;
+  }
+  .report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .report-card {
+    border: 1px solid #d9d9d9;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+  }
+  .report-card-key {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+  }
+  .report-card-value {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .report-table-wrap {
+    overflow-x: auto;
+  }
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .report-table th,
+  .report-table td {
+    border: 1px solid #ddd;
+    padding: 6px 8px;
+    white-space: nowrap;
+    text-align: left;
+  }
+  .report-table thead {
+    background: #f7f7f7;
+  }
+</style>
+
+<div class="report-controls">
+  <label for="session-select"><b>选择 Session：</b></label>
+  <select id="session-select">
+    {{ for option in session_options }}
+      <option value="{{ option.session_code }}" {{ if option.session_code == default_session_code }}selected{{ endif }}>{{ option.label }}</option>
+    {{ endfor }}
+  </select>
+  <button type="button" class="btn btn-primary" id="export-session-csv">导出当前 Session CSV</button>
+</div>
+
+<div id="report-alert" class="alert alert-warning report-alert" style="display:none;"></div>
+<div id="report-empty" class="alert alert-info report-empty" style="display:none;">当前没有可显示的 route_choice session 数据。</div>
+
+<div id="report-content" style="display:none;">
+  <div class="report-summary">
+    <div class="report-summary-grid">
+      <div class="report-card">
+        <div class="report-card-key">Session Code</div>
+        <div class="report-card-value" id="summary-session-code"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">Session Config</div>
+        <div class="report-card-value" id="summary-session-config"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">数据层级</div>
+        <div class="report-card-value" id="summary-data-tier"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">总记录数</div>
+        <div class="report-card-value" id="summary-total-records"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">参与者数</div>
+        <div class="report-card-value" id="summary-participant-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">完成人数</div>
+        <div class="report-card-value" id="summary-finished-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">Dropout 人数</div>
+        <div class="report-card-value" id="summary-dropout-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">轮次数</div>
+        <div class="report-card-value" id="summary-round-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">分组状态</div>
+        <div class="report-card-value" id="summary-grouping-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="report-table-wrap">
+    <table class="report-table" id="session-data-table">
+      <thead>
+        <tr>
+          {{ for header in export_headers }}
+            <th>{{ header }}</th>
+          {{ endfor }}
+        </tr>
+      </thead>
+      <tbody id="session-data-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script id="export-headers-data" type="application/json">{{ export_headers_json|safe }}</script>
+<script id="session-reports-data" type="application/json">{{ session_reports_json|safe }}</script>
+<script>
+  (function () {
+    const exportHeaders = JSON.parse(document.getElementById('export-headers-data').textContent || '[]');
+    const reports = JSON.parse(document.getElementById('session-reports-data').textContent || '[]');
+    const reportMap = Object.fromEntries(reports.map(report => [report.session_code, report]));
+    const selectEl = document.getElementById('session-select');
+    const alertEl = document.getElementById('report-alert');
+    const emptyEl = document.getElementById('report-empty');
+    const contentEl = document.getElementById('report-content');
+    const tbodyEl = document.getElementById('session-data-body');
+    const defaultSessionCode = selectEl.value || '';
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value ?? '';
+    }
+
+    function updateQueryString(sessionCode) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('session_code', sessionCode);
+      window.history.replaceState({}, '', url);
+    }
+
+    function renderRows(rows) {
+      tbodyEl.innerHTML = '';
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        exportHeaders.forEach(header => {
+          const td = document.createElement('td');
+          const value = row[header];
+          td.textContent = value === null || value === undefined ? '' : String(value);
+          tr.appendChild(td);
+        });
+        tbodyEl.appendChild(tr);
+      });
+    }
+
+    function renderSession(sessionCode) {
+      const report = reportMap[sessionCode];
+      if (!report) {
+        emptyEl.style.display = 'block';
+        contentEl.style.display = 'none';
+        return;
+      }
+
+      const summary = report.summary;
+      setText('summary-session-code', summary.session_code);
+      setText('summary-session-config', summary.session_config_name);
+      setText('summary-data-tier', summary.data_tier);
+      setText('summary-total-records', summary.total_records);
+      setText('summary-participant-count', summary.participant_count);
+      setText('summary-finished-count', summary.finished_count);
+      setText('summary-dropout-count', summary.dropout_count);
+      setText('summary-round-count', summary.round_count);
+      setText('summary-grouping-status', summary.grouping_status);
+      renderRows(report.rows);
+      emptyEl.style.display = 'none';
+      contentEl.style.display = 'block';
+    }
+
+    function escapeCsv(value) {
+      const text = value === null || value === undefined ? '' : String(value);
+      if (/[",\n]/.test(text)) {
+        return '"' + text.replace(/"/g, '""') + '"';
+      }
+      return text;
+    }
+
+    function exportCurrentSession() {
+      const sessionCode = selectEl.value;
+      const report = reportMap[sessionCode];
+      if (!report) {
+        return;
+      }
+      const lines = [];
+      lines.push(exportHeaders.map(escapeCsv).join(','));
+      report.rows.forEach(row => {
+        lines.push(exportHeaders.map(header => escapeCsv(row[header])).join(','));
+      });
+      const csvContent = '\uFEFF' + lines.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `route_choice_${sessionCode}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    if (!reports.length) {
+      emptyEl.style.display = 'block';
+      contentEl.style.display = 'none';
+      selectEl.disabled = true;
+      document.getElementById('export-session-csv').disabled = true;
+      return;
+    }
+
+    const requestedSessionCode = new URLSearchParams(window.location.search).get('session_code');
+    let activeSessionCode = requestedSessionCode || defaultSessionCode || reports[0].session_code;
+
+    if (!reportMap[activeSessionCode]) {
+      alertEl.textContent = `指定 session 不存在，已切换到默认 session：${defaultSessionCode || reports[0].session_code}`;
+      alertEl.style.display = 'block';
+      activeSessionCode = defaultSessionCode || reports[0].session_code;
+    }
+
+    selectEl.value = activeSessionCode;
+    renderSession(activeSessionCode);
+    updateQueryString(activeSessionCode);
+
+    selectEl.addEventListener('change', function () {
+      const sessionCode = this.value;
+      alertEl.style.display = 'none';
+      renderSession(sessionCode);
+      updateQueryString(sessionCode);
+    });
+
+    document.getElementById('export-session-csv').addEventListener('click', exportCurrentSession);
+  })();
+</script>

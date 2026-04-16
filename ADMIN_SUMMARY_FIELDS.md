@@ -74,27 +74,42 @@
 
 ## 六、新的数据获取方式（按 Session 分层导出）
 
-你现在可以在 oTree 的 Data 页面使用 route_choice 的自定义导出，直接获得“按 session 分层”的统一数据。
+你现在有两种 route_choice 数据获取方式：
 
-1. 导出步骤
+1. admin report 按 session 查看/导出
+- 进入某个 route_choice session 的 Admin Report 页面。
+- 页面顶部可手动选择任意已有的 route_choice session。
+- 页面会直接展示该 session 的摘要统计与逐行明细。
+- 可点击“导出当前 Session CSV”，只导出当前选中 session 的数据。
+
+2. Data 页面全量自定义导出
 - 进入 Data 页面，选择 route_choice 应用。
 - 使用 Custom Export（自定义导出）。
-- 下载后按 `session_config_name` 或 `data_tier` 过滤。
+- 下载后按 `session_config_name`、`data_tier` 或 `session_code` 过滤。
+
+1. admin report 的推荐用途
+- 快速查看某一个 session 的当前数据，不需要先导出全量数据。
+- 快速核对某个 session 的完成人数、dropout 情况和分组状态。
+- 快速导出某一个 session 的独立 CSV 文件。
+
+2. Data 页全量导出的推荐用途
+- 需要跨多个 session 做合并分析时。
+- 需要保留完整历史备份时。
 - 如启用了手动分组，可继续按 `assigned_group_label` 或 `grouping_enabled` 过滤。
 
-2. 新增分层字段
+3. 新增分层字段
 - session_config_name: 会话配置名（route_choice_prod / route_choice_demo）。
 - data_tier: 运营分层标签（prod / demo / other）。
 - grouping_enabled: 是否启用手动分组。
 - manual_grouping_spec: 创建 session 时填写的原始分组配置。
 - assigned_group_id / assigned_group_label / assigned_group_members: 参与者所属分组信息。
 
-3. 导出内容范围
+4. 导出内容范围
 - route_choice 每轮行为字段（round_number、route、travel_time、route_a_count、route_b_count、payoff）。
 - 最终奖励字段 final_total_payoff（来自参与者累计奖励）。
 - 分组字段（grouping_enabled、manual_grouping_spec、assigned_group_id、assigned_group_label、assigned_group_members）。
 
-4. 推荐使用方式
+5. 推荐使用方式
 - 发放时只保留 `session_config_name = route_choice_prod` 或 `data_tier = prod`。
 - 演示数据（demo）仅用于测试，不用于发放。
 - 如果正式场次启用了手动分组，建议先按 `assigned_group_label` 抽样核对 1-2 组，再进入正式分析。

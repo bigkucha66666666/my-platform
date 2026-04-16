@@ -1,4 +1,5 @@
 from otree.api import *
+import json
 import random
 
 doc = """
@@ -50,6 +51,30 @@ class Player(BasePlayer):
     my_route_count = models.IntegerField(initial=0)
 
 
+EXPORT_HEADERS = [
+    'session_code',
+    'session_config_name',
+    'data_tier',
+    'grouping_enabled',
+    'manual_grouping_spec',
+    'assigned_group_id',
+    'assigned_group_label',
+    'assigned_group_members',
+    'participant_code',
+    'participant_label',
+    'round_number',
+    'route',
+    'travel_time',
+    'route_a_count',
+    'route_b_count',
+    'my_route_count',
+    'payoff',
+    'final_total_payoff',
+    'is_dropout',
+    'finished',
+]
+
+
 def config_flag(value) -> bool:
     if isinstance(value, bool):
         return value
@@ -62,6 +87,11 @@ def config_flag(value) -> bool:
 
 def participant_display_label(player: Player) -> str:
     return player.participant.label or player.participant.code
+
+
+def safe_model_field(obj, field_name, default=''):
+    value = obj.field_maybe_none(field_name) if hasattr(obj, 'field_maybe_none') else getattr(obj, field_name, None)
+    return default if value is None else value
 
 
 def build_auto_group_matrix(players, cohort_size: int):
@@ -222,6 +252,161 @@ def set_results(group: Group):
             p.participant.vars['route_choice_total_payoff'] = total_payoff
 
 
+def export_row_for_player(p: Player):
+    session_config_name = p.session.config.get('name', '')
+    grouping_enabled = config_flag(p.session.config.get('grouping_enabled', 0))
+    manual_grouping_spec = p.session.config.get('manual_grouping_spec', '')
+    if session_config_name == 'route_choice_prod':
+        data_tier = 'prod'
+    elif session_config_name == 'route_choice_demo':
+        data_tier = 'demo'
+    else:
+        data_tier = 'other'
+
+    participant = p.participant
+    final_total_payoff = participant.vars.get('route_choice_total_payoff', '')
+    is_dropout = getattr(participant, 'is_dropout', False)
+    finished = getattr(participant, 'finished', False)
+    assigned_group_id = participant.vars.get('assigned_group_id', '')
+    assigned_group_label = participant.vars.get('assigned_group_label', '')
+    assigned_group_members = participant.vars.get('assigned_group_members', '')
+    participant_code = safe_model_field(participant, 'code', '')
+    participant_label = safe_model_field(participant, 'label', '')
+    round_number = safe_model_field(p, 'round_number', '')
+    route = safe_model_field(p, 'route', '')
+    travel_time = safe_model_field(p, 'travel_time', 0)
+    route_a_count = safe_model_field(p, 'route_a_count', 0)
+    route_b_count = safe_model_field(p, 'route_b_count', 0)
+    my_route_count = safe_model_field(p, 'my_route_count', 0)
+    payoff = safe_model_field(p, 'payoff', '')
+
+    return [
+        p.session.code,
+        session_config_name,
+        data_tier,
+        grouping_enabled,
+        manual_grouping_spec,
+        assigned_group_id,
+        assigned_group_label,
+        assigned_group_members,
+        participant_code,
+        participant_label,
+        round_number,
+        route,
+        travel_time,
+        route_a_count,
+        route_b_count,
+        my_route_count,
+        payoff,
+        final_total_payoff,
+        is_dropout,
+        finished,
+    ]
+
+
+def row_to_dict(row):
+    def normalize(value):
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        return str(value)
+
+    record = {}
+    for header, value in zip(EXPORT_HEADERS, row):
+        record[header] = normalize(value)
+    return record
+
+
+def build_session_reports(players):
+    reports = {}
+    for p in players:
+        row = export_row_for_player(p)
+        record = row_to_dict(row)
+        session_code = record['session_code']
+        session_pk = getattr(p.session, 'id', 0) or 0
+
+        if session_code not in reports:
+            reports[session_code] = dict(
+                session_code=session_code,
+                session_config_name=record['session_config_name'],
+                data_tier=record['data_tier'],
+                grouping_enabled=record['grouping_enabled'],
+                manual_grouping_spec=record['manual_grouping_spec'],
+                session_pk=session_pk,
+                rows=[],
+                participant_codes=set(),
+                finished_codes=set(),
+                dropout_codes=set(),
+                rounds=set(),
+            )
+
+        report = reports[session_code]
+        report['rows'].append(record)
+        report['participant_codes'].add(record['participant_code'])
+        if record['finished']:
+            report['finished_codes'].add(record['participant_code'])
+        if record['is_dropout']:
+            report['dropout_codes'].add(record['participant_code'])
+        report['rounds'].add(record['round_number'])
+
+    session_reports = []
+    for report in reports.values():
+        summary = dict(
+            session_code=report['session_code'],
+            session_config_name=report['session_config_name'],
+            data_tier=report['data_tier'],
+            total_records=len(report['rows']),
+            participant_count=len(report['participant_codes']),
+            finished_count=len(report['finished_codes']),
+            dropout_count=len(report['dropout_codes']),
+            round_count=len(report['rounds']),
+            grouping_status='手动分组' if report['grouping_enabled'] else '自动分组',
+        )
+        session_reports.append(
+            dict(
+                session_code=report['session_code'],
+                session_config_name=report['session_config_name'],
+                label=f"{report['session_code']} | {report['session_config_name']}",
+                session_pk=report['session_pk'],
+                summary=summary,
+                rows=report['rows'],
+            )
+        )
+
+    session_reports.sort(key=lambda item: (item['session_pk'], item['session_code']), reverse=True)
+    return session_reports
+
+
+def vars_for_admin_report(subsession: Subsession):
+    players = []
+    for round_subsession in subsession.in_all_rounds():
+        players.extend(round_subsession.get_players())
+
+    session_reports = build_session_reports(players)
+    default_session_code = ''
+    current_session_code = subsession.session.code
+    available_session_codes = [report['session_code'] for report in session_reports]
+
+    if current_session_code in available_session_codes:
+        default_session_code = current_session_code
+    elif session_reports:
+        default_session_code = session_reports[0]['session_code']
+
+    return dict(
+        export_headers=EXPORT_HEADERS,
+        export_headers_json=json.dumps(EXPORT_HEADERS, ensure_ascii=False),
+        session_options=[
+            dict(
+                session_code=report['session_code'],
+                label=report['label'],
+            )
+            for report in session_reports
+        ],
+        default_session_code=default_session_code,
+        current_session_code=current_session_code,
+        session_reports_json=json.dumps(session_reports, ensure_ascii=False),
+    )
+
+
 def access_allowed(player: Player):
     if player.session.config.get('name') != 'route_choice_prod':
         return True
@@ -300,70 +485,9 @@ class Results(Page):
         )
 
 def custom_export(players):
-    yield [
-        'session_code',
-        'session_config_name',
-        'data_tier',
-        'grouping_enabled',
-        'manual_grouping_spec',
-        'assigned_group_id',
-        'assigned_group_label',
-        'assigned_group_members',
-        'participant_code',
-        'participant_label',
-        'round_number',
-        'route',
-        'travel_time',
-        'route_a_count',
-        'route_b_count',
-        'my_route_count',
-        'payoff',
-        'final_total_payoff',
-        'is_dropout',
-        'finished',
-    ]
-
+    yield EXPORT_HEADERS
     for p in players:
-        session_config_name = p.session.config.get('name', '')
-        grouping_enabled = config_flag(p.session.config.get('grouping_enabled', 0))
-        manual_grouping_spec = p.session.config.get('manual_grouping_spec', '')
-        if session_config_name == 'route_choice_prod':
-            data_tier = 'prod'
-        elif session_config_name == 'route_choice_demo':
-            data_tier = 'demo'
-        else:
-            data_tier = 'other'
-
-        participant = p.participant
-        final_total_payoff = participant.vars.get('route_choice_total_payoff', '')
-        is_dropout = getattr(participant, 'is_dropout', False)
-        finished = getattr(participant, 'finished', False)
-        assigned_group_id = participant.vars.get('assigned_group_id', '')
-        assigned_group_label = participant.vars.get('assigned_group_label', '')
-        assigned_group_members = participant.vars.get('assigned_group_members', '')
-
-        yield [
-            p.session.code,
-            session_config_name,
-            data_tier,
-            grouping_enabled,
-            manual_grouping_spec,
-            assigned_group_id,
-            assigned_group_label,
-            assigned_group_members,
-            participant.code,
-            participant.label,
-            p.round_number,
-            p.route,
-            p.travel_time,
-            p.route_a_count,
-            p.route_b_count,
-            p.my_route_count,
-            p.payoff,
-            final_total_payoff,
-            is_dropout,
-            finished,
-        ]
+        yield export_row_for_player(p)
 
 
 page_sequence = [MyPage, ResultsWaitPage, Results]

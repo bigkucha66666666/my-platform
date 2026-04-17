@@ -1,6 +1,9 @@
-from otree.api import *
+from math import ceil
 import json
 import random
+import time
+
+from otree.api import *
 
 doc = """
 一个极简的交通拥堵分析 demo。
@@ -14,6 +17,10 @@ class C(BaseConstants):
     DECISION_TIMEOUT_SECONDS = 30
     RESULTS_TIMEOUT_SECONDS = 12
     DROPOUT_TIMEOUT_SECONDS = 1
+    ROUND1_JOIN_GRACE_SECONDS = 15
+    WAIT_GRACE_SECONDS = 5
+    SYNC_POLL_INTERVAL_SECONDS = 1
+    AUTO_CONTINUE_DELAY_MS = 200
 
     # Route A: free-flow faster but congestion-sensitive.
     TIME_A_FREE = 10
@@ -33,7 +40,8 @@ class Subsession(BaseSubsession):
     pass
 
 class Group(BaseGroup):
-    pass
+    decision_deadline_ts = models.FloatField(initial=0)
+    results_ready = models.BooleanField(initial=False)
 
 
 class Player(BasePlayer):
@@ -208,6 +216,10 @@ def creating_session(subsession: Subsession):
     else:
         subsession.group_like_round(1)
 
+    for group in subsession.get_groups():
+        group.decision_deadline_ts = 0
+        group.results_ready = False
+
 
 def route_time(route: str, route_a_count: int, route_b_count: int, total_players: int) -> int:
     route_count = route_a_count if route == 'A' else route_b_count
@@ -231,7 +243,72 @@ def mark_dropout(player: Player):
     player.participant.is_dropout = True
 
 
+def ensure_decision_deadline(group: Group):
+    if group.decision_deadline_ts:
+        return
+
+    if group.round_number == 1:
+        seconds_until_deadline = (
+            C.ROUND1_JOIN_GRACE_SECONDS
+            + C.DECISION_TIMEOUT_SECONDS
+            + C.WAIT_GRACE_SECONDS
+        )
+    else:
+        seconds_until_deadline = (
+            C.RESULTS_TIMEOUT_SECONDS
+            + C.DECISION_TIMEOUT_SECONDS
+            + C.WAIT_GRACE_SECONDS
+        )
+
+    group.decision_deadline_ts = time.time() + seconds_until_deadline
+
+
+def all_players_have_route(group: Group) -> bool:
+    return all(bool(player.route) for player in group.get_players())
+
+
+def fill_missing_routes(group: Group):
+    for player in group.get_players():
+        if player.route:
+            continue
+        player.route = random.choice(['A', 'B'])
+        mark_dropout(player)
+
+
+def schedule_next_round_deadline(group: Group):
+    if group.round_number >= C.NUM_ROUNDS:
+        return
+
+    next_group = group.in_round(group.round_number + 1)
+    if next_group.decision_deadline_ts:
+        return
+
+    next_group.decision_deadline_ts = time.time() + (
+        C.RESULTS_TIMEOUT_SECONDS
+        + C.DECISION_TIMEOUT_SECONDS
+        + C.WAIT_GRACE_SECONDS
+    )
+
+
+def maybe_prepare_results(group: Group):
+    ensure_decision_deadline(group)
+
+    if group.results_ready:
+        return
+
+    if all_players_have_route(group):
+        set_results(group)
+        return
+
+    if time.time() >= group.decision_deadline_ts:
+        fill_missing_routes(group)
+        set_results(group)
+
+
 def set_results(group: Group):
+    if group.results_ready:
+        return
+
     players = group.get_players()
     route_a_count = sum(p.route == 'A' for p in players)
     route_b_count = sum(p.route == 'B' for p in players)
@@ -250,6 +327,9 @@ def set_results(group: Group):
         if group.round_number == C.NUM_ROUNDS:
             total_payoff = sum(round_player.payoff for round_player in p.in_all_rounds())
             p.participant.vars['route_choice_total_payoff'] = total_payoff
+
+    group.results_ready = True
+    schedule_next_round_deadline(group)
 
 
 def export_row_for_player(p: Player):
@@ -419,7 +499,10 @@ class MyPage(Page):
 
     @staticmethod
     def is_displayed(player: Player):
-        return access_allowed(player)
+        if not access_allowed(player):
+            return False
+        ensure_decision_deadline(player.group)
+        return True
 
     @staticmethod
     def get_timeout_seconds(player: Player):
@@ -439,13 +522,27 @@ class MyPage(Page):
             mark_dropout(player)
 
 
-class ResultsWaitPage(WaitPage):
-    wait_for_all_groups = False
-    after_all_players_arrive = set_results
+class ResultsSync(Page):
 
     @staticmethod
     def is_displayed(player: Player):
         return access_allowed(player)
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        maybe_prepare_results(player.group)
+        remaining_seconds = max(0, ceil(player.group.decision_deadline_ts - time.time()))
+
+        return dict(
+            results_ready=player.group.results_ready,
+            remaining_seconds=remaining_seconds,
+            poll_interval_ms=C.SYNC_POLL_INTERVAL_SECONDS * 1000,
+            auto_continue_delay_ms=C.AUTO_CONTINUE_DELAY_MS,
+        )
+
+    @staticmethod
+    def before_next_page(player: Player, timeout_happened):
+        maybe_prepare_results(player.group)
 
 
 class Results(Page):
@@ -490,4 +587,4 @@ def custom_export(players):
         yield export_row_for_player(p)
 
 
-page_sequence = [MyPage, ResultsWaitPage, Results]
+page_sequence = [MyPage, ResultsSync, Results]

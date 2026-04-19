@@ -63,7 +63,13 @@ SESSION_CONFIG_DEFAULTS = dict(
     manual_grouping_spec="",
 )
 
-PARTICIPANT_FIELDS = ['is_dropout', 'finished']
+PARTICIPANT_FIELDS = [
+    'is_dropout',
+    'dropout_active',
+    'dropout_reason',
+    'has_recovered_after_disconnect',
+    'finished',
+]
 SESSION_FIELDS = []
 
 # ISO-639 code

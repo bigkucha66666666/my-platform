@@ -10,6 +10,13 @@ doc = """
 所有参与者同时选择路线，路线人数越多，通行时间越长。
 """
 
+DECISION_SOURCE_MANUAL = 'manual'
+DECISION_SOURCE_TIMEOUT_AUTO = 'timeout_auto'
+DECISION_SOURCE_DISCONNECT_AUTO = 'disconnect_auto'
+
+DROPOUT_REASON_TIMEOUT = 'timeout'
+DROPOUT_REASON_DISCONNECT = 'disconnect'
+
 class C(BaseConstants):
     NAME_IN_URL = 'route_choice'
     PLAYERS_PER_GROUP = None
@@ -57,6 +64,7 @@ class Player(BasePlayer):
     route_a_count = models.IntegerField(initial=0)
     route_b_count = models.IntegerField(initial=0)
     my_route_count = models.IntegerField(initial=0)
+    decision_source = models.StringField(blank=True)
 
 
 EXPORT_HEADERS = [
@@ -72,6 +80,7 @@ EXPORT_HEADERS = [
     'participant_label',
     'round_number',
     'route',
+    'decision_source',
     'travel_time',
     'route_a_count',
     'route_b_count',
@@ -79,6 +88,9 @@ EXPORT_HEADERS = [
     'payoff',
     'final_total_payoff',
     'is_dropout',
+    'dropout_active',
+    'dropout_reason',
+    'has_recovered_after_disconnect',
     'finished',
 ]
 
@@ -100,6 +112,22 @@ def participant_display_label(player: Player) -> str:
 def safe_model_field(obj, field_name, default=''):
     value = obj.field_maybe_none(field_name) if hasattr(obj, 'field_maybe_none') else getattr(obj, field_name, None)
     return default if value is None else value
+
+
+def player_route(player: Player):
+    route = player.field_maybe_none('route') if hasattr(player, 'field_maybe_none') else None
+    return route if route in {'A', 'B'} else None
+
+
+def player_has_route(player: Player) -> bool:
+    return player_route(player) is not None
+
+
+def cumulative_payoff_so_far(player: Player):
+    total_payoff = cu(0)
+    for round_player in player.in_rounds(1, player.round_number):
+        total_payoff += safe_model_field(round_player, 'payoff', cu(0))
+    return total_payoff
 
 
 def build_auto_group_matrix(players, cohort_size: int):
@@ -200,6 +228,9 @@ def creating_session(subsession: Subsession):
         players = subsession.get_players()
         for player in players:
             player.participant.is_dropout = False
+            player.participant.dropout_active = False
+            player.participant.dropout_reason = ''
+            player.participant.has_recovered_after_disconnect = False
             player.participant.finished = False
         session_name = subsession.session.config.get('name', '')
         grouping_enabled = config_flag(subsession.session.config.get('grouping_enabled', 0))
@@ -239,8 +270,48 @@ def participant_is_dropout(player: Player) -> bool:
     return bool(getattr(player.participant, 'is_dropout', False))
 
 
-def mark_dropout(player: Player):
-    player.participant.is_dropout = True
+def participant_dropout_active(player: Player) -> bool:
+    return bool(getattr(player.participant, 'dropout_active', False))
+
+
+def participant_dropout_reason(player: Player) -> str:
+    reason = (getattr(player.participant, 'dropout_reason', '') or '').strip()
+    if reason in {DROPOUT_REASON_TIMEOUT, DROPOUT_REASON_DISCONNECT}:
+        return reason
+    return ''
+
+
+def participant_has_recovered_after_disconnect(player: Player) -> bool:
+    return bool(getattr(player.participant, 'has_recovered_after_disconnect', False))
+
+
+def mark_timeout_dropout(player: Player):
+    participant = player.participant
+    participant.is_dropout = True
+    participant.dropout_active = True
+    participant.dropout_reason = DROPOUT_REASON_TIMEOUT
+
+
+def mark_disconnect_dropout(player: Player):
+    participant = player.participant
+    participant.is_dropout = True
+    participant.dropout_active = True
+    if participant_dropout_reason(player) == DROPOUT_REASON_TIMEOUT:
+        return
+    participant.dropout_reason = DROPOUT_REASON_DISCONNECT
+
+
+def maybe_restore_disconnect_participant(player: Player):
+    if not participant_dropout_active(player):
+        return False
+    if participant_dropout_reason(player) != DROPOUT_REASON_DISCONNECT:
+        return False
+
+    participant = player.participant
+    participant.dropout_active = False
+    participant.dropout_reason = ''
+    participant.has_recovered_after_disconnect = True
+    return True
 
 
 def ensure_decision_deadline(group: Group):
@@ -263,16 +334,22 @@ def ensure_decision_deadline(group: Group):
     group.decision_deadline_ts = time.time() + seconds_until_deadline
 
 
+def remaining_decision_seconds(group: Group) -> int:
+    ensure_decision_deadline(group)
+    return max(0, ceil(group.decision_deadline_ts - time.time()))
+
+
 def all_players_have_route(group: Group) -> bool:
-    return all(bool(player.route) for player in group.get_players())
+    return all(player_has_route(player) for player in group.get_players())
 
 
 def fill_missing_routes(group: Group):
     for player in group.get_players():
-        if player.route:
+        if player_has_route(player):
             continue
         player.route = random.choice(['A', 'B'])
-        mark_dropout(player)
+        player.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
+        mark_disconnect_dropout(player)
 
 
 def schedule_next_round_deadline(group: Group):
@@ -309,18 +386,32 @@ def set_results(group: Group):
     if group.results_ready:
         return
 
+    if not all_players_have_route(group):
+        fill_missing_routes(group)
+
     players = group.get_players()
-    route_a_count = sum(p.route == 'A' for p in players)
-    route_b_count = sum(p.route == 'B' for p in players)
+    player_routes = {}
+    for p in players:
+        route = player_route(p)
+        if route is None:
+            route = random.choice(['A', 'B'])
+            p.route = route
+            p.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
+            mark_disconnect_dropout(p)
+        player_routes[p.id_in_group] = route
+
+    route_a_count = sum(route == 'A' for route in player_routes.values())
+    route_b_count = sum(route == 'B' for route in player_routes.values())
     total_players = route_a_count + route_b_count
 
     for p in players:
+        route = player_routes[p.id_in_group]
         p.route_a_count = route_a_count
         p.route_b_count = route_b_count
-        p.my_route_count = route_a_count if p.route == 'A' else route_b_count
-        p.travel_time = route_time(p.route, route_a_count, route_b_count, total_players)
+        p.my_route_count = route_a_count if route == 'A' else route_b_count
+        p.travel_time = route_time(route, route_a_count, route_b_count, total_players)
 
-        toll = C.TOLL_A if p.route == 'A' else C.TOLL_B
+        toll = C.TOLL_A if route == 'A' else C.TOLL_B
         points = C.BASE_POINTS - C.TIME_COST * p.travel_time - toll
         p.payoff = cu(max(0, points))
 
@@ -345,7 +436,10 @@ def export_row_for_player(p: Player):
 
     participant = p.participant
     final_total_payoff = participant.vars.get('route_choice_total_payoff', '')
-    is_dropout = getattr(participant, 'is_dropout', False)
+    is_dropout = participant_is_dropout(p)
+    dropout_active = participant_dropout_active(p)
+    dropout_reason = participant_dropout_reason(p)
+    has_recovered_after_disconnect = participant_has_recovered_after_disconnect(p)
     finished = getattr(participant, 'finished', False)
     assigned_group_id = participant.vars.get('assigned_group_id', '')
     assigned_group_label = participant.vars.get('assigned_group_label', '')
@@ -354,6 +448,7 @@ def export_row_for_player(p: Player):
     participant_label = safe_model_field(participant, 'label', '')
     round_number = safe_model_field(p, 'round_number', '')
     route = safe_model_field(p, 'route', '')
+    decision_source = safe_model_field(p, 'decision_source', '')
     travel_time = safe_model_field(p, 'travel_time', 0)
     route_a_count = safe_model_field(p, 'route_a_count', 0)
     route_b_count = safe_model_field(p, 'route_b_count', 0)
@@ -373,6 +468,7 @@ def export_row_for_player(p: Player):
         participant_label,
         round_number,
         route,
+        decision_source,
         travel_time,
         route_a_count,
         route_b_count,
@@ -380,6 +476,9 @@ def export_row_for_player(p: Player):
         payoff,
         final_total_payoff,
         is_dropout,
+        dropout_active,
+        dropout_reason,
+        has_recovered_after_disconnect,
         finished,
     ]
 
@@ -415,7 +514,9 @@ def build_session_reports(players):
                 rows=[],
                 participant_codes=set(),
                 finished_codes=set(),
-                dropout_codes=set(),
+                historical_dropout_codes=set(),
+                active_dropout_codes=set(),
+                recovered_codes=set(),
                 rounds=set(),
             )
 
@@ -425,7 +526,11 @@ def build_session_reports(players):
         if record['finished']:
             report['finished_codes'].add(record['participant_code'])
         if record['is_dropout']:
-            report['dropout_codes'].add(record['participant_code'])
+            report['historical_dropout_codes'].add(record['participant_code'])
+        if record['dropout_active']:
+            report['active_dropout_codes'].add(record['participant_code'])
+        if record['has_recovered_after_disconnect']:
+            report['recovered_codes'].add(record['participant_code'])
         report['rounds'].add(record['round_number'])
 
     session_reports = []
@@ -437,7 +542,9 @@ def build_session_reports(players):
             total_records=len(report['rows']),
             participant_count=len(report['participant_codes']),
             finished_count=len(report['finished_codes']),
-            dropout_count=len(report['dropout_codes']),
+            historical_dropout_count=len(report['historical_dropout_codes']),
+            active_dropout_count=len(report['active_dropout_codes']),
+            recovered_count=len(report['recovered_codes']),
             round_count=len(report['rounds']),
             grouping_status='手动分组' if report['grouping_enabled'] else '自动分组',
         )
@@ -502,13 +609,22 @@ class MyPage(Page):
         if not access_allowed(player):
             return False
         ensure_decision_deadline(player.group)
+        maybe_prepare_results(player.group)
+        if player.group.results_ready:
+            return False
+        if player_has_route(player):
+            return False
+        maybe_restore_disconnect_participant(player)
         return True
 
     @staticmethod
     def get_timeout_seconds(player: Player):
-        if participant_is_dropout(player):
+        maybe_prepare_results(player.group)
+        if not player.group.results_ready and not player_has_route(player):
+            maybe_restore_disconnect_participant(player)
+        if participant_dropout_active(player):
             return C.DROPOUT_TIMEOUT_SECONDS
-        return C.DECISION_TIMEOUT_SECONDS
+        return min(C.DECISION_TIMEOUT_SECONDS, max(1, remaining_decision_seconds(player.group)))
 
     @staticmethod
     def vars_for_template(player: Player):
@@ -516,10 +632,12 @@ class MyPage(Page):
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
-        if timeout_happened and not player.route:
+        if timeout_happened and not player_has_route(player):
             player.route = random.choice(['A', 'B'])
-        if timeout_happened:
-            mark_dropout(player)
+            player.decision_source = DECISION_SOURCE_TIMEOUT_AUTO
+            mark_timeout_dropout(player)
+            return
+        player.decision_source = DECISION_SOURCE_MANUAL
 
 
 class ResultsSync(Page):
@@ -552,32 +670,44 @@ class Results(Page):
 
     @staticmethod
     def get_timeout_seconds(player: Player):
-        if participant_is_dropout(player):
+        if participant_dropout_active(player):
             return C.DROPOUT_TIMEOUT_SECONDS
         return C.RESULTS_TIMEOUT_SECONDS
 
     @staticmethod
     def vars_for_template(player: Player):
-        total_players = player.route_a_count + player.route_b_count
-        route_label = '路线 A（主干道）' if player.route == 'A' else '路线 B（环线）'
+        maybe_prepare_results(player.group)
+        route = player_route(player)
+        route_a_count = safe_model_field(player, 'route_a_count', 0)
+        route_b_count = safe_model_field(player, 'route_b_count', 0)
+        my_route_count = safe_model_field(player, 'my_route_count', 0)
+        my_travel_time = safe_model_field(player, 'travel_time', 0)
+        my_payoff = safe_model_field(player, 'payoff', cu(0))
+        cumulative_payoff = cumulative_payoff_so_far(player)
+        total_players = route_a_count + route_b_count
+        route_label = {
+            'A': '路线 A（主干道）',
+            'B': '路线 B（环线）',
+        }.get(route, '系统随机分配中')
         congestion_ratio = 0
         if total_players > 0:
-            congestion_ratio = round(player.my_route_count / total_players * 100)
+            congestion_ratio = round(my_route_count / total_players * 100)
 
-        travel_time_if_a = route_time('A', player.route_a_count, player.route_b_count, total_players)
-        travel_time_if_b = route_time('B', player.route_a_count, player.route_b_count, total_players)
+        travel_time_if_a = route_time('A', route_a_count, route_b_count, total_players)
+        travel_time_if_b = route_time('B', route_a_count, route_b_count, total_players)
 
         return dict(
             total_players=total_players,
-            route_a_count=player.route_a_count,
-            route_b_count=player.route_b_count,
+            route_a_count=route_a_count,
+            route_b_count=route_b_count,
             route_label=route_label,
-            my_route_count=player.my_route_count,
+            my_route_count=my_route_count,
             congestion_ratio=congestion_ratio,
-            my_travel_time=player.travel_time,
+            my_travel_time=my_travel_time,
             travel_time_if_a=travel_time_if_a,
             travel_time_if_b=travel_time_if_b,
-            my_payoff=player.payoff,
+            my_payoff=my_payoff,
+            cumulative_payoff_so_far=cumulative_payoff,
             auto_advance_seconds=Results.get_timeout_seconds(player),
         )
 

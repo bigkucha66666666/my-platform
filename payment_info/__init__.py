@@ -29,16 +29,30 @@ class Player(BasePlayer):
 
 
 # FUNCTIONS
+def maybe_restore_disconnect_participant(player: Player):
+    participant = player.participant
+    if not bool(getattr(participant, 'dropout_active', False)):
+        return
+    if (getattr(participant, 'dropout_reason', '') or '') != 'disconnect':
+        return
+
+    participant.dropout_active = False
+    participant.dropout_reason = ''
+    participant.has_recovered_after_disconnect = True
+
+
 # PAGES
 class PaymentInfo(Page):
     @staticmethod
     def get_timeout_seconds(player: Player):
-        if getattr(player.participant, 'is_dropout', False):
+        maybe_restore_disconnect_participant(player)
+        if bool(getattr(player.participant, 'dropout_active', False)):
             return C.DROPOUT_TIMEOUT_SECONDS
         return C.PAYMENT_TIMEOUT_SECONDS
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
+        maybe_restore_disconnect_participant(player)
         participant = player.participant
         player.final_total_payoff = participant.vars.get(
             'route_choice_total_payoff', participant.payoff
@@ -47,6 +61,7 @@ class PaymentInfo(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
+        maybe_restore_disconnect_participant(player)
         participant = player.participant
         total_payoff = participant.vars.get('route_choice_total_payoff', participant.payoff)
         return dict(

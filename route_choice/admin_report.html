@@ -87,8 +87,16 @@
         <div class="report-card-value" id="summary-finished-count"></div>
       </div>
       <div class="report-card">
-        <div class="report-card-key">Dropout 人数</div>
-        <div class="report-card-value" id="summary-dropout-count"></div>
+        <div class="report-card-key">曾掉线/代填人数</div>
+        <div class="report-card-value" id="summary-historical-dropout-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">当前快进人数</div>
+        <div class="report-card-value" id="summary-active-dropout-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">已恢复人数</div>
+        <div class="report-card-value" id="summary-recovered-count"></div>
       </div>
       <div class="report-card">
         <div class="report-card-key">轮次数</div>
@@ -168,7 +176,9 @@
       setText('summary-total-records', summary.total_records);
       setText('summary-participant-count', summary.participant_count);
       setText('summary-finished-count', summary.finished_count);
-      setText('summary-dropout-count', summary.dropout_count);
+      setText('summary-historical-dropout-count', summary.historical_dropout_count);
+      setText('summary-active-dropout-count', summary.active_dropout_count);
+      setText('summary-recovered-count', summary.recovered_count);
       setText('summary-round-count', summary.round_count);
       setText('summary-grouping-status', summary.grouping_status);
       renderRows(report.rows);

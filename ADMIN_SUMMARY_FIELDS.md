@@ -14,10 +14,15 @@
 - assigned_group_members: 该参与者所在组的成员标签串。
 - round_number: 轮次编号（1-10）。
 - route: 本轮路线选择（A 或 B）。
+- decision_source: 本轮作答来源（`manual` / `timeout_auto` / `disconnect_auto`）。
 - travel_time: 本轮通行时间。
 - route_a_count: 本轮路线 A 总人数。
 - route_b_count: 本轮路线 B 总人数。
 - payoff: 本轮奖励 points。
+- is_dropout: 参与者历史上是否发生过系统代填。
+- dropout_active: 参与者当前是否仍处于快进状态。
+- dropout_reason: 当前快进原因（`timeout` / `disconnect` / 空）。
+- has_recovered_after_disconnect: 参与者是否曾在断线代填后恢复正常作答。
 - final_total_payoff: 10轮累计奖励 points（在 payment_info 应用中记录，便于最终发放）。
 
 ## 二、管理员核对建议
@@ -30,6 +35,8 @@
 2. 过程核对
 - 按 participant_label + round_number 排序。
 - 正常情况下每位参与者应有 10 条 route_choice 记录（round_number 1 到 10）。
+- 若要核对掉线影响了哪几轮，优先查看 `decision_source`。
+- `disconnect_auto` 表示该轮因断线被系统代填；`timeout_auto` 表示该轮因在线超时被系统代填。
 
 3. 最终奖励核对
 - final_total_payoff 应等于该参与者 10 条 route_choice 记录中的 payoff 求和。
@@ -90,6 +97,7 @@
 1. admin report 的推荐用途
 - 快速查看某一个 session 的当前数据，不需要先导出全量数据。
 - 快速核对某个 session 的完成人数、dropout 情况和分组状态。
+- 快速区分“曾发生代填”“当前仍在快进”“已恢复正常作答”的参与者人数。
 - 快速导出某一个 session 的独立 CSV 文件。
 
 2. Data 页全量导出的推荐用途
@@ -105,9 +113,10 @@
 - assigned_group_id / assigned_group_label / assigned_group_members: 参与者所属分组信息。
 
 4. 导出内容范围
-- route_choice 每轮行为字段（round_number、route、travel_time、route_a_count、route_b_count、payoff）。
+- route_choice 每轮行为字段（round_number、route、decision_source、travel_time、route_a_count、route_b_count、payoff）。
 - 最终奖励字段 final_total_payoff（来自参与者累计奖励）。
 - 分组字段（grouping_enabled、manual_grouping_spec、assigned_group_id、assigned_group_label、assigned_group_members）。
+- 掉线/恢复字段（is_dropout、dropout_active、dropout_reason、has_recovered_after_disconnect）。
 
 5. 推荐使用方式
 - 发放时只保留 `session_config_name = route_choice_prod` 或 `data_tier = prod`。

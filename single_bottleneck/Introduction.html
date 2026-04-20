@@ -1,0 +1,36 @@
+{{ block title }}
+    单瓶颈出发时间实验说明
+{{ endblock }}
+
+{{ block content }}
+    <div class="card-lite">
+        <p class="text-main">你将参加一个 {{ total_rounds }} 轮的单瓶颈通勤实验。</p>
+        <p class="text-sub">每一轮中，你都要为同一次通勤选择一个出发时间。所有人共享同一个瓶颈，越多人集中在相近时间出发，排队越长。</p>
+    </div>
+
+    <div class="card-lite">
+        <p><b>规则概览</b></p>
+        <p>目标到达时间：<b>{{ preferred_arrival_time }}</b></p>
+        <p>无拥堵时建议出发时间：<b>{{ free_flow_departure_time }}</b>（自由流行程 {{ free_flow_travel_minutes }} 分钟）</p>
+        <p>瓶颈通行能力：每个时点窗口最多服务 <b>{{ capacity_per_slot }}</b> 位参与者</p>
+        <p>收益规则：<b>基础分 {{ base_points }}</b> - 排队延误成本 - 早到成本 - 晚到成本 + 可选奖励</p>
+        <p class="text-sub">排队延误每分钟扣 {{ queue_cost_per_minute }} 分，早到每分钟扣 {{ early_cost_per_minute }} 分，晚到每分钟扣 {{ late_cost_per_minute }} 分。</p>
+    </div>
+
+    <div class="hint-lite">
+        {{ reward_description }}
+    </div>
+
+    <p class="text-sub">可选出发时点如下：</p>
+    <div class="stats-grid">
+        {{ for item in slot_preview }}
+            <div class="stat-card">
+                <div class="stat-key">{{ item.departure_time }}</div>
+                <div class="stat-value" style="font-size: 16px;">{{ if item.reward_active }}+{{ item.reward_bonus }}{{ else }}无额外奖励{{ endif }}</div>
+                <div class="text-sub" style="margin-top: 8px;">{{ item.departure_label }}</div>
+            </div>
+        {{ endfor }}
+    </div>
+
+    <button class="otree-btn-next btn btn-primary">进入第 1 轮</button>
+{{ endblock }}

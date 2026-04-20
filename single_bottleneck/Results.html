@@ -1,5 +1,5 @@
 {{ block title }}
-    📊 本轮结果
+    本轮结果
 {{ endblock }}
 
 {{ block global_styles }}
@@ -90,15 +90,20 @@
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">🧭 第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮已完成，看看你这轮的表现吧。</p>
+    <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮已完成，看看你这轮的排队与收益情况。</p>
 
     <div class="card-lite">
-        <p><b>🙋 你的本轮表现</b></p>
-        <p>🛣 本轮路线：<b>{{ route_label }}</b></p>
-        <p>⏱ 通行时间：<b>{{ my_travel_time }}</b> 分钟</p>
-        <p>👥 同路线人数：<b>{{ my_route_count }}</b>（占总人数 {{ congestion_ratio }}%）</p>
-        <p>🏅 本轮积分：<b>{{ my_payoff }}</b></p>
-        <p>📦 累计总积分（截至当前轮）：<b>{{ cumulative_payoff_so_far }}</b></p>
+        <p><b>你的本轮表现</b></p>
+        <p>出发时间：<b>{{ departure_time_label }}</b></p>
+        <p>到达时间：<b>{{ arrival_time_label }}</b>（目标到达时间 {{ preferred_arrival_time }}）</p>
+        <p>总行程时间：<b>{{ travel_time_minutes }}</b> 分钟</p>
+        <p>排队延误：<b>{{ queue_delay_minutes }}</b> 分钟</p>
+        <p>早到惩罚对应分钟：<b>{{ schedule_early_minutes }}</b></p>
+        <p>晚到惩罚对应分钟：<b>{{ schedule_late_minutes }}</b></p>
+        <p>本时点总选择人数：<b>{{ slot_load }}</b></p>
+        <p>奖励补贴：<b>{{ reward_bonus }}</b></p>
+        <p>本轮积分：<b>{{ my_payoff }}</b></p>
+        <p>累计总积分（截至当前轮）：<b>{{ cumulative_payoff_so_far }}</b></p>
 
         <div class="result-reward-chart" aria-label="奖励可视化">
             <p class="result-reward-chart-title">奖励可视化</p>
@@ -132,35 +137,31 @@
         </div>
     </div>
 
-    <p class="text-sub">🌐 本轮整体路况快照：</p>
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-key">👤 总参与人数</div>
-            <div class="stat-value">{{ total_players }}</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-key">🅰 路线 A 人数</div>
-            <div class="stat-value">{{ route_a_count }}</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-key">🅱 路线 B 人数</div>
-            <div class="stat-value">{{ route_b_count }}</div>
-        </div>
-    </div>
-
     <div class="hint-lite">
-        📌 路线参考：在当前拥堵状态下，选择路线 A 预计 {{ travel_time_if_a }} 分钟，选择路线 B 预计 {{ travel_time_if_b }} 分钟。
+        {{ reward_description }}
     </div>
 
-    <p class="text-sub">⏭ 该页面会在 {{ auto_advance_seconds }} 秒后自动继续。</p>
+    <p class="text-sub">本轮各时点选择分布：</p>
+    <div class="stats-grid">
+        {{ for item in slot_summaries }}
+            <div class="stat-card" style="{{ if item.is_current }}border-color:#1f5fcc; box-shadow:0 0 0 1px rgba(31,95,204,0.12);{{ endif }}">
+                <div class="stat-key">{{ item.departure_time }}</div>
+                <div class="stat-value">{{ item.count }}</div>
+                <div class="text-sub" style="margin-top: 8px;">
+                    {{ if item.is_current }}你选择了这个时点{{ else }}其他时点{{ endif }}
+                    {{ if item.is_rewarded }} · 奖励时点{{ endif }}
+                </div>
+            </div>
+        {{ endfor }}
+    </div>
+
+    <p class="text-sub">该页面会在 {{ auto_advance_seconds }} 秒后自动继续。</p>
 
     {{ if player.round_number < C.NUM_ROUNDS }}
-        <p class="text-sub">✅ 本轮结束，点击“下一轮”继续挑战。</p>
+        <p class="text-sub">本轮结束，点击“下一轮”继续。</p>
         <button class="otree-btn-next btn btn-primary">下一轮</button>
     {{ else }}
-        <p class="text-sub">🎉 你已完成全部轮次，点击下方按钮查看最终奖励。</p>
+        <p class="text-sub">你已完成全部轮次，点击下方按钮查看最终奖励。</p>
         <button class="otree-btn-next btn btn-primary">查看最终奖励</button>
     {{ endif }}
 {{ endblock }}
-
-

@@ -5,9 +5,11 @@ import time
 
 from otree.api import *
 
+
 doc = """
-一个极简的交通拥堵分析 demo。
-所有参与者同时选择路线，路线人数越多，通行时间越长。
+离散化的单瓶颈出发时间实验。
+参与者在每轮选择出发时间，系统根据瓶颈通行能力形成排队，
+并按照排队延误、早到/晚到惩罚和可选奖励处理计算收益。
 """
 
 DECISION_SOURCE_MANUAL = 'manual'
@@ -17,34 +19,96 @@ DECISION_SOURCE_DISCONNECT_AUTO = 'disconnect_auto'
 DROPOUT_REASON_TIMEOUT = 'timeout'
 DROPOUT_REASON_DISCONNECT = 'disconnect'
 
+
 class C(BaseConstants):
-    NAME_IN_URL = 'route_choice'
+    NAME_IN_URL = 'single_bottleneck'
     PLAYERS_PER_GROUP = None
     NUM_ROUNDS = 10
-    DECISION_TIMEOUT_SECONDS = 30
+    DECISION_TIMEOUT_SECONDS = 45
     RESULTS_TIMEOUT_SECONDS = 12
     DROPOUT_TIMEOUT_SECONDS = 1
-    ROUND1_JOIN_GRACE_SECONDS = 15
+    ROUND1_JOIN_GRACE_SECONDS = 20
     WAIT_GRACE_SECONDS = 5
     SYNC_POLL_INTERVAL_SECONDS = 1
     AUTO_CONTINUE_DELAY_MS = 200
 
-    # Route A: free-flow faster but congestion-sensitive.
-    TIME_A_FREE = 10
-    TIME_A_CONGESTION = 2
+    PREFERRED_ARRIVAL_MINUTE = 8 * 60
+    FREE_FLOW_TRAVEL_MINUTES = 6
+    SLOT_SIZE_MINUTES = 2
+    NUM_DEPARTURE_SLOTS = 11
+    FIRST_DEPARTURE_MINUTE = (
+        PREFERRED_ARRIVAL_MINUTE
+        - FREE_FLOW_TRAVEL_MINUTES
+        - SLOT_SIZE_MINUTES * 5
+    )
+    DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT = 1
 
-    # Route B: free-flow slower but congestion-resilient.
-    TIME_B_FREE = 14
-    TIME_B_CONGESTION = 1
-
-    # Utility/points model.
     BASE_POINTS = 140
-    TIME_COST = 2
-    TOLL_A = 8
-    TOLL_B = 2
+    QUEUE_COST_PER_MINUTE = 2
+    EARLY_COST_PER_MINUTE = 1
+    LATE_COST_PER_MINUTE = 3
+    DEFAULT_REWARD_BONUS_POINTS = 0
+
+
+def minute_to_clock(value):
+    total_seconds = int(round(float(value) * 60))
+    hours = (total_seconds // 3600) % 24
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    if seconds:
+        return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+    return f'{hours:02d}:{minutes:02d}'
+
+
+def minute_value_display(value):
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return '0'
+
+    rounded = round(numeric_value, 1)
+    if abs(rounded - round(rounded)) < 1e-9:
+        return str(int(round(rounded)))
+    return f'{rounded:.1f}'
+
+
+def departure_slots():
+    return list(range(1, C.NUM_DEPARTURE_SLOTS + 1))
+
+
+def departure_minute_for_slot(slot: int):
+    return C.FIRST_DEPARTURE_MINUTE + (slot - 1) * C.SLOT_SIZE_MINUTES
+
+
+def free_flow_departure_minute():
+    return C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES
+
+
+def departure_offset_from_free_flow(slot: int):
+    return int(round(departure_minute_for_slot(slot) - free_flow_departure_minute()))
+
+
+def departure_label_for_slot(slot: int):
+    departure_time = minute_to_clock(departure_minute_for_slot(slot))
+    offset = departure_offset_from_free_flow(slot)
+    if offset == 0:
+        offset_text = '与无拥堵基准相同'
+    elif offset < 0:
+        offset_text = f'比无拥堵基准早 {abs(offset)} 分钟'
+    else:
+        offset_text = f'比无拥堵基准晚 {offset} 分钟'
+    return f'{departure_time}（{offset_text}）'
+
+
+DEPARTURE_SLOT_CHOICES = [
+    [slot, departure_label_for_slot(slot)]
+    for slot in departure_slots()
+]
+
 
 class Subsession(BaseSubsession):
     pass
+
 
 class Group(BaseGroup):
     decision_deadline_ts = models.FloatField(initial=0)
@@ -52,18 +116,21 @@ class Group(BaseGroup):
 
 
 class Player(BasePlayer):
-    route = models.StringField(
-        choices=[
-            ['A', '路线 A（主干道）: 平时更快，但更容易拥堵'],
-            ['B', '路线 B（环线）: 平时略慢，但更稳定'],
-        ],
+    departure_slot = models.IntegerField(
+        choices=DEPARTURE_SLOT_CHOICES,
         widget=widgets.RadioSelect,
-        label='请选择你的出行路线',
+        label='请选择你的出发时间',
     )
-    travel_time = models.IntegerField(initial=0)
-    route_a_count = models.IntegerField(initial=0)
-    route_b_count = models.IntegerField(initial=0)
-    my_route_count = models.IntegerField(initial=0)
+    departure_time_label = models.StringField(blank=True)
+    arrival_time_label = models.StringField(blank=True)
+    departure_minute = models.FloatField(initial=0)
+    arrival_minute = models.FloatField(initial=0)
+    queue_delay_minutes = models.FloatField(initial=0)
+    travel_time_minutes = models.FloatField(initial=0)
+    schedule_early_minutes = models.FloatField(initial=0)
+    schedule_late_minutes = models.FloatField(initial=0)
+    slot_load = models.IntegerField(initial=0)
+    reward_bonus = models.CurrencyField(initial=0)
     decision_source = models.StringField(blank=True)
 
 
@@ -73,18 +140,26 @@ EXPORT_HEADERS = [
     'data_tier',
     'grouping_enabled',
     'manual_grouping_spec',
+    'reward_treatment_enabled',
+    'rewarded_slot_spec',
+    'reward_bonus_points',
+    'bottleneck_capacity_per_slot',
     'assigned_group_id',
     'assigned_group_label',
     'assigned_group_members',
     'participant_code',
     'participant_label',
     'round_number',
-    'route',
+    'departure_slot',
+    'departure_time_label',
     'decision_source',
-    'travel_time',
-    'route_a_count',
-    'route_b_count',
-    'my_route_count',
+    'arrival_time_label',
+    'queue_delay_minutes',
+    'travel_time_minutes',
+    'schedule_early_minutes',
+    'schedule_late_minutes',
+    'slot_load',
+    'reward_bonus',
     'payoff',
     'final_total_payoff',
     'is_dropout',
@@ -105,6 +180,20 @@ def config_flag(value) -> bool:
     return False
 
 
+def parse_int(value, default: int):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_float(value, default: float):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def participant_display_label(player: Player) -> str:
     return player.participant.label or player.participant.code
 
@@ -118,13 +207,13 @@ def participant_var(player: Player, field_name, default=''):
     return player.participant.vars.get(field_name, default)
 
 
-def player_route(player: Player):
-    route = player.field_maybe_none('route') if hasattr(player, 'field_maybe_none') else None
-    return route if route in {'A', 'B'} else None
+def player_departure_slot(player: Player):
+    slot = player.field_maybe_none('departure_slot') if hasattr(player, 'field_maybe_none') else None
+    return slot if slot in departure_slots() else None
 
 
-def player_has_route(player: Player) -> bool:
-    return player_route(player) is not None
+def player_has_departure_slot(player: Player) -> bool:
+    return player_departure_slot(player) is not None
 
 
 def cumulative_payoff_so_far(player: Player):
@@ -169,18 +258,13 @@ def parse_manual_grouping_spec(spec: str):
             raise ValueError(
                 'manual_grouping_spec 中存在空标签。请使用格式：P001,P003|P002,P004|P005'
             )
-        group_labels = raw_labels
-        if not group_labels:
-            raise ValueError(
-                'manual_grouping_spec 存在空分组。请使用格式：P001,P003|P002,P004|P005'
-            )
-        groups.append(group_labels)
+        groups.append(raw_labels)
     return groups
 
 
 def validate_manual_groups(players, manual_groups, session_name: str):
-    if session_name != 'route_choice_prod':
-        raise ValueError('仅正式场次 route_choice_prod 支持按 participant_label 手动分组。')
+    if session_name != 'single_bottleneck_prod':
+        raise ValueError('仅正式场次 single_bottleneck_prod 支持按 participant_label 手动分组。')
 
     available_labels = []
     label_to_player = {}
@@ -241,6 +325,107 @@ def assign_group_metadata(matrix, grouping_enabled: bool):
             participant.vars['assigned_group_members'] = member_labels
 
 
+def parse_rewarded_slot_spec(spec: str):
+    rewarded_slots = set()
+    raw_spec = (spec or '').strip()
+    if not raw_spec:
+        return rewarded_slots
+
+    for raw_token in raw_spec.split(','):
+        token = raw_token.strip()
+        if not token:
+            continue
+        if '-' in token:
+            start_text, end_text = token.split('-', 1)
+            start_slot = parse_int(start_text.strip(), 0)
+            end_slot = parse_int(end_text.strip(), 0)
+            if start_slot <= 0 or end_slot <= 0 or end_slot < start_slot:
+                raise ValueError(
+                    f'非法 rewarded_slot_spec 区间：{token}。示例：1-3,9-11'
+                )
+            rewarded_slots.update(range(start_slot, end_slot + 1))
+            continue
+        slot = parse_int(token, 0)
+        if slot <= 0:
+            raise ValueError(f'非法 rewarded_slot_spec 项：{token}。示例：1-3,9-11')
+        rewarded_slots.add(slot)
+
+    invalid_slots = sorted(slot for slot in rewarded_slots if slot not in departure_slots())
+    if invalid_slots:
+        raise ValueError(
+            'rewarded_slot_spec 中存在超出可选范围的时点：'
+            + ', '.join(str(slot) for slot in invalid_slots)
+        )
+    return rewarded_slots
+
+
+def bottleneck_capacity_per_slot(session):
+    return max(
+        1,
+        parse_int(
+            session.config.get('bottleneck_capacity_per_slot', C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT),
+            C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT,
+        ),
+    )
+
+
+def service_interval_minutes(session):
+    return C.SLOT_SIZE_MINUTES / bottleneck_capacity_per_slot(session)
+
+
+def reward_treatment_enabled(session) -> bool:
+    return config_flag(session.config.get('reward_treatment_enabled', 0))
+
+
+def rewarded_slots_for_session(session):
+    return parse_rewarded_slot_spec(session.config.get('rewarded_slot_spec', ''))
+
+
+def reward_bonus_points(session):
+    raw_value = session.config.get('reward_bonus_points', C.DEFAULT_REWARD_BONUS_POINTS)
+    return cu(max(0, round(parse_float(raw_value, C.DEFAULT_REWARD_BONUS_POINTS), 2)))
+
+
+def reward_bonus_for_slot(session, slot: int):
+    if not reward_treatment_enabled(session):
+        return cu(0)
+    if slot not in rewarded_slots_for_session(session):
+        return cu(0)
+    return reward_bonus_points(session)
+
+
+def reward_description(session):
+    if not reward_treatment_enabled(session):
+        return '当前未开启奖励处理。'
+
+    rewarded_slots = sorted(rewarded_slots_for_session(session))
+    if not rewarded_slots:
+        return '奖励处理已开启，但当前没有配置可获得奖励的出发时点。'
+
+    time_labels = ', '.join(minute_to_clock(departure_minute_for_slot(slot)) for slot in rewarded_slots)
+    return (
+        f'奖励处理已开启：若选择 {time_labels}，每轮可额外获得 '
+        f'{reward_bonus_points(session)} points。'
+    )
+
+
+def slot_preview(session):
+    rewarded_slots = rewarded_slots_for_session(session)
+    reward_bonus = reward_bonus_points(session)
+    preview = []
+    for slot in departure_slots():
+        preview.append(
+            dict(
+                slot=slot,
+                departure_label=departure_label_for_slot(slot),
+                departure_time=minute_to_clock(departure_minute_for_slot(slot)),
+                reward_active=slot in rewarded_slots and reward_treatment_enabled(session),
+                reward_bonus=reward_bonus if slot in rewarded_slots and reward_treatment_enabled(session) else cu(0),
+            )
+        )
+    return preview
+
+
 def creating_session(subsession: Subsession):
     if subsession.round_number == 1:
         players = subsession.get_players()
@@ -250,16 +435,27 @@ def creating_session(subsession: Subsession):
             player.participant.dropout_reason = ''
             player.participant.has_recovered_after_disconnect = False
             player.participant.finished = False
+
         session_name = subsession.session.config.get('name', '')
         grouping_enabled = config_flag(subsession.session.config.get('grouping_enabled', 0))
         manual_grouping_spec = subsession.session.config.get('manual_grouping_spec', '')
-        if session_name != 'route_choice_prod' and (grouping_enabled or manual_grouping_spec.strip()):
-            raise ValueError('仅正式场次 route_choice_prod 支持配置 participant_label 手动分组。')
+
+        if reward_treatment_enabled(subsession.session):
+            rewarded_slots = rewarded_slots_for_session(subsession.session)
+            if not rewarded_slots:
+                raise ValueError(
+                    'reward_treatment_enabled=1 时，rewarded_slot_spec 不能为空。示例：1-3,9-11'
+                )
+
+        if session_name != 'single_bottleneck_prod' and (grouping_enabled or manual_grouping_spec.strip()):
+            raise ValueError('仅正式场次 single_bottleneck_prod 支持配置 participant_label 手动分组。')
+
         if grouping_enabled:
             matrix = build_manual_group_matrix(players, manual_grouping_spec, session_name)
         else:
             cohort_size = max(1, int(subsession.session.config.get('cohort_size', len(players) or 1)))
             matrix = build_auto_group_matrix(players, cohort_size)
+
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
     else:
@@ -268,20 +464,6 @@ def creating_session(subsession: Subsession):
     for group in subsession.get_groups():
         group.decision_deadline_ts = 0
         group.results_ready = False
-
-
-def route_time(route: str, route_a_count: int, route_b_count: int, total_players: int) -> int:
-    route_count = route_a_count if route == 'A' else route_b_count
-    safe_total = max(total_players, 1)
-    congestion_ratio = route_count / safe_total
-    effective_load = route_count * (1 + congestion_ratio)
-
-    if route == 'A':
-        time_value = C.TIME_A_FREE + C.TIME_A_CONGESTION * effective_load
-    else:
-        time_value = C.TIME_B_FREE + C.TIME_B_CONGESTION * effective_load
-
-    return int(round(time_value))
 
 
 def participant_is_dropout(player: Player) -> bool:
@@ -357,15 +539,15 @@ def remaining_decision_seconds(group: Group) -> int:
     return max(0, ceil(group.decision_deadline_ts - time.time()))
 
 
-def all_players_have_route(group: Group) -> bool:
-    return all(player_has_route(player) for player in group.get_players())
+def all_players_have_departure_slot(group: Group) -> bool:
+    return all(player_has_departure_slot(player) for player in group.get_players())
 
 
-def fill_missing_routes(group: Group):
+def fill_missing_departure_slots(group: Group):
     for player in group.get_players():
-        if player_has_route(player):
+        if player_has_departure_slot(player):
             continue
-        player.route = random.choice(['A', 'B'])
+        player.departure_slot = random.choice(departure_slots())
         player.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
         mark_disconnect_dropout(player)
 
@@ -391,12 +573,12 @@ def maybe_prepare_results(group: Group):
     if group.results_ready:
         return
 
-    if all_players_have_route(group):
+    if all_players_have_departure_slot(group):
         set_results(group)
         return
 
     if time.time() >= group.decision_deadline_ts:
-        fill_missing_routes(group)
+        fill_missing_departure_slots(group)
         set_results(group)
 
 
@@ -404,94 +586,125 @@ def set_results(group: Group):
     if group.results_ready:
         return
 
-    if not all_players_have_route(group):
-        fill_missing_routes(group)
+    if not all_players_have_departure_slot(group):
+        fill_missing_departure_slots(group)
 
     players = group.get_players()
-    player_routes = {}
-    for p in players:
-        route = player_route(p)
-        if route is None:
-            route = random.choice(['A', 'B'])
-            p.route = route
-            p.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
-            mark_disconnect_dropout(p)
-        player_routes[p.id_in_group] = route
+    players_by_slot = {slot: [] for slot in departure_slots()}
+    for player in players:
+        slot = player_departure_slot(player)
+        if slot is None:
+            slot = random.choice(departure_slots())
+            player.departure_slot = slot
+            player.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
+            mark_disconnect_dropout(player)
+        players_by_slot[slot].append(player)
 
-    route_a_count = sum(route == 'A' for route in player_routes.values())
-    route_b_count = sum(route == 'B' for route in player_routes.values())
-    total_players = route_a_count + route_b_count
+    for slot_players in players_by_slot.values():
+        random.shuffle(slot_players)
 
-    for p in players:
-        route = player_routes[p.id_in_group]
-        p.route_a_count = route_a_count
-        p.route_b_count = route_b_count
-        p.my_route_count = route_a_count if route == 'A' else route_b_count
-        p.travel_time = route_time(route, route_a_count, route_b_count, total_players)
+    next_available_bottleneck_minute = departure_minute_for_slot(1)
+    slot_service_interval = service_interval_minutes(group.session)
 
-        toll = C.TOLL_A if route == 'A' else C.TOLL_B
-        points = C.BASE_POINTS - C.TIME_COST * p.travel_time - toll
-        p.payoff = cu(max(0, points))
+    for slot in departure_slots():
+        departure_minute = departure_minute_for_slot(slot)
+        slot_players = players_by_slot[slot]
+        slot_load = len(slot_players)
 
+        for player in slot_players:
+            service_start_minute = max(departure_minute, next_available_bottleneck_minute)
+            queue_delay = max(0, service_start_minute - departure_minute)
+            arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
+            early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
+            late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
+            reward_bonus = reward_bonus_for_slot(group.session, slot)
+            generalized_cost = (
+                C.QUEUE_COST_PER_MINUTE * queue_delay
+                + C.EARLY_COST_PER_MINUTE * early_minutes
+                + C.LATE_COST_PER_MINUTE * late_minutes
+            )
+            points = max(0, round(C.BASE_POINTS - generalized_cost + float(reward_bonus), 2))
+
+            player.slot_load = slot_load
+            player.departure_minute = round(departure_minute, 2)
+            player.arrival_minute = round(arrival_minute, 2)
+            player.departure_time_label = minute_to_clock(departure_minute)
+            player.arrival_time_label = minute_to_clock(arrival_minute)
+            player.queue_delay_minutes = round(queue_delay, 2)
+            player.travel_time_minutes = round(C.FREE_FLOW_TRAVEL_MINUTES + queue_delay, 2)
+            player.schedule_early_minutes = round(early_minutes, 2)
+            player.schedule_late_minutes = round(late_minutes, 2)
+            player.reward_bonus = reward_bonus
+            player.payoff = cu(points)
+
+            next_available_bottleneck_minute = service_start_minute + slot_service_interval
+
+        if next_available_bottleneck_minute < departure_minute:
+            next_available_bottleneck_minute = departure_minute
+
+    for player in players:
         if group.round_number == C.NUM_ROUNDS:
-            total_payoff = sum(round_player.payoff for round_player in p.in_all_rounds())
-            p.participant.vars['route_choice_total_payoff'] = total_payoff
+            total_payoff = sum(round_player.payoff for round_player in player.in_all_rounds())
+            player.participant.vars['single_bottleneck_total_payoff'] = total_payoff
 
     group.results_ready = True
     schedule_next_round_deadline(group)
 
 
-def export_row_for_player(p: Player):
-    session_config_name = p.session.config.get('name', '')
-    grouping_enabled = config_flag(p.session.config.get('grouping_enabled', 0))
-    manual_grouping_spec = p.session.config.get('manual_grouping_spec', '')
-    if session_config_name == 'route_choice_prod':
+def export_row_for_player(player: Player):
+    session_config_name = player.session.config.get('name', '')
+    grouping_enabled = config_flag(player.session.config.get('grouping_enabled', 0))
+    manual_grouping_spec = player.session.config.get('manual_grouping_spec', '')
+    reward_enabled = reward_treatment_enabled(player.session)
+    rewarded_slot_spec = player.session.config.get('rewarded_slot_spec', '')
+    reward_bonus_points_value = reward_bonus_points(player.session)
+    capacity_per_slot = bottleneck_capacity_per_slot(player.session)
+
+    if session_config_name == 'single_bottleneck_prod':
         data_tier = 'prod'
-    elif session_config_name == 'route_choice_demo':
+    elif session_config_name == 'single_bottleneck_demo':
         data_tier = 'demo'
     else:
         data_tier = 'other'
 
-    participant = p.participant
-    final_total_payoff = participant.vars.get('route_choice_total_payoff', '')
-    is_dropout = participant_is_dropout(p)
-    dropout_active = participant_dropout_active(p)
-    dropout_reason = participant_dropout_reason(p)
-    has_recovered_after_disconnect = participant_has_recovered_after_disconnect(p)
+    participant = player.participant
+    final_total_payoff = participant.vars.get('single_bottleneck_total_payoff', '')
+    is_dropout = participant_is_dropout(player)
+    dropout_active = participant_dropout_active(player)
+    dropout_reason = participant_dropout_reason(player)
+    has_recovered_after_disconnect = participant_has_recovered_after_disconnect(player)
     finished = participant.vars.get('finished', False)
     assigned_group_id = participant.vars.get('assigned_group_id', '')
     assigned_group_label = participant.vars.get('assigned_group_label', '')
     assigned_group_members = participant.vars.get('assigned_group_members', '')
-    participant_code = safe_model_field(participant, 'code', '')
-    participant_label = safe_model_field(participant, 'label', '')
-    round_number = safe_model_field(p, 'round_number', '')
-    route = safe_model_field(p, 'route', '')
-    decision_source = safe_model_field(p, 'decision_source', '')
-    travel_time = safe_model_field(p, 'travel_time', 0)
-    route_a_count = safe_model_field(p, 'route_a_count', 0)
-    route_b_count = safe_model_field(p, 'route_b_count', 0)
-    my_route_count = safe_model_field(p, 'my_route_count', 0)
-    payoff = safe_model_field(p, 'payoff', '')
 
     return [
-        p.session.code,
+        player.session.code,
         session_config_name,
         data_tier,
         grouping_enabled,
         manual_grouping_spec,
+        reward_enabled,
+        rewarded_slot_spec,
+        reward_bonus_points_value,
+        capacity_per_slot,
         assigned_group_id,
         assigned_group_label,
         assigned_group_members,
-        participant_code,
-        participant_label,
-        round_number,
-        route,
-        decision_source,
-        travel_time,
-        route_a_count,
-        route_b_count,
-        my_route_count,
-        payoff,
+        safe_model_field(participant, 'code', ''),
+        safe_model_field(participant, 'label', ''),
+        safe_model_field(player, 'round_number', ''),
+        safe_model_field(player, 'departure_slot', ''),
+        safe_model_field(player, 'departure_time_label', ''),
+        safe_model_field(player, 'decision_source', ''),
+        safe_model_field(player, 'arrival_time_label', ''),
+        safe_model_field(player, 'queue_delay_minutes', 0),
+        safe_model_field(player, 'travel_time_minutes', 0),
+        safe_model_field(player, 'schedule_early_minutes', 0),
+        safe_model_field(player, 'schedule_late_minutes', 0),
+        safe_model_field(player, 'slot_load', 0),
+        safe_model_field(player, 'reward_bonus', cu(0)),
+        safe_model_field(player, 'payoff', ''),
         final_total_payoff,
         is_dropout,
         dropout_active,
@@ -515,11 +728,11 @@ def row_to_dict(row):
 
 def build_session_reports(players):
     reports = {}
-    for p in players:
-        row = export_row_for_player(p)
+    for player in players:
+        row = export_row_for_player(player)
         record = row_to_dict(row)
         session_code = record['session_code']
-        session_pk = getattr(p.session, 'id', 0) or 0
+        session_pk = getattr(player.session, 'id', 0) or 0
 
         if session_code not in reports:
             reports[session_code] = dict(
@@ -600,10 +813,7 @@ def vars_for_admin_report(subsession: Subsession):
         export_headers=EXPORT_HEADERS,
         export_headers_json=json.dumps(EXPORT_HEADERS, ensure_ascii=False),
         session_options=[
-            dict(
-                session_code=report['session_code'],
-                label=report['label'],
-            )
+            dict(session_code=report['session_code'], label=report['label'])
             for report in session_reports
         ],
         default_session_code=default_session_code,
@@ -613,14 +823,53 @@ def vars_for_admin_report(subsession: Subsession):
 
 
 def access_allowed(player: Player):
-    if player.session.config.get('name') != 'route_choice_prod':
+    if player.session.config.get('name') != 'single_bottleneck_prod':
         return True
     return bool(player.participant.vars.get('access_granted', False))
 
 
-class MyPage(Page):
+def result_slot_summaries(group: Group, current_slot: int):
+    rewarded_slots = rewarded_slots_for_session(group.session)
+    summaries = []
+    for slot in departure_slots():
+        count = sum(1 for player in group.get_players() if player_departure_slot(player) == slot)
+        summaries.append(
+            dict(
+                slot=slot,
+                departure_time=minute_to_clock(departure_minute_for_slot(slot)),
+                count=count,
+                is_current=slot == current_slot,
+                is_rewarded=reward_treatment_enabled(group.session) and slot in rewarded_slots,
+            )
+        )
+    return summaries
+
+
+class Introduction(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == 1 and access_allowed(player)
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        return dict(
+            preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
+            free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
+            free_flow_travel_minutes=minute_value_display(C.FREE_FLOW_TRAVEL_MINUTES),
+            queue_cost_per_minute=C.QUEUE_COST_PER_MINUTE,
+            early_cost_per_minute=C.EARLY_COST_PER_MINUTE,
+            late_cost_per_minute=C.LATE_COST_PER_MINUTE,
+            base_points=C.BASE_POINTS,
+            reward_description=reward_description(player.session),
+            slot_preview=slot_preview(player.session),
+            capacity_per_slot=bottleneck_capacity_per_slot(player.session),
+            total_rounds=C.NUM_ROUNDS,
+        )
+
+
+class Decision(Page):
     form_model = 'player'
-    form_fields = ['route']
+    form_fields = ['departure_slot']
 
     @staticmethod
     def is_displayed(player: Player):
@@ -630,7 +879,7 @@ class MyPage(Page):
         maybe_prepare_results(player.group)
         if player.group.results_ready:
             return False
-        if player_has_route(player):
+        if player_has_departure_slot(player):
             return False
         maybe_restore_disconnect_participant(player)
         return True
@@ -638,7 +887,7 @@ class MyPage(Page):
     @staticmethod
     def get_timeout_seconds(player: Player):
         maybe_prepare_results(player.group)
-        if not player.group.results_ready and not player_has_route(player):
+        if not player.group.results_ready and not player_has_departure_slot(player):
             maybe_restore_disconnect_participant(player)
         if participant_dropout_active(player):
             return C.DROPOUT_TIMEOUT_SECONDS
@@ -646,12 +895,18 @@ class MyPage(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        return dict(auto_advance_seconds=MyPage.get_timeout_seconds(player))
+        return dict(
+            auto_advance_seconds=Decision.get_timeout_seconds(player),
+            preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
+            free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
+            reward_description=reward_description(player.session),
+            slot_preview=slot_preview(player.session),
+        )
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
-        if timeout_happened and not player_has_route(player):
-            player.route = random.choice(['A', 'B'])
+        if timeout_happened and not player_has_departure_slot(player):
+            player.departure_slot = random.choice(departure_slots())
             player.decision_source = DECISION_SOURCE_TIMEOUT_AUTO
             mark_timeout_dropout(player)
             return
@@ -659,7 +914,6 @@ class MyPage(Page):
 
 
 class ResultsSync(Page):
-
     @staticmethod
     def is_displayed(player: Player):
         return access_allowed(player)
@@ -668,7 +922,6 @@ class ResultsSync(Page):
     def vars_for_template(player: Player):
         maybe_prepare_results(player.group)
         remaining_seconds = max(0, ceil(player.group.decision_deadline_ts - time.time()))
-
         return dict(
             results_ready=player.group.results_ready,
             remaining_seconds=remaining_seconds,
@@ -695,55 +948,43 @@ class Results(Page):
     @staticmethod
     def vars_for_template(player: Player):
         maybe_prepare_results(player.group)
-        route = player_route(player)
-        route_a_count = safe_model_field(player, 'route_a_count', 0)
-        route_b_count = safe_model_field(player, 'route_b_count', 0)
-        my_route_count = safe_model_field(player, 'my_route_count', 0)
-        my_travel_time = safe_model_field(player, 'travel_time', 0)
+        current_slot = player_departure_slot(player) or departure_slots()[0]
         my_payoff = safe_model_field(player, 'payoff', cu(0))
         cumulative_payoff = cumulative_payoff_so_far(player)
-        current_payoff_pct = bounded_percent(my_payoff, C.BASE_POINTS)
+        current_payoff_pct = bounded_percent(my_payoff, C.BASE_POINTS + float(reward_bonus_points(player.session)))
         cumulative_payoff_pct = bounded_percent(
             cumulative_payoff,
-            C.BASE_POINTS * max(1, player.round_number),
+            (C.BASE_POINTS + float(reward_bonus_points(player.session))) * max(1, player.round_number),
         )
-        current_payoff_min_width_px = 18 if current_payoff_pct > 0 else 0
-        cumulative_payoff_min_width_px = 18 if cumulative_payoff_pct > 0 else 0
-        total_players = route_a_count + route_b_count
-        route_label = {
-            'A': '路线 A（主干道）',
-            'B': '路线 B（环线）',
-        }.get(route, '系统随机分配中')
-        congestion_ratio = 0
-        if total_players > 0:
-            congestion_ratio = round(my_route_count / total_players * 100)
-
-        travel_time_if_a = route_time('A', route_a_count, route_b_count, total_players)
-        travel_time_if_b = route_time('B', route_a_count, route_b_count, total_players)
 
         return dict(
-            total_players=total_players,
-            route_a_count=route_a_count,
-            route_b_count=route_b_count,
-            route_label=route_label,
-            my_route_count=my_route_count,
-            congestion_ratio=congestion_ratio,
-            my_travel_time=my_travel_time,
-            travel_time_if_a=travel_time_if_a,
-            travel_time_if_b=travel_time_if_b,
+            departure_time_label=safe_model_field(player, 'departure_time_label', ''),
+            arrival_time_label=safe_model_field(player, 'arrival_time_label', ''),
+            queue_delay_minutes=minute_value_display(safe_model_field(player, 'queue_delay_minutes', 0)),
+            travel_time_minutes=minute_value_display(safe_model_field(player, 'travel_time_minutes', 0)),
+            schedule_early_minutes=minute_value_display(safe_model_field(player, 'schedule_early_minutes', 0)),
+            schedule_late_minutes=minute_value_display(safe_model_field(player, 'schedule_late_minutes', 0)),
+            reward_bonus=safe_model_field(player, 'reward_bonus', cu(0)),
+            slot_load=safe_model_field(player, 'slot_load', 0),
+            current_slot=current_slot,
+            current_slot_time=minute_to_clock(departure_minute_for_slot(current_slot)),
+            preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             my_payoff=my_payoff,
             cumulative_payoff_so_far=cumulative_payoff,
             current_payoff_pct=current_payoff_pct,
             cumulative_payoff_pct=cumulative_payoff_pct,
-            current_payoff_min_width_px=current_payoff_min_width_px,
-            cumulative_payoff_min_width_px=cumulative_payoff_min_width_px,
+            current_payoff_min_width_px=18 if current_payoff_pct > 0 else 0,
+            cumulative_payoff_min_width_px=18 if cumulative_payoff_pct > 0 else 0,
+            reward_description=reward_description(player.session),
+            slot_summaries=result_slot_summaries(player.group, current_slot),
             auto_advance_seconds=Results.get_timeout_seconds(player),
         )
 
+
 def custom_export(players):
     yield EXPORT_HEADERS
-    for p in players:
-        yield export_row_for_player(p)
+    for player in players:
+        yield export_row_for_player(player)
 
 
-page_sequence = [MyPage, ResultsSync, Results]
+page_sequence = [Introduction, Decision, ResultsSync, Results]

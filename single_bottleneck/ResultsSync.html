@@ -1,0 +1,44 @@
+{{ block title }}
+    正在同步本轮结果
+{{ endblock }}
+
+{{ block content }}
+    {{ if results_ready }}
+        <div class="card-lite">
+            <p class="text-main">本轮结果已生成，正在进入结果页。</p>
+            <p class="text-sub">若页面未自动跳转，可点击下方按钮继续。</p>
+        </div>
+
+        <button class="otree-btn-next btn btn-primary" id="results-sync-next">查看本轮结果</button>
+    {{ else }}
+        <div class="card-lite">
+            <p class="text-main">正在等待同组参与者完成本轮决策。</p>
+            <p class="text-sub">系统会持续检查全组状态，并在可结算后自动进入结果页。</p>
+        </div>
+
+        <div class="hint-lite">
+            若有参与者因断线未及时到达，系统会在截止后自动补全其选择并继续实验；该参与者之后重新通过原入口登录，追到当前开放轮次时可恢复正常作答。
+        </div>
+
+        <p class="text-sub">当前预计还需等待 {{ remaining_seconds }} 秒，页面会自动刷新。</p>
+    {{ endif }}
+
+    <script>
+      (function () {
+        const resultsReady = {{ if results_ready }}true{{ else }}false{{ endif }};
+        if (resultsReady) {
+          window.setTimeout(function () {
+            const nextButton = document.getElementById('results-sync-next');
+            if (nextButton) {
+              nextButton.click();
+            }
+          }, {{ auto_continue_delay_ms }});
+          return;
+        }
+
+        window.setTimeout(function () {
+          window.location.reload();
+        }, {{ poll_interval_ms }});
+      })();
+    </script>
+{{ endblock }}

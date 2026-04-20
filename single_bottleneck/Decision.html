@@ -1,0 +1,33 @@
+{{ block title }}
+    单瓶颈出发时间选择
+{{ endblock }}
+
+{{ block content }}
+    <p class="text-sub">当前为第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请选择你本轮的出发时间。</p>
+
+    <div class="card-lite">
+        <p class="text-main">目标到达时间：<b>{{ preferred_arrival_time }}</b></p>
+        <p class="text-sub">如果没有排队，无拥堵基准出发时间为 <b>{{ free_flow_departure_time }}</b>。</p>
+    </div>
+
+    <div class="hint-lite">
+        {{ reward_description }}
+    </div>
+
+    <p class="text-sub">⏱ 请在 {{ auto_advance_seconds }} 秒内完成选择；若在线超时未操作，系统将随机分配一个出发时间并自动继续。</p>
+    <p class="text-sub">📴 若中途关闭页面或网络中断，系统可能在截止后自动补全你错过轮次的选择；你重新通过原参与者入口登录后，追到当前开放轮次时可恢复正常作答。</p>
+
+    <div class="stats-grid" style="margin-bottom: 18px;">
+        {{ for item in slot_preview }}
+            <div class="stat-card">
+                <div class="stat-key">{{ item.departure_time }}</div>
+                <div class="stat-value" style="font-size: 16px;">{{ if item.reward_active }}+{{ item.reward_bonus }}{{ else }}0{{ endif }}</div>
+                <div class="text-sub" style="margin-top: 8px;">{{ item.departure_label }}</div>
+            </div>
+        {{ endfor }}
+    </div>
+
+    {{ formfields }}
+
+    <button class="otree-btn-next btn btn-primary">确认本轮选择</button>
+{{ endblock }}

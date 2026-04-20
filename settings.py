@@ -48,6 +48,50 @@ SESSION_CONFIGS = [
         manual_grouping_spec='',
         num_demo_participants=3,
     ),
+    dict(
+        name='single_bottleneck_prod',
+        display_name="正式实验 · 单瓶颈出发时间",
+        app_sequence=['access_gate', 'single_bottleneck', 'payment_info'],
+        doc=(
+            "用于真实被试的单瓶颈出发时间实验。\n"
+            "参与者在每轮选择出发时间，系统按瓶颈容量与早到/晚到成本计算收益。\n"
+            "如需奖励处理，可在创建 session 时开启 reward_treatment_enabled 并设置奖励时段。"
+        ),
+        participant_password=PROD_PARTICIPANT_PASSWORD,
+        cohort_size=5,
+        grouping_enabled=0,
+        manual_grouping_spec='',
+        reward_treatment_enabled=0,
+        rewarded_slot_spec='',
+        reward_bonus_points=8,
+        bottleneck_capacity_per_slot=1,
+        payoff_source_var='single_bottleneck_total_payoff',
+        final_payoff_label='单瓶颈出发时间实验',
+        payoff_source_label='single_bottleneck 全 10 轮累计结果',
+        payoff_rounds=10,
+        num_demo_participants=1,
+    ),
+    dict(
+        name='single_bottleneck_demo',
+        display_name="演示测试 · 单瓶颈出发时间",
+        app_sequence=['single_bottleneck'],
+        doc=(
+            "用于单瓶颈出发时间实验的流程演示。\n"
+            "默认关闭奖励处理；如需测试奖励，可设置 reward_treatment_enabled=1。"
+        ),
+        cohort_size=5,
+        grouping_enabled=0,
+        manual_grouping_spec='',
+        reward_treatment_enabled=0,
+        rewarded_slot_spec='',
+        reward_bonus_points=8,
+        bottleneck_capacity_per_slot=1,
+        payoff_source_var='single_bottleneck_total_payoff',
+        final_payoff_label='单瓶颈出发时间实验',
+        payoff_source_label='single_bottleneck 全 10 轮累计结果',
+        payoff_rounds=10,
+        num_demo_participants=5,
+    ),
 ]
 
 # if you set a property in SESSION_CONFIG_DEFAULTS, it will be inherited by all configs
@@ -61,6 +105,10 @@ SESSION_CONFIG_DEFAULTS = dict(
     doc="",
     grouping_enabled=0,
     manual_grouping_spec="",
+    payoff_source_var='route_choice_total_payoff',
+    final_payoff_label='交通实验',
+    payoff_source_label='route_choice 全 10 轮累计结果',
+    payoff_rounds=10,
 )
 
 PARTICIPANT_FIELDS = [

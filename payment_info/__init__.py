@@ -29,11 +29,38 @@ class Player(BasePlayer):
 
 
 # FUNCTIONS
+def participant_var(participant, field_name, default=''):
+    return participant.vars.get(field_name, default)
+
+
+def payoff_source_var(player: Player):
+    return player.session.config.get('payoff_source_var', 'route_choice_total_payoff')
+
+
+def experiment_label(player: Player):
+    return player.session.config.get('final_payoff_label', '交通实验')
+
+
+def payoff_rounds(player: Player):
+    value = player.session.config.get('payoff_rounds', 10)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 10
+
+
+def payoff_source_label(player: Player):
+    return player.session.config.get(
+        'payoff_source_label',
+        f'{experiment_label(player)} 全 {payoff_rounds(player)} 轮累计结果',
+    )
+
+
 def maybe_restore_disconnect_participant(player: Player):
     participant = player.participant
-    if not bool(getattr(participant, 'dropout_active', False)):
+    if not bool(participant_var(participant, 'dropout_active', False)):
         return
-    if (getattr(participant, 'dropout_reason', '') or '') != 'disconnect':
+    if (participant_var(participant, 'dropout_reason', '') or '') != 'disconnect':
         return
 
     participant.dropout_active = False
@@ -46,7 +73,7 @@ class PaymentInfo(Page):
     @staticmethod
     def get_timeout_seconds(player: Player):
         maybe_restore_disconnect_participant(player)
-        if bool(getattr(player.participant, 'dropout_active', False)):
+        if bool(participant_var(player.participant, 'dropout_active', False)):
             return C.DROPOUT_TIMEOUT_SECONDS
         return C.PAYMENT_TIMEOUT_SECONDS
 
@@ -55,7 +82,7 @@ class PaymentInfo(Page):
         maybe_restore_disconnect_participant(player)
         participant = player.participant
         player.final_total_payoff = participant.vars.get(
-            'route_choice_total_payoff', participant.payoff
+            payoff_source_var(player), participant.payoff
         )
         participant.finished = True
 
@@ -63,10 +90,13 @@ class PaymentInfo(Page):
     def vars_for_template(player: Player):
         maybe_restore_disconnect_participant(player)
         participant = player.participant
-        total_payoff = participant.vars.get('route_choice_total_payoff', participant.payoff)
+        total_payoff = participant.vars.get(payoff_source_var(player), participant.payoff)
         return dict(
             redemption_code=participant.label or participant.code,
             total_payoff=total_payoff,
+            experiment_label=experiment_label(player),
+            payoff_rounds=payoff_rounds(player),
+            payoff_source_label=payoff_source_label(player),
             auto_advance_seconds=PaymentInfo.get_timeout_seconds(player),
         )
 

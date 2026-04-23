@@ -134,6 +134,18 @@ def cumulative_payoff_so_far(player: Player):
     return total_payoff
 
 
+def reward_history_so_far(player: Player):
+    history = []
+    for round_player in player.in_rounds(1, player.round_number):
+        history.append(
+            dict(
+                round_number=safe_model_field(round_player, 'round_number', 0),
+                payoff=safe_model_field(round_player, 'payoff', cu(0)),
+            )
+        )
+    return history
+
+
 def bounded_percent(value, max_value):
     try:
         numeric_value = float(value)
@@ -146,6 +158,148 @@ def bounded_percent(value, max_value):
 
     percentage = numeric_value / numeric_max * 100
     return max(0, min(100, round(percentage, 1)))
+
+
+def format_numeric_label(value):
+    numeric_value = float(value)
+    return str(int(numeric_value)) if numeric_value.is_integer() else f'{numeric_value:.1f}'
+
+
+def build_reward_trend_svg(player: Player):
+    chart_width = 360
+    chart_height = 144
+    padding_left = 30
+    padding_right = 10
+    padding_top = 10
+    padding_bottom = 24
+    plot_width = chart_width - padding_left - padding_right
+    plot_height = chart_height - padding_top - padding_bottom
+    plot_bottom = padding_top + plot_height
+    plot_right = padding_left + plot_width
+    max_value = max(float(C.BASE_POINTS), 1)
+
+    history = reward_history_so_far(player)
+    trend_points = []
+    for index, item in enumerate(history):
+        if len(history) == 1:
+            x_pos = padding_left + plot_width / 2
+        else:
+            x_pos = padding_left + (plot_width * index / (len(history) - 1))
+        y_ratio = max(0, min(1, float(item['payoff']) / max_value))
+        y_pos = padding_top + (1 - y_ratio) * plot_height
+        trend_points.append(
+            dict(
+                x=round(x_pos, 1),
+                y=round(y_pos, 1),
+                round_number=item['round_number'],
+                payoff=item['payoff'],
+            )
+        )
+
+    y_tick_values = [C.BASE_POINTS, C.BASE_POINTS / 2, 0]
+    y_ticks = []
+    for tick_value in y_tick_values:
+        y_ratio = max(0, min(1, float(tick_value) / max_value))
+        y_pos = padding_top + (1 - y_ratio) * plot_height
+        y_ticks.append(
+            dict(
+                label=format_numeric_label(tick_value),
+                y=round(y_pos, 1),
+                label_y=round(y_pos + 4, 1),
+            )
+        )
+
+    area_points = ''
+    if trend_points:
+        area_points = ' '.join(
+            [
+                f"{trend_points[0]['x']},{round(plot_bottom, 1)}",
+                *[f"{point['x']},{point['y']}" for point in trend_points],
+                f"{trend_points[-1]['x']},{round(plot_bottom, 1)}",
+            ]
+        )
+
+    if history:
+        reward_values = [float(item['payoff']) for item in history]
+        highest_value = max(reward_values)
+        lowest_value = min(reward_values)
+        average_value = sum(reward_values) / len(reward_values)
+    else:
+        highest_value = 0
+        lowest_value = 0
+        average_value = 0
+
+    return dict(
+        reward_history_rounds=[item['round_number'] for item in history],
+        reward_history_values=[item['payoff'] for item in history],
+        reward_trend_svg_points=' '.join(f"{point['x']},{point['y']}" for point in trend_points),
+        reward_trend_area_points=area_points,
+        reward_trend_current_point=(
+            dict(
+                **trend_points[-1],
+                label_y=max(padding_top + 10, trend_points[-1]['y'] - 10),
+            )
+            if trend_points else None
+        ),
+        reward_trend_points=trend_points,
+        reward_trend_y_ticks=y_ticks,
+        reward_trend_has_multiple_points=len(trend_points) > 1,
+        reward_trend_width=chart_width,
+        reward_trend_height=chart_height,
+        reward_trend_plot_left=padding_left,
+        reward_trend_plot_right=round(plot_right, 1),
+        reward_trend_plot_top=padding_top,
+        reward_trend_plot_bottom=round(plot_bottom, 1),
+        reward_trend_y_label_x=padding_left - 8,
+        reward_trend_x_label_y=round(plot_bottom + 16, 1),
+        reward_trend_summary=[
+            dict(label='当前', value=format_numeric_label(history[-1]['payoff']) if history else '0'),
+            dict(label='最高', value=format_numeric_label(highest_value)),
+            dict(label='最低', value=format_numeric_label(lowest_value)),
+            dict(label='平均', value=format_numeric_label(average_value)),
+        ],
+    )
+
+
+def current_round_average_scope_players(player: Player):
+    grouping_enabled = config_flag(player.session.config.get('grouping_enabled', 0))
+    if grouping_enabled:
+        return player.group.get_players()
+    current_subsession = player.subsession
+    return current_subsession.get_players()
+
+
+def current_round_average_reference(player: Player):
+    scoped_players = current_round_average_scope_players(player)
+    completed_payoffs = []
+    for scoped_player in scoped_players:
+        payoff = safe_model_field(scoped_player, 'payoff', None)
+        if payoff is None:
+            continue
+        completed_payoffs.append(float(payoff))
+
+    if not completed_payoffs:
+        return dict(
+            reward_trend_show_avg_line=False,
+            reward_trend_avg_line_y=0,
+            reward_trend_avg_line_value='',
+            reward_trend_avg_line_label='',
+        )
+
+    average_value = sum(completed_payoffs) / len(completed_payoffs)
+    max_value = max(float(C.BASE_POINTS), 1)
+    plot_top = 10
+    plot_height = 144 - 10 - 24
+    average_ratio = max(0, min(1, average_value / max_value))
+    average_y = plot_top + (1 - average_ratio) * plot_height
+    grouping_enabled = config_flag(player.session.config.get('grouping_enabled', 0))
+
+    return dict(
+        reward_trend_show_avg_line=True,
+        reward_trend_avg_line_y=round(average_y, 1),
+        reward_trend_avg_line_value=format_numeric_label(average_value),
+        reward_trend_avg_line_label='当前轮同组平均' if grouping_enabled else '当前轮全场平均',
+    )
 
 
 def build_auto_group_matrix(players, cohort_size: int):
@@ -709,6 +863,8 @@ class Results(Page):
         )
         current_payoff_min_width_px = 18 if current_payoff_pct > 0 else 0
         cumulative_payoff_min_width_px = 18 if cumulative_payoff_pct > 0 else 0
+        reward_trend_data = build_reward_trend_svg(player)
+        reward_average_data = current_round_average_reference(player)
         total_players = route_a_count + route_b_count
         route_label = {
             'A': '路线 A（主干道）',
@@ -738,6 +894,8 @@ class Results(Page):
             current_payoff_min_width_px=current_payoff_min_width_px,
             cumulative_payoff_min_width_px=cumulative_payoff_min_width_px,
             auto_advance_seconds=Results.get_timeout_seconds(player),
+            **reward_trend_data,
+            **reward_average_data,
         )
 
 def custom_export(players):

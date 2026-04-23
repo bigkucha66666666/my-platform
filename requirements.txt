@@ -1,6 +1,6 @@
-# oTree-may-overwrite-this-file
-# IF YOU MODIFY THIS FILE, remove these comments. 
-# otherwise, oTree will automatically overwrite it.
-otree>=5.4.0
-psycopg2>=2.8.4
-sentry-sdk==0.7.9
+# Keep deployment dependencies narrow and predictable.
+# Pin major versions to reduce surprises during ECS/RDS deployment.
+otree>=5.11,<6.0
+
+# Binary wheel avoids compiling libpq on the ECS host during install.
+psycopg2-binary>=2.9,<3.0

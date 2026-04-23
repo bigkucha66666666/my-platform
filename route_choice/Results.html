@@ -79,11 +79,123 @@
             background: linear-gradient(90deg, #42c68b 0%, #167f5b 100%);
         }
 
+        .result-trend-chart {
+            margin-top: 16px;
+            padding: 12px 12px 10px;
+            border: 1px solid #dbe8ff;
+            border-radius: 14px;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        }
+
+        .result-trend-chart-title {
+            margin: 0 0 4px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e2a3a;
+        }
+
+        .result-trend-chart-note {
+            margin: 0 0 10px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #5a6b82;
+        }
+
+        .result-trend-summary {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .result-trend-summary-item {
+            padding: 8px 9px;
+            border: 1px solid #dbe8ff;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #fbfdff 0%, #f1f7ff 100%);
+        }
+
+        .result-trend-summary-key {
+            display: block;
+            margin-bottom: 2px;
+            font-size: 11px;
+            color: #6a7b92;
+        }
+
+        .result-trend-summary-value {
+            display: block;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1f5fcc;
+            line-height: 1.1;
+        }
+
+        .result-trend-svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .result-trend-grid {
+            stroke: #d8e6fb;
+            stroke-width: 1;
+            stroke-dasharray: 3 3;
+        }
+
+        .result-trend-average-line {
+            stroke: #1d8c64;
+            stroke-width: 1.5;
+            stroke-dasharray: 5 4;
+        }
+
+        .result-trend-average-label {
+            font-size: 10.5px;
+            font-weight: 700;
+            fill: #1d8c64;
+        }
+
+        .result-trend-area {
+            fill: rgba(44, 112, 216, 0.10);
+        }
+
+        .result-trend-axis-label {
+            font-size: 11px;
+            fill: #6a7b92;
+        }
+
+        .result-trend-line {
+            fill: none;
+            stroke: #2c70d8;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .result-trend-point {
+            fill: #2c70d8;
+        }
+
+        .result-trend-point-current {
+            fill: #174f9f;
+            stroke: #ffffff;
+            stroke-width: 2;
+        }
+
+        .result-trend-current-label {
+            font-size: 11px;
+            font-weight: 700;
+            fill: #174f9f;
+        }
+
         @media (max-width: 575px) {
             .result-reward-head {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 2px;
+            }
+
+            .result-trend-summary {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
     </style>
@@ -112,7 +224,8 @@
                 <div class="result-reward-track" aria-hidden="true">
                     <div
                         class="result-reward-fill"
-                        style="width: {{ current_payoff_pct }}%; min-width: {{ current_payoff_min_width_px }}px;"
+                        data-width="{{ current_payoff_pct }}"
+                        data-min-width-px="{{ current_payoff_min_width_px }}"
                     ></div>
                 </div>
             </div>
@@ -125,10 +238,101 @@
                 <div class="result-reward-track result-reward-track-cumulative" aria-hidden="true">
                     <div
                         class="result-reward-fill result-reward-fill-cumulative"
-                        style="width: {{ cumulative_payoff_pct }}%; min-width: {{ cumulative_payoff_min_width_px }}px;"
+                        data-width="{{ cumulative_payoff_pct }}"
+                        data-min-width-px="{{ cumulative_payoff_min_width_px }}"
                     ></div>
                 </div>
             </div>
+        </div>
+
+        <div class="result-trend-chart" aria-label="历轮积分变化">
+            <p class="result-trend-chart-title">历轮积分变化</p>
+            <p class="result-trend-chart-note">更扁平的趋势图用于快速查看各轮积分变化，下面的摘要可直接读出当前、最高、最低和平均水平。</p>
+
+            <div class="result-trend-summary">
+                {{ for item in reward_trend_summary }}
+                    <div class="result-trend-summary-item">
+                        <span class="result-trend-summary-key">{{ item.label }}</span>
+                        <span class="result-trend-summary-value">{{ item.value }}</span>
+                    </div>
+                {{ endfor }}
+            </div>
+
+            <svg
+                class="result-trend-svg"
+                viewBox="0 0 {{ reward_trend_width }} {{ reward_trend_height }}"
+                role="img"
+                aria-label="各轮积分变化折线图"
+            >
+                {{ for tick in reward_trend_y_ticks }}
+                    <line
+                        class="result-trend-grid"
+                        x1="{{ reward_trend_plot_left }}"
+                        y1="{{ tick.y }}"
+                        x2="{{ reward_trend_plot_right }}"
+                        y2="{{ tick.y }}"
+                    />
+                    <text
+                        class="result-trend-axis-label"
+                        x="{{ reward_trend_y_label_x }}"
+                        y="{{ tick.label_y }}"
+                        text-anchor="end"
+                    >{{ tick.label }}</text>
+                {{ endfor }}
+
+                {{ if reward_trend_show_avg_line }}
+                    <line
+                        class="result-trend-average-line"
+                        x1="{{ reward_trend_plot_left }}"
+                        y1="{{ reward_trend_avg_line_y }}"
+                        x2="{{ reward_trend_plot_right }}"
+                        y2="{{ reward_trend_avg_line_y }}"
+                    />
+                    <text
+                        class="result-trend-average-label"
+                        x="{{ reward_trend_plot_right }}"
+                        y="{{ reward_trend_avg_line_y }}"
+                        text-anchor="end"
+                        dominant-baseline="ideographic"
+                    >{{ reward_trend_avg_line_label }} · {{ reward_trend_avg_line_value }}</text>
+                {{ endif }}
+
+                {{ if reward_trend_has_multiple_points }}
+                    <polygon
+                        class="result-trend-area"
+                        points="{{ reward_trend_area_points }}"
+                    />
+                    <polyline
+                        class="result-trend-line"
+                        points="{{ reward_trend_svg_points }}"
+                    />
+                {{ endif }}
+
+                {{ for point in reward_trend_points }}
+                    <circle class="result-trend-point" cx="{{ point.x }}" cy="{{ point.y }}" r="3.5"></circle>
+                    <text
+                        class="result-trend-axis-label"
+                        x="{{ point.x }}"
+                        y="{{ reward_trend_x_label_y }}"
+                        text-anchor="middle"
+                    >{{ point.round_number }}</text>
+                {{ endfor }}
+
+                {{ if reward_trend_current_point }}
+                    <circle
+                        class="result-trend-point-current"
+                        cx="{{ reward_trend_current_point.x }}"
+                        cy="{{ reward_trend_current_point.y }}"
+                        r="5.2"
+                    ></circle>
+                    <text
+                        class="result-trend-current-label"
+                        x="{{ reward_trend_current_point.x }}"
+                        y="{{ reward_trend_current_point.label_y }}"
+                        text-anchor="middle"
+                    >当前轮</text>
+                {{ endif }}
+            </svg>
         </div>
     </div>
 
@@ -161,6 +365,24 @@
         <p class="text-sub">🎉 你已完成全部轮次，点击下方按钮查看最终奖励。</p>
         <button class="otree-btn-next btn btn-primary">查看最终奖励</button>
     {{ endif }}
+{{ endblock }}
+
+{{ block scripts }}
+    {{ super() }}
+    <script>
+        (function () {
+            document.querySelectorAll('.result-reward-fill[data-width]').forEach(function (element) {
+                var width = Number(element.dataset.width || 0);
+                var minWidthPx = Number(element.dataset.minWidthPx || 0);
+
+                width = Math.max(0, Math.min(100, width));
+                minWidthPx = Math.max(0, minWidthPx);
+
+                element.style.width = width + '%';
+                element.style.minWidth = minWidthPx + 'px';
+            });
+        })();
+    </script>
 {{ endblock }}
 
 

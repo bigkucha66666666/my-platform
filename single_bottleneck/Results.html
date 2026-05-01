@@ -79,11 +79,152 @@
             background: linear-gradient(90deg, #42c68b 0%, #167f5b 100%);
         }
 
+        .bottleneck-route-visual {
+            margin-top: 16px;
+            padding: 16px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background:
+                linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+        }
+
+        .bottleneck-route-title {
+            margin: 0 0 4px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e2a3a;
+        }
+
+        .bottleneck-route-note {
+            margin: 0 0 12px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #5a6b82;
+        }
+
+        .route-svg {
+            display: block;
+            width: 100%;
+            max-width: 620px;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        .route-label {
+            font-size: 14px;
+            font-weight: 700;
+            fill: #1e2a3a;
+        }
+
+        .route-label-muted {
+            font-size: 12px;
+            fill: #65758a;
+        }
+
+        .route-metric-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .route-metric {
+            padding: 10px 12px;
+            border: 1px solid #dbe5f0;
+            border-radius: 10px;
+            background: #ffffff;
+        }
+
+        .route-metric-key {
+            display: block;
+            margin-bottom: 3px;
+            color: #65758a;
+            font-size: 12px;
+        }
+
+        .route-metric-value {
+            display: block;
+            color: #1e2a3a;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .slot-table-wrap {
+            overflow-x: auto;
+            margin-top: 10px;
+            border: 1px solid #dbe5f0;
+            border-radius: 12px;
+            background: #ffffff;
+        }
+
+        .slot-table {
+            width: 100%;
+            min-width: 360px;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+            font-size: 14px;
+        }
+
+        .slot-table th,
+        .slot-table td {
+            padding: 11px 14px;
+            border-bottom: 1px solid #edf2f7;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .slot-table th {
+            color: #52657c;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f6f9fc;
+        }
+
+        .slot-table th:last-child,
+        .slot-table td:last-child {
+            text-align: right;
+        }
+
+        .slot-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .slot-table-row-current td {
+            background: #eef6ff;
+        }
+
+        .slot-table-row-current td:first-child {
+            border-left: 4px solid #1f5fcc;
+            padding-left: 10px;
+            font-weight: 700;
+            color: #174f9f;
+        }
+
         @media (max-width: 575px) {
             .result-reward-head {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 2px;
+            }
+
+            .bottleneck-route-visual {
+                padding: 12px;
+            }
+
+            .route-metric-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .slot-table {
+                min-width: 0;
+                font-size: 13px;
+            }
+
+            .slot-table th,
+            .slot-table td {
+                padding: 10px;
             }
         }
     </style>
@@ -137,22 +278,68 @@
         </div>
     </div>
 
+    <div class="bottleneck-route-visual" aria-label="Y 字路与瓶颈示意">
+        <p class="bottleneck-route-title">路径示意</p>
+        <p class="bottleneck-route-note">本轮所有参与者从出发入口进入同一个瓶颈，之后到达共同目标点。</p>
+
+        <svg class="route-svg" viewBox="0 0 620 270" role="img" aria-label="Y 字路、瓶颈和目标到达点">
+            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#cbd5e1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 150 L440 56" fill="none" stroke="#cbd5e1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#475569" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 150 L440 56" fill="none" stroke="#475569" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 230 L310 154 L190 66" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
+            <path d="M310 154 L430 66" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
+
+            <circle cx="310" cy="150" r="22" fill="#f59e0b" stroke="#ffffff" stroke-width="5" />
+            <circle cx="310" cy="238" r="16" fill="#1f5fcc" stroke="#ffffff" stroke-width="4" />
+            <circle cx="180" cy="56" r="15" fill="#167f5b" stroke="#ffffff" stroke-width="4" />
+            <circle cx="440" cy="56" r="15" fill="#167f5b" stroke="#ffffff" stroke-width="4" />
+
+            <text x="310" y="265" text-anchor="middle" class="route-label">出发入口</text>
+            <text x="310" y="118" text-anchor="middle" class="route-label">瓶颈</text>
+            <text x="310" y="136" text-anchor="middle" class="route-label-muted">排队通过</text>
+            <text x="180" y="28" text-anchor="middle" class="route-label">目标到达</text>
+            <text x="440" y="28" text-anchor="middle" class="route-label">目标到达</text>
+        </svg>
+
+        <div class="route-metric-grid">
+            <div class="route-metric">
+                <span class="route-metric-key">出发时间</span>
+                <span class="route-metric-value">{{ departure_time_label }}</span>
+            </div>
+            <div class="route-metric">
+                <span class="route-metric-key">到达时间</span>
+                <span class="route-metric-value">{{ arrival_time_label }}</span>
+            </div>
+            <div class="route-metric">
+                <span class="route-metric-key">排队延误</span>
+                <span class="route-metric-value">{{ queue_delay_minutes }} 分钟</span>
+            </div>
+        </div>
+    </div>
+
     <div class="hint-lite">
         {{ reward_description }}
     </div>
 
     <p class="text-sub">本轮各时点选择分布：</p>
-    <div class="stats-grid">
-        {{ for item in slot_summaries }}
-            <div class="stat-card" style="{{ if item.is_current }}border-color:#1f5fcc; box-shadow:0 0 0 1px rgba(31,95,204,0.12);{{ endif }}">
-                <div class="stat-key">{{ item.departure_time }}</div>
-                <div class="stat-value">{{ item.count }}</div>
-                <div class="text-sub" style="margin-top: 8px;">
-                    {{ if item.is_current }}你选择了这个时点{{ else }}其他时点{{ endif }}
-                    {{ if item.is_rewarded }} · 奖励时点{{ endif }}
-                </div>
-            </div>
-        {{ endfor }}
+    <div class="slot-table-wrap">
+        <table class="slot-table">
+            <thead>
+                <tr>
+                    <th>出发时间</th>
+                    <th>选择人数</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ for item in slot_summaries }}
+                    <tr class="{{ if item.is_current }}slot-table-row-current{{ endif }}">
+                        <td>{{ item.departure_time }}</td>
+                        <td>{{ item.count }}</td>
+                    </tr>
+                {{ endfor }}
+            </tbody>
+        </table>
     </div>
 
     <p class="text-sub">该页面会在 {{ auto_advance_seconds }} 秒后自动继续。</p>

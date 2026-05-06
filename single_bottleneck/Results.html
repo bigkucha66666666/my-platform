@@ -5,33 +5,33 @@
 {{ block global_styles }}
     {{ super() }}
     <style>
-        .result-reward-chart {
+        .result-cost-chart {
             margin-top: 16px;
             padding: 14px 14px 12px;
-            border: 1px solid #dbe8ff;
+            border: 1px solid #dbe5f0;
             border-radius: 14px;
-            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
 
-        .result-reward-chart-title {
+        .result-cost-chart-title {
             margin: 0 0 4px;
             font-size: 15px;
             font-weight: 700;
             color: #1e2a3a;
         }
 
-        .result-reward-chart-note {
+        .result-cost-chart-note {
             margin: 0 0 12px;
             font-size: 12px;
             line-height: 1.5;
             color: #5a6b82;
         }
 
-        .result-reward-row + .result-reward-row {
+        .result-cost-row + .result-cost-row {
             margin-top: 14px;
         }
 
-        .result-reward-head {
+        .result-cost-head {
             display: flex;
             align-items: baseline;
             justify-content: space-between;
@@ -39,44 +39,47 @@
             margin-bottom: 7px;
         }
 
-        .result-reward-label {
+        .result-cost-label {
             font-size: 13px;
             font-weight: 600;
             color: #1e2a3a;
         }
 
-        .result-reward-value {
+        .result-cost-value {
             flex-shrink: 0;
             font-size: 14px;
             font-weight: 700;
-            color: #1f5fcc;
+            color: #9f3a17;
         }
 
-        .result-reward-track {
+        .result-cost-track {
             position: relative;
             overflow: hidden;
             height: 16px;
-            border: 1px solid #d7e5ff;
+            border: 1px solid #ead6ca;
             border-radius: 999px;
-            background: linear-gradient(180deg, #eef4ff 0%, #dbe8ff 100%);
+            background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
         }
 
-        .result-reward-track.result-reward-track-cumulative {
-            border-color: #cfe7da;
-            background: linear-gradient(180deg, #edf8f2 0%, #d9f0e4 100%);
-        }
-
-        .result-reward-fill {
+        .result-cost-fill {
             height: 100%;
             min-width: 0;
             border-radius: inherit;
-            background: linear-gradient(90deg, #71afff 0%, #1f5fcc 100%);
+            background: linear-gradient(90deg, #f7b267 0%, #c8551f 100%);
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
             transition: width 220ms ease;
         }
 
-        .result-reward-fill.result-reward-fill-cumulative {
-            background: linear-gradient(90deg, #42c68b 0%, #167f5b 100%);
+        .result-cost-fill-early {
+            background: linear-gradient(90deg, #9fd3c7 0%, #2f8f7b 100%);
+        }
+
+        .result-cost-fill-late {
+            background: linear-gradient(90deg, #f4a7a2 0%, #bc3f3a 100%);
+        }
+
+        .result-cost-fill-toll {
+            background: linear-gradient(90deg, #ffd166 0%, #a66c00 100%);
         }
 
         .bottleneck-route-visual {
@@ -85,7 +88,7 @@
             border: 1px solid #dbe5f0;
             border-radius: 14px;
             background:
-                linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
 
         .bottleneck-route-title {
@@ -150,6 +153,10 @@
             line-height: 1.2;
         }
 
+        .route-metric-value-cost {
+            color: #9f3a17;
+        }
+
         .slot-table-wrap {
             overflow-x: auto;
             margin-top: 10px;
@@ -203,7 +210,7 @@
         }
 
         @media (max-width: 575px) {
-            .result-reward-head {
+            .result-cost-head {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 2px;
@@ -231,95 +238,119 @@
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮已完成，看看你这轮的排队与收益情况。</p>
+    <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮已完成，看看你这轮选择带来的成本。</p>
 
     <div class="card-lite">
-        <p><b>你的本轮表现</b></p>
+        <p><b>你的本轮成本</b></p>
         <p>出发时间：<b>{{ departure_time_label }}</b></p>
         <p>到达时间：<b>{{ arrival_time_label }}</b>（目标到达时间 {{ preferred_arrival_time }}）</p>
         <p>总行程时间：<b>{{ travel_time_minutes }}</b> 分钟</p>
         <p>排队延误：<b>{{ queue_delay_minutes }}</b> 分钟</p>
-        <p>早到惩罚对应分钟：<b>{{ schedule_early_minutes }}</b></p>
-        <p>晚到惩罚对应分钟：<b>{{ schedule_late_minutes }}</b></p>
+        <p>早到时间：<b>{{ schedule_early_minutes }}</b> 分钟</p>
+        <p>晚到时间：<b>{{ schedule_late_minutes }}</b> 分钟</p>
         <p>本时点总选择人数：<b>{{ slot_load }}</b></p>
-        <p>奖励补贴：<b>{{ reward_bonus }}</b></p>
-        <p>本轮积分：<b>{{ my_payoff }}</b></p>
-        <p>累计总积分（截至当前轮）：<b>{{ cumulative_payoff_so_far }}</b></p>
+        <p>出行成本：<b>{{ total_travel_cost_points }}</b> 成本分</p>
+        <p>粗收费：<b>{{ toll_charge_points }}</b> 成本分</p>
+        <p>最终选择成本：<b>{{ total_choice_cost_points }}</b> 成本分</p>
 
-        <div class="result-reward-chart" aria-label="奖励可视化">
-            <p class="result-reward-chart-title">奖励可视化</p>
-            <p class="result-reward-chart-note">下方柱状图用于直观看到本轮积分和截至当前轮的累计积分。</p>
+        <div class="result-cost-chart" aria-label="成本分解可视化">
+            <p class="result-cost-chart-title">成本分解</p>
+            <p class="result-cost-chart-note">最终选择成本由出行成本和粗收费组成；奖励不用于抵扣这里展示的成本。</p>
 
-            <div class="result-reward-row">
-                <div class="result-reward-head">
-                    <span class="result-reward-label">本轮积分</span>
-                    <span class="result-reward-value">{{ my_payoff }}</span>
+            <div class="result-cost-row">
+                <div class="result-cost-head">
+                    <span class="result-cost-label">排队成本</span>
+                    <span class="result-cost-value">{{ queue_cost_points }} 成本分</span>
                 </div>
-                <div class="result-reward-track" aria-hidden="true">
+                <div class="result-cost-track" aria-hidden="true">
                     <div
-                        class="result-reward-fill"
-                        style="width: {{ current_payoff_pct }}%; min-width: {{ current_payoff_min_width_px }}px;"
+                        class="result-cost-fill"
+                        style="width: {{ queue_cost_pct }}%; min-width: {{ if queue_cost_pct > 0 }}{{ cost_bar_min_width_px }}{{ else }}0{{ endif }}px;"
                     ></div>
                 </div>
             </div>
 
-            <div class="result-reward-row">
-                <div class="result-reward-head">
-                    <span class="result-reward-label">累计总积分（截至当前轮）</span>
-                    <span class="result-reward-value">{{ cumulative_payoff_so_far }}</span>
+            <div class="result-cost-row">
+                <div class="result-cost-head">
+                    <span class="result-cost-label">早到成本</span>
+                    <span class="result-cost-value">{{ early_cost_points }} 成本分</span>
                 </div>
-                <div class="result-reward-track result-reward-track-cumulative" aria-hidden="true">
+                <div class="result-cost-track" aria-hidden="true">
                     <div
-                        class="result-reward-fill result-reward-fill-cumulative"
-                        style="width: {{ cumulative_payoff_pct }}%; min-width: {{ cumulative_payoff_min_width_px }}px;"
+                        class="result-cost-fill result-cost-fill-early"
+                        style="width: {{ early_cost_pct }}%; min-width: {{ if early_cost_pct > 0 }}{{ cost_bar_min_width_px }}{{ else }}0{{ endif }}px;"
+                    ></div>
+                </div>
+            </div>
+
+            <div class="result-cost-row">
+                <div class="result-cost-head">
+                    <span class="result-cost-label">晚到成本</span>
+                    <span class="result-cost-value">{{ late_cost_points }} 成本分</span>
+                </div>
+                <div class="result-cost-track" aria-hidden="true">
+                    <div
+                        class="result-cost-fill result-cost-fill-late"
+                        style="width: {{ late_cost_pct }}%; min-width: {{ if late_cost_pct > 0 }}{{ cost_bar_min_width_px }}{{ else }}0{{ endif }}px;"
+                    ></div>
+                </div>
+            </div>
+
+            <div class="result-cost-row">
+                <div class="result-cost-head">
+                    <span class="result-cost-label">粗收费</span>
+                    <span class="result-cost-value">{{ toll_charge_points }} 成本分</span>
+                </div>
+                <div class="result-cost-track" aria-hidden="true">
+                    <div
+                        class="result-cost-fill result-cost-fill-toll"
+                        style="width: {{ toll_cost_pct }}%; min-width: {{ if toll_cost_pct > 0 }}{{ cost_bar_min_width_px }}{{ else }}0{{ endif }}px;"
                     ></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="bottleneck-route-visual" aria-label="Y 字路与瓶颈示意">
-        <p class="bottleneck-route-title">路径示意</p>
-        <p class="bottleneck-route-note">本轮所有参与者从出发入口进入同一个瓶颈，之后到达共同目标点。</p>
+    <div class="bottleneck-route-visual" aria-label="Y 字路与成本示意">
+        <p class="bottleneck-route-title">成本路径示意</p>
+        <p class="bottleneck-route-note">从出发入口进入瓶颈后，排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
 
-        <svg class="route-svg" viewBox="0 0 620 270" role="img" aria-label="Y 字路、瓶颈和目标到达点">
-            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#cbd5e1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 150 L440 56" fill="none" stroke="#cbd5e1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#475569" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 150 L440 56" fill="none" stroke="#475569" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 230 L310 154 L190 66" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
-            <path d="M310 154 L430 66" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
+        <svg class="route-svg" viewBox="0 0 620 270" role="img" aria-label="Y 字路、瓶颈和成本来源">
+            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#e7d4c4" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 150 L440 56" fill="none" stroke="#e7d4c4" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#7c4a2d" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 150 L440 56" fill="none" stroke="#7c4a2d" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M310 230 L310 154 L190 66" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
+            <path d="M310 154 L430 66" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
 
-            <circle cx="310" cy="150" r="22" fill="#f59e0b" stroke="#ffffff" stroke-width="5" />
-            <circle cx="310" cy="238" r="16" fill="#1f5fcc" stroke="#ffffff" stroke-width="4" />
-            <circle cx="180" cy="56" r="15" fill="#167f5b" stroke="#ffffff" stroke-width="4" />
-            <circle cx="440" cy="56" r="15" fill="#167f5b" stroke="#ffffff" stroke-width="4" />
+            <circle cx="310" cy="150" r="22" fill="#c8551f" stroke="#ffffff" stroke-width="5" />
+            <rect x="282" y="171" width="56" height="24" rx="8" fill="#ffd166" stroke="#7c4a2d" stroke-width="3" />
+            <circle cx="310" cy="238" r="16" fill="#4f6f52" stroke="#ffffff" stroke-width="4" />
+            <circle cx="180" cy="56" r="15" fill="#9f3a17" stroke="#ffffff" stroke-width="4" />
+            <circle cx="440" cy="56" r="15" fill="#9f3a17" stroke="#ffffff" stroke-width="4" />
 
             <text x="310" y="265" text-anchor="middle" class="route-label">出发入口</text>
             <text x="310" y="118" text-anchor="middle" class="route-label">瓶颈</text>
-            <text x="310" y="136" text-anchor="middle" class="route-label-muted">排队通过</text>
-            <text x="180" y="28" text-anchor="middle" class="route-label">目标到达</text>
-            <text x="440" y="28" text-anchor="middle" class="route-label">目标到达</text>
+            <text x="310" y="136" text-anchor="middle" class="route-label-muted">排队成本</text>
+            <text x="310" y="187" text-anchor="middle" class="route-label-muted">收费</text>
+            <text x="180" y="28" text-anchor="middle" class="route-label">到达偏差</text>
+            <text x="440" y="28" text-anchor="middle" class="route-label">到达偏差</text>
         </svg>
 
         <div class="route-metric-grid">
             <div class="route-metric">
-                <span class="route-metric-key">出发时间</span>
-                <span class="route-metric-value">{{ departure_time_label }}</span>
+                <span class="route-metric-key">最终选择成本</span>
+                <span class="route-metric-value route-metric-value-cost">{{ total_choice_cost_points }} 成本分</span>
             </div>
             <div class="route-metric">
-                <span class="route-metric-key">到达时间</span>
-                <span class="route-metric-value">{{ arrival_time_label }}</span>
+                <span class="route-metric-key">出行成本</span>
+                <span class="route-metric-value">{{ total_travel_cost_points }} 成本分</span>
             </div>
             <div class="route-metric">
-                <span class="route-metric-key">排队延误</span>
-                <span class="route-metric-value">{{ queue_delay_minutes }} 分钟</span>
+                <span class="route-metric-key">粗收费</span>
+                <span class="route-metric-value">{{ toll_charge_points }} 成本分</span>
             </div>
         </div>
-    </div>
-
-    <div class="hint-lite">
-        {{ reward_description }}
     </div>
 
     <p class="text-sub">本轮各时点选择分布：</p>

@@ -11,7 +11,8 @@
     </div>
 
     <div class="hint-lite">
-        {{ reward_description }}
+        <p style="margin: 0;">{{ coarse_toll_description }}</p>
+        <p style="margin: 6px 0 0;">{{ reward_description }}</p>
     </div>
 
     <p class="text-sub">⏱ 请在 {{ auto_advance_seconds }} 秒内完成选择；若在线超时未操作，系统将随机分配一个出发时间并自动继续。</p>
@@ -21,7 +22,12 @@
         {{ for item in slot_preview }}
             <div class="stat-card">
                 <div class="stat-key">{{ item.departure_time }}</div>
-                <div class="stat-value" style="font-size: 16px;">{{ if item.reward_active }}+{{ item.reward_bonus }}{{ else }}0{{ endif }}</div>
+                <div class="stat-value" style="font-size: 16px; color: #9f3a17;">
+                    收费 {{ item.toll_charge_label }} 成本分
+                </div>
+                <div class="text-sub" style="margin-top: 4px;">
+                    奖励：{{ if item.reward_active }}+{{ item.reward_bonus }}{{ else }}无{{ endif }}
+                </div>
                 <div class="text-sub" style="margin-top: 8px;">{{ item.departure_label }}</div>
             </div>
         {{ endfor }}

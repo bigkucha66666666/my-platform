@@ -2,35 +2,243 @@
     单瓶颈出发时间实验说明
 {{ endblock }}
 
+{{ block global_styles }}
+    {{ super() }}
+    <style>
+        .intro-lead {
+            margin: 0 0 16px;
+            color: #334155;
+            font-size: 15px;
+            line-height: 1.8;
+        }
+
+        .intro-section {
+            margin-top: 16px;
+            border: 1px solid #dbe5f0;
+            border-radius: 12px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .intro-section-title {
+            margin: 0;
+            padding: 12px 14px;
+            border-bottom: 1px solid #dbe5f0;
+            background: #f6f9fc;
+            color: #1e2a3a;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .intro-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 14px;
+        }
+
+        .intro-table th,
+        .intro-table td {
+            padding: 11px 14px;
+            border-bottom: 1px solid #edf2f7;
+            color: #334155;
+            line-height: 1.55;
+            text-align: left;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+        }
+
+        .intro-table tr:last-child th,
+        .intro-table tr:last-child td,
+        .intro-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .intro-table th {
+            width: 30%;
+            color: #52657c;
+            font-weight: 700;
+            background: #fbfdff;
+        }
+
+        .intro-time-table th:nth-child(1),
+        .intro-time-table td:nth-child(1) {
+            width: 22%;
+        }
+
+        .intro-time-table th:nth-child(2),
+        .intro-time-table td:nth-child(2) {
+            width: 48%;
+        }
+
+        .intro-time-table th:nth-child(3),
+        .intro-time-table td:nth-child(3),
+        .intro-time-table th:nth-child(4),
+        .intro-time-table td:nth-child(4) {
+            width: 15%;
+            text-align: right;
+        }
+
+        .intro-reward-value {
+            color: #1f5fcc;
+            font-weight: 700;
+        }
+
+        .intro-toll-value {
+            color: #9f3a17;
+            font-weight: 700;
+        }
+
+        .intro-actions {
+            margin-top: 18px;
+        }
+
+        @media (max-width: 575px) {
+            .intro-lead {
+                font-size: 14px;
+                line-height: 1.7;
+            }
+
+            .intro-section-title {
+                padding: 10px 11px;
+                font-size: 14px;
+            }
+
+            .intro-table {
+                font-size: 12.5px;
+            }
+
+            .intro-table th,
+            .intro-table td {
+                padding: 9px 10px;
+            }
+
+            .intro-table th {
+                width: 34%;
+            }
+
+            .intro-time-table th:nth-child(1),
+            .intro-time-table td:nth-child(1) {
+                width: 24%;
+            }
+
+            .intro-time-table th:nth-child(2),
+            .intro-time-table td:nth-child(2) {
+                width: 42%;
+            }
+
+            .intro-time-table th:nth-child(3),
+            .intro-time-table td:nth-child(3),
+            .intro-time-table th:nth-child(4),
+            .intro-time-table td:nth-child(4) {
+                width: 17%;
+            }
+        }
+    </style>
+{{ endblock }}
+
 {{ block content }}
-    <div class="card-lite">
-        <p class="text-main">你将参加一个 {{ total_rounds }} 轮的单瓶颈通勤实验。</p>
-        <p class="text-sub">每一轮中，你都要为同一次通勤选择一个出发时间。所有人共享同一个瓶颈，越多人集中在相近时间出发，排队越长。</p>
+    <p class="intro-lead">
+        你将参加 {{ total_rounds }} 轮单瓶颈通勤实验。每轮请选择一个出发时间；所有参与者都会经过同一个瓶颈，集中出发会增加排队延误。
+    </p>
+
+    <div class="intro-section">
+        <p class="intro-section-title">规则摘要</p>
+        <table class="intro-table">
+            <tbody>
+                <tr>
+                    <th>总轮数</th>
+                    <td>{{ total_rounds }} 轮</td>
+                </tr>
+                <tr>
+                    <th>目标到达时间</th>
+                    <td>{{ preferred_arrival_time }}</td>
+                </tr>
+                <tr>
+                    <th>无排队基准出发时间</th>
+                    <td>{{ free_flow_departure_time }}</td>
+                </tr>
+                <tr>
+                    <th>自由流行程</th>
+                    <td>{{ free_flow_travel_minutes }} 分钟</td>
+                </tr>
+                <tr>
+                    <th>瓶颈通行能力</th>
+                    <td>每个时点窗口最多服务 {{ capacity_per_slot }} 位参与者</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <div class="card-lite">
-        <p><b>规则概览</b></p>
-        <p>目标到达时间：<b>{{ preferred_arrival_time }}</b></p>
-        <p>无拥堵时建议出发时间：<b>{{ free_flow_departure_time }}</b>（自由流行程 {{ free_flow_travel_minutes }} 分钟）</p>
-        <p>瓶颈通行能力：每个时点窗口最多服务 <b>{{ capacity_per_slot }}</b> 位参与者</p>
-        <p>收益规则：<b>基础分 {{ base_points }}</b> - 排队延误成本 - 早到成本 - 晚到成本 + 可选奖励</p>
-        <p class="text-sub">排队延误每分钟扣 {{ queue_cost_per_minute }} 分，早到每分钟扣 {{ early_cost_per_minute }} 分，晚到每分钟扣 {{ late_cost_per_minute }} 分。</p>
+    <div class="intro-section">
+        <p class="intro-section-title">成本与结算规则</p>
+        <table class="intro-table">
+            <tbody>
+                <tr>
+                    <th>基础分</th>
+                    <td>{{ base_points }} points</td>
+                </tr>
+                <tr>
+                    <th>排队延误成本</th>
+                    <td>每分钟扣 {{ queue_cost_per_minute }} 分</td>
+                </tr>
+                <tr>
+                    <th>早到成本</th>
+                    <td>每分钟扣 {{ early_cost_per_minute }} 分</td>
+                </tr>
+                <tr>
+                    <th>晚到成本</th>
+                    <td>每分钟扣 {{ late_cost_per_minute }} 分</td>
+                </tr>
+                <tr>
+                    <th>奖励处理</th>
+                    <td>{{ reward_description }}</td>
+                </tr>
+                <tr>
+                    <th>粗收费处理</th>
+                    <td>{{ coarse_toll_description }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <div class="hint-lite">
-        {{ reward_description }}
+    <div class="intro-section">
+        <p class="intro-section-title">可选出发时间</p>
+        <table class="intro-table intro-time-table">
+            <thead>
+                <tr>
+                    <th>出发时间</th>
+                    <th>相对基准说明</th>
+                    <th>收费</th>
+                    <th>额外奖励</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ for item in slot_preview }}
+                    <tr>
+                        <td>{{ item.departure_time }}</td>
+                        <td>{{ item.departure_relation }}</td>
+                        <td>
+                            {{ if item.toll_active }}
+                                <span class="intro-toll-value">{{ item.toll_charge_label }} 成本分</span>
+                            {{ else }}
+                                无
+                            {{ endif }}
+                        </td>
+                        <td>
+                            {{ if item.reward_active }}
+                                <span class="intro-reward-value">+{{ item.reward_bonus }}</span>
+                            {{ else }}
+                                无
+                            {{ endif }}
+                        </td>
+                    </tr>
+                {{ endfor }}
+            </tbody>
+        </table>
     </div>
 
-    <p class="text-sub">可选出发时点如下：</p>
-    <div class="stats-grid">
-        {{ for item in slot_preview }}
-            <div class="stat-card">
-                <div class="stat-key">{{ item.departure_time }}</div>
-                <div class="stat-value" style="font-size: 16px;">{{ if item.reward_active }}+{{ item.reward_bonus }}{{ else }}无额外奖励{{ endif }}</div>
-                <div class="text-sub" style="margin-top: 8px;">{{ item.departure_label }}</div>
-            </div>
-        {{ endfor }}
+    <div class="intro-actions">
+        <button class="otree-btn-next btn btn-primary">进入第 1 轮</button>
     </div>
-
-    <button class="otree-btn-next btn btn-primary">进入第 1 轮</button>
 {{ endblock }}

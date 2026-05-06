@@ -9,7 +9,7 @@ from otree.api import *
 doc = """
 离散化的单瓶颈出发时间实验。
 参与者在每轮选择出发时间，系统根据瓶颈通行能力形成排队，
-并按照排队延误、早到/晚到惩罚和可选奖励处理计算收益。
+并按照排队延误、早到/晚到惩罚、可选奖励处理和粗收费处理计算收益。
 """
 
 DECISION_SOURCE_MANUAL = 'manual'
@@ -48,6 +48,7 @@ class C(BaseConstants):
     EARLY_COST_PER_MINUTE = 1
     LATE_COST_PER_MINUTE = 3
     DEFAULT_REWARD_BONUS_POINTS = 0
+    DEFAULT_COARSE_TOLL_POINTS = 8
 
 
 def minute_to_clock(value):
@@ -72,6 +73,10 @@ def minute_value_display(value):
     return f'{rounded:.1f}'
 
 
+def point_value_display(value):
+    return minute_value_display(value)
+
+
 def departure_slots():
     return list(range(1, C.NUM_DEPARTURE_SLOTS + 1))
 
@@ -88,16 +93,18 @@ def departure_offset_from_free_flow(slot: int):
     return int(round(departure_minute_for_slot(slot) - free_flow_departure_minute()))
 
 
-def departure_label_for_slot(slot: int):
-    departure_time = minute_to_clock(departure_minute_for_slot(slot))
+def departure_relation_for_slot(slot: int):
     offset = departure_offset_from_free_flow(slot)
     if offset == 0:
-        offset_text = '与无拥堵基准相同'
-    elif offset < 0:
-        offset_text = f'比无拥堵基准早 {abs(offset)} 分钟'
-    else:
-        offset_text = f'比无拥堵基准晚 {offset} 分钟'
-    return f'{departure_time}（{offset_text}）'
+        return '等于准时到达且无排队延误时所需出发时间'
+    if offset < 0:
+        return f'相对于准时到达且无排队延误时所需出发时间，提前 {abs(offset)} 分钟'
+    return f'相对于准时到达且无排队延误时所需出发时间，延后 {offset} 分钟'
+
+
+def departure_label_for_slot(slot: int):
+    departure_time = minute_to_clock(departure_minute_for_slot(slot))
+    return f'{departure_time}（{departure_relation_for_slot(slot)}）'
 
 
 DEPARTURE_SLOT_CHOICES = [
@@ -143,6 +150,9 @@ EXPORT_HEADERS = [
     'reward_treatment_enabled',
     'rewarded_slot_spec',
     'reward_bonus_points',
+    'coarse_toll_enabled',
+    'coarse_toll_slot_spec',
+    'coarse_toll_points',
     'bottleneck_capacity_per_slot',
     'assigned_group_id',
     'assigned_group_label',
@@ -160,6 +170,9 @@ EXPORT_HEADERS = [
     'schedule_late_minutes',
     'slot_load',
     'reward_bonus',
+    'coarse_toll_charge',
+    'travel_cost_without_toll',
+    'choice_cost_with_toll',
     'payoff',
     'final_total_payoff',
     'is_dropout',
@@ -325,11 +338,11 @@ def assign_group_metadata(matrix, grouping_enabled: bool):
             participant.vars['assigned_group_members'] = member_labels
 
 
-def parse_rewarded_slot_spec(spec: str):
-    rewarded_slots = set()
+def parse_slot_spec(spec: str, field_name: str):
+    selected_slots = set()
     raw_spec = (spec or '').strip()
     if not raw_spec:
-        return rewarded_slots
+        return selected_slots
 
     for raw_token in raw_spec.split(','):
         token = raw_token.strip()
@@ -341,22 +354,26 @@ def parse_rewarded_slot_spec(spec: str):
             end_slot = parse_int(end_text.strip(), 0)
             if start_slot <= 0 or end_slot <= 0 or end_slot < start_slot:
                 raise ValueError(
-                    f'非法 rewarded_slot_spec 区间：{token}。示例：1-3,9-11'
+                    f'非法 {field_name} 区间：{token}。示例：1-3,9-11'
                 )
-            rewarded_slots.update(range(start_slot, end_slot + 1))
+            selected_slots.update(range(start_slot, end_slot + 1))
             continue
         slot = parse_int(token, 0)
         if slot <= 0:
-            raise ValueError(f'非法 rewarded_slot_spec 项：{token}。示例：1-3,9-11')
-        rewarded_slots.add(slot)
+            raise ValueError(f'非法 {field_name} 项：{token}。示例：1-3,9-11')
+        selected_slots.add(slot)
 
-    invalid_slots = sorted(slot for slot in rewarded_slots if slot not in departure_slots())
+    invalid_slots = sorted(slot for slot in selected_slots if slot not in departure_slots())
     if invalid_slots:
         raise ValueError(
-            'rewarded_slot_spec 中存在超出可选范围的时点：'
+            f'{field_name} 中存在超出可选范围的时点：'
             + ', '.join(str(slot) for slot in invalid_slots)
         )
-    return rewarded_slots
+    return selected_slots
+
+
+def parse_rewarded_slot_spec(spec: str):
+    return parse_slot_spec(spec, 'rewarded_slot_spec')
 
 
 def bottleneck_capacity_per_slot(session):
@@ -409,18 +426,64 @@ def reward_description(session):
     )
 
 
+def coarse_toll_enabled(session) -> bool:
+    return config_flag(session.config.get('coarse_toll_enabled', 0))
+
+
+def coarse_toll_slot_spec(session):
+    return session.config.get('coarse_toll_slot_spec', '')
+
+
+def coarse_toll_slots_for_session(session):
+    return parse_slot_spec(coarse_toll_slot_spec(session), 'coarse_toll_slot_spec')
+
+
+def coarse_toll_points(session):
+    raw_value = session.config.get('coarse_toll_points', C.DEFAULT_COARSE_TOLL_POINTS)
+    return cu(max(0, round(parse_float(raw_value, C.DEFAULT_COARSE_TOLL_POINTS), 2)))
+
+
+def coarse_toll_for_slot(session, slot: int):
+    if not coarse_toll_enabled(session):
+        return cu(0)
+    if slot not in coarse_toll_slots_for_session(session):
+        return cu(0)
+    return coarse_toll_points(session)
+
+
+def coarse_toll_description(session):
+    if not coarse_toll_enabled(session):
+        return '当前未开启粗收费处理。'
+
+    tolled_slots = sorted(coarse_toll_slots_for_session(session))
+    if not tolled_slots:
+        return '粗收费处理已开启，但当前没有配置收费出发时点。'
+
+    time_labels = ', '.join(minute_to_clock(departure_minute_for_slot(slot)) for slot in tolled_slots)
+    return (
+        f'粗收费已开启：若选择 {time_labels} 出发，每轮需支付 '
+        f'{point_value_display(coarse_toll_points(session))} 成本分。'
+    )
+
+
 def slot_preview(session):
     rewarded_slots = rewarded_slots_for_session(session)
     reward_bonus = reward_bonus_points(session)
+    tolled_slots = coarse_toll_slots_for_session(session) if coarse_toll_enabled(session) else set()
+    toll_charge = coarse_toll_points(session)
     preview = []
     for slot in departure_slots():
         preview.append(
             dict(
                 slot=slot,
                 departure_label=departure_label_for_slot(slot),
+                departure_relation=departure_relation_for_slot(slot),
                 departure_time=minute_to_clock(departure_minute_for_slot(slot)),
                 reward_active=slot in rewarded_slots and reward_treatment_enabled(session),
                 reward_bonus=reward_bonus if slot in rewarded_slots and reward_treatment_enabled(session) else cu(0),
+                toll_active=slot in tolled_slots and coarse_toll_enabled(session),
+                toll_charge=toll_charge if slot in tolled_slots and coarse_toll_enabled(session) else cu(0),
+                toll_charge_label=point_value_display(toll_charge) if slot in tolled_slots and coarse_toll_enabled(session) else '0',
             )
         )
     return preview
@@ -445,6 +508,13 @@ def creating_session(subsession: Subsession):
             if not rewarded_slots:
                 raise ValueError(
                     'reward_treatment_enabled=1 时，rewarded_slot_spec 不能为空。示例：1-3,9-11'
+                )
+
+        if coarse_toll_enabled(subsession.session):
+            tolled_slots = coarse_toll_slots_for_session(subsession.session)
+            if not tolled_slots:
+                raise ValueError(
+                    'coarse_toll_enabled=1 时，coarse_toll_slot_spec 不能为空。示例：4-8'
                 )
 
         if session_name != 'single_bottleneck_prod' and (grouping_enabled or manual_grouping_spec.strip()):
@@ -618,12 +688,22 @@ def set_results(group: Group):
             early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
             late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
             reward_bonus = reward_bonus_for_slot(group.session, slot)
+            coarse_toll_charge = coarse_toll_for_slot(group.session, slot)
             generalized_cost = (
                 C.QUEUE_COST_PER_MINUTE * queue_delay
                 + C.EARLY_COST_PER_MINUTE * early_minutes
                 + C.LATE_COST_PER_MINUTE * late_minutes
             )
-            points = max(0, round(C.BASE_POINTS - generalized_cost + float(reward_bonus), 2))
+            points = max(
+                0,
+                round(
+                    C.BASE_POINTS
+                    - generalized_cost
+                    - float(coarse_toll_charge)
+                    + float(reward_bonus),
+                    2,
+                ),
+            )
 
             player.slot_load = slot_load
             player.departure_minute = round(departure_minute, 2)
@@ -658,7 +738,17 @@ def export_row_for_player(player: Player):
     reward_enabled = reward_treatment_enabled(player.session)
     rewarded_slot_spec = player.session.config.get('rewarded_slot_spec', '')
     reward_bonus_points_value = reward_bonus_points(player.session)
+    toll_enabled = coarse_toll_enabled(player.session)
+    toll_slot_spec = player.session.config.get('coarse_toll_slot_spec', '')
+    toll_points_value = coarse_toll_points(player.session)
     capacity_per_slot = bottleneck_capacity_per_slot(player.session)
+    selected_slot = player_departure_slot(player)
+    coarse_toll_charge = coarse_toll_for_slot(player.session, selected_slot) if selected_slot else cu(0)
+    queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(player, 'queue_delay_minutes', 0), 2)
+    early_cost = round(C.EARLY_COST_PER_MINUTE * safe_model_field(player, 'schedule_early_minutes', 0), 2)
+    late_cost = round(C.LATE_COST_PER_MINUTE * safe_model_field(player, 'schedule_late_minutes', 0), 2)
+    travel_cost_without_toll = round(queue_cost + early_cost + late_cost, 2)
+    choice_cost_with_toll = round(travel_cost_without_toll + float(coarse_toll_charge), 2)
 
     if session_config_name == 'single_bottleneck_prod':
         data_tier = 'prod'
@@ -687,6 +777,9 @@ def export_row_for_player(player: Player):
         reward_enabled,
         rewarded_slot_spec,
         reward_bonus_points_value,
+        toll_enabled,
+        toll_slot_spec,
+        toll_points_value,
         capacity_per_slot,
         assigned_group_id,
         assigned_group_label,
@@ -704,6 +797,9 @@ def export_row_for_player(player: Player):
         safe_model_field(player, 'schedule_late_minutes', 0),
         safe_model_field(player, 'slot_load', 0),
         safe_model_field(player, 'reward_bonus', cu(0)),
+        coarse_toll_charge,
+        travel_cost_without_toll,
+        choice_cost_with_toll,
         safe_model_field(player, 'payoff', ''),
         final_total_payoff,
         is_dropout,
@@ -830,6 +926,7 @@ def access_allowed(player: Player):
 
 def result_slot_summaries(group: Group, current_slot: int):
     rewarded_slots = rewarded_slots_for_session(group.session)
+    tolled_slots = coarse_toll_slots_for_session(group.session) if coarse_toll_enabled(group.session) else set()
     summaries = []
     for slot in departure_slots():
         count = sum(1 for player in group.get_players() if player_departure_slot(player) == slot)
@@ -840,6 +937,7 @@ def result_slot_summaries(group: Group, current_slot: int):
                 count=count,
                 is_current=slot == current_slot,
                 is_rewarded=reward_treatment_enabled(group.session) and slot in rewarded_slots,
+                is_tolled=coarse_toll_enabled(group.session) and slot in tolled_slots,
             )
         )
     return summaries
@@ -861,6 +959,7 @@ class Introduction(Page):
             late_cost_per_minute=C.LATE_COST_PER_MINUTE,
             base_points=C.BASE_POINTS,
             reward_description=reward_description(player.session),
+            coarse_toll_description=coarse_toll_description(player.session),
             slot_preview=slot_preview(player.session),
             capacity_per_slot=bottleneck_capacity_per_slot(player.session),
             total_rounds=C.NUM_ROUNDS,
@@ -900,6 +999,7 @@ class Decision(Page):
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
             reward_description=reward_description(player.session),
+            coarse_toll_description=coarse_toll_description(player.session),
             slot_preview=slot_preview(player.session),
         )
 
@@ -949,33 +1049,46 @@ class Results(Page):
     def vars_for_template(player: Player):
         maybe_prepare_results(player.group)
         current_slot = player_departure_slot(player) or departure_slots()[0]
-        my_payoff = safe_model_field(player, 'payoff', cu(0))
-        cumulative_payoff = cumulative_payoff_so_far(player)
-        current_payoff_pct = bounded_percent(my_payoff, C.BASE_POINTS + float(reward_bonus_points(player.session)))
-        cumulative_payoff_pct = bounded_percent(
-            cumulative_payoff,
-            (C.BASE_POINTS + float(reward_bonus_points(player.session))) * max(1, player.round_number),
-        )
+        queue_delay = safe_model_field(player, 'queue_delay_minutes', 0)
+        early_minutes = safe_model_field(player, 'schedule_early_minutes', 0)
+        late_minutes = safe_model_field(player, 'schedule_late_minutes', 0)
+        queue_cost_points = round(C.QUEUE_COST_PER_MINUTE * queue_delay, 2)
+        early_cost_points = round(C.EARLY_COST_PER_MINUTE * early_minutes, 2)
+        late_cost_points = round(C.LATE_COST_PER_MINUTE * late_minutes, 2)
+        schedule_cost_points = round(early_cost_points + late_cost_points, 2)
+        total_travel_cost_points = round(queue_cost_points + schedule_cost_points, 2)
+        toll_charge_points = round(float(coarse_toll_for_slot(player.session, current_slot)), 2)
+        total_choice_cost_points = round(total_travel_cost_points + toll_charge_points, 2)
+        queue_cost_pct = bounded_percent(queue_cost_points, total_choice_cost_points)
+        early_cost_pct = bounded_percent(early_cost_points, total_choice_cost_points)
+        late_cost_pct = bounded_percent(late_cost_points, total_choice_cost_points)
+        toll_cost_pct = bounded_percent(toll_charge_points, total_choice_cost_points)
+        cost_bar_min_width_px = 18 if total_choice_cost_points > 0 else 0
 
         return dict(
             departure_time_label=safe_model_field(player, 'departure_time_label', ''),
             arrival_time_label=safe_model_field(player, 'arrival_time_label', ''),
-            queue_delay_minutes=minute_value_display(safe_model_field(player, 'queue_delay_minutes', 0)),
+            queue_delay_minutes=minute_value_display(queue_delay),
             travel_time_minutes=minute_value_display(safe_model_field(player, 'travel_time_minutes', 0)),
-            schedule_early_minutes=minute_value_display(safe_model_field(player, 'schedule_early_minutes', 0)),
-            schedule_late_minutes=minute_value_display(safe_model_field(player, 'schedule_late_minutes', 0)),
-            reward_bonus=safe_model_field(player, 'reward_bonus', cu(0)),
+            schedule_early_minutes=minute_value_display(early_minutes),
+            schedule_late_minutes=minute_value_display(late_minutes),
             slot_load=safe_model_field(player, 'slot_load', 0),
             current_slot=current_slot,
             current_slot_time=minute_to_clock(departure_minute_for_slot(current_slot)),
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
-            my_payoff=my_payoff,
-            cumulative_payoff_so_far=cumulative_payoff,
-            current_payoff_pct=current_payoff_pct,
-            cumulative_payoff_pct=cumulative_payoff_pct,
-            current_payoff_min_width_px=18 if current_payoff_pct > 0 else 0,
-            cumulative_payoff_min_width_px=18 if cumulative_payoff_pct > 0 else 0,
-            reward_description=reward_description(player.session),
+            queue_cost_points=minute_value_display(queue_cost_points),
+            early_cost_points=minute_value_display(early_cost_points),
+            late_cost_points=minute_value_display(late_cost_points),
+            schedule_cost_points=minute_value_display(schedule_cost_points),
+            total_travel_cost_points=minute_value_display(total_travel_cost_points),
+            toll_charge_points=minute_value_display(toll_charge_points),
+            total_choice_cost_points=minute_value_display(total_choice_cost_points),
+            queue_cost_pct=queue_cost_pct,
+            early_cost_pct=early_cost_pct,
+            late_cost_pct=late_cost_pct,
+            toll_cost_pct=toll_cost_pct,
+            cost_bar_min_width_px=cost_bar_min_width_px,
+            coarse_toll_description=coarse_toll_description(player.session),
             slot_summaries=result_slot_summaries(player.group, current_slot),
             auto_advance_seconds=Results.get_timeout_seconds(player),
         )

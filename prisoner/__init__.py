@@ -70,6 +70,8 @@ class ResultsWaitPage(WaitPage):
 
 
 class Results(Page):
+    timeout_seconds = 30
+
     @staticmethod
     def vars_for_template(player: Player):
         opponent = other_player(player)

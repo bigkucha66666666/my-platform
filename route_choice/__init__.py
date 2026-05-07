@@ -22,7 +22,7 @@ class C(BaseConstants):
     PLAYERS_PER_GROUP = None
     NUM_ROUNDS = 10
     DECISION_TIMEOUT_SECONDS = 30
-    RESULTS_TIMEOUT_SECONDS = 12
+    RESULTS_TIMEOUT_SECONDS = 30
     DROPOUT_TIMEOUT_SECONDS = 1
     ROUND1_JOIN_GRACE_SECONDS = 15
     WAIT_GRACE_SECONDS = 5
@@ -842,6 +842,7 @@ class Results(Page):
 
     @staticmethod
     def get_timeout_seconds(player: Player):
+        maybe_restore_disconnect_participant(player)
         if participant_dropout_active(player):
             return C.DROPOUT_TIMEOUT_SECONDS
         return C.RESULTS_TIMEOUT_SECONDS

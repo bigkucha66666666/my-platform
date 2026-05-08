@@ -313,15 +313,21 @@
 
     <div class="bottleneck-route-visual" aria-label="Y 字路与成本示意">
         <p class="bottleneck-route-title">成本路径示意</p>
-        <p class="bottleneck-route-note">从出发入口进入瓶颈后，排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
+        <p class="bottleneck-route-note">两个出发入口汇入同一瓶颈后，沿共同路段到达目标终点；排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
 
-        <svg class="route-svg" viewBox="0 0 620 270" role="img" aria-label="Y 字路、瓶颈和成本来源">
+        <svg class="route-svg" viewBox="0 0 620 270" role="img" aria-label="两个出发入口汇入瓶颈并到达同一终点">
+            <defs>
+                <marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                    <path d="M0 0 L10 5 L0 10 Z" fill="#fff7ed" />
+                </marker>
+            </defs>
+
             <path d="M310 238 L310 150 L180 56" fill="none" stroke="#e7d4c4" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
             <path d="M310 150 L440 56" fill="none" stroke="#e7d4c4" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
             <path d="M310 238 L310 150 L180 56" fill="none" stroke="#7c4a2d" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
             <path d="M310 150 L440 56" fill="none" stroke="#7c4a2d" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 230 L310 154 L190 66" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
-            <path d="M310 154 L430 66" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" />
+            <path d="M190 66 L310 154 L310 226" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" marker-end="url(#route-arrow)" />
+            <path d="M430 66 L310 154 L310 226" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" marker-end="url(#route-arrow)" />
 
             <circle cx="310" cy="150" r="22" fill="#c8551f" stroke="#ffffff" stroke-width="5" />
             <rect x="282" y="171" width="56" height="24" rx="8" fill="#ffd166" stroke="#7c4a2d" stroke-width="3" />
@@ -329,12 +335,12 @@
             <circle cx="180" cy="56" r="15" fill="#9f3a17" stroke="#ffffff" stroke-width="4" />
             <circle cx="440" cy="56" r="15" fill="#9f3a17" stroke="#ffffff" stroke-width="4" />
 
-            <text x="310" y="265" text-anchor="middle" class="route-label">出发入口</text>
+            <text x="310" y="265" text-anchor="middle" class="route-label">目标终点</text>
             <text x="310" y="118" text-anchor="middle" class="route-label">瓶颈</text>
             <text x="310" y="136" text-anchor="middle" class="route-label-muted">排队成本</text>
             <text x="310" y="187" text-anchor="middle" class="route-label-muted">收费</text>
-            <text x="180" y="28" text-anchor="middle" class="route-label">到达偏差</text>
-            <text x="440" y="28" text-anchor="middle" class="route-label">到达偏差</text>
+            <text x="180" y="28" text-anchor="middle" class="route-label">出发入口</text>
+            <text x="440" y="28" text-anchor="middle" class="route-label">出发入口</text>
         </svg>
 
         <div class="route-metric-grid">

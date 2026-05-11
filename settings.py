@@ -20,6 +20,10 @@ def load_local_env():
 
 load_local_env()
 
+# oTree computes its default DEBUG before importing this project settings file.
+# Re-declare DEBUG here so values loaded from .env can hide participant debug info.
+DEBUG = environ.get('OTREE_PRODUCTION') in [None, '', '0']
+
 PROD_PARTICIPANT_PASSWORD = environ.get('OTREE_PROD_PARTICIPANT_PASSWORD')
 
 SESSION_CONFIGS = [
@@ -55,7 +59,7 @@ SESSION_CONFIGS = [
         doc=(
             "用于真实被试的单瓶颈出发时间实验。\n"
             "参与者在每轮选择出发时间，系统按瓶颈容量与早到/晚到成本计算收益。\n"
-            "默认开启单步粗收费；如需调整，可修改 coarse_toll_slot_spec 与 coarse_toll_points。"
+            "默认按每组实际人数自动校准单步粗收费；关闭自动校准后可手动设置收费时段。"
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
         cohort_size=5,
@@ -64,6 +68,10 @@ SESSION_CONFIGS = [
         reward_treatment_enabled=0,
         rewarded_slot_spec='',
         reward_bonus_points=8,
+        coarse_toll_auto_enabled=1,
+        coarse_toll_auto_min_toll=0,
+        coarse_toll_auto_max_toll=40,
+        coarse_toll_auto_toll_step=1,
         coarse_toll_enabled=1,
         coarse_toll_slot_spec='4-8',
         coarse_toll_points=8,
@@ -80,7 +88,7 @@ SESSION_CONFIGS = [
         app_sequence=['single_bottleneck'],
         doc=(
             "用于单瓶颈出发时间实验的流程演示。\n"
-            "默认开启单步粗收费；如需测试奖励，可设置 reward_treatment_enabled=1。"
+            "默认按每组实际人数自动校准单步粗收费；如需测试奖励，可设置 reward_treatment_enabled=1。"
         ),
         cohort_size=5,
         grouping_enabled=0,
@@ -88,6 +96,10 @@ SESSION_CONFIGS = [
         reward_treatment_enabled=0,
         rewarded_slot_spec='',
         reward_bonus_points=8,
+        coarse_toll_auto_enabled=1,
+        coarse_toll_auto_min_toll=0,
+        coarse_toll_auto_max_toll=40,
+        coarse_toll_auto_toll_step=1,
         coarse_toll_enabled=1,
         coarse_toll_slot_spec='4-8',
         coarse_toll_points=8,

@@ -2,12 +2,199 @@
     单瓶颈出发时间选择
 {{ endblock }}
 
+{{ block global_styles }}
+    {{ super() }}
+    <style>
+        .decision-summary {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .decision-summary-item {
+            border: 1px solid #dbe5f0;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 11px 13px;
+        }
+
+        .decision-summary-key {
+            margin: 0 0 4px;
+            color: #65758a;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .decision-summary-value {
+            margin: 0;
+            color: #1e2a3a;
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .choice-table-card {
+            margin: 14px 0 18px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .choice-table-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 13px 15px;
+            border-bottom: 1px solid #dbe5f0;
+            background: #f6f9fc;
+        }
+
+        .choice-table-title {
+            margin: 0;
+            color: #1e2a3a;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .choice-table-note {
+            margin: 0;
+            color: #65758a;
+            font-size: 12px;
+        }
+
+        .choice-table-wrap {
+            overflow-x: auto;
+        }
+
+        .choice-table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+            font-size: 14px;
+        }
+
+        .choice-table th,
+        .choice-table td {
+            padding: 11px 13px;
+            border-bottom: 1px solid #edf2f7;
+            color: #334155;
+            text-align: left;
+            vertical-align: middle;
+            line-height: 1.45;
+        }
+
+        .choice-table th {
+            color: #52657c;
+            font-size: 12px;
+            font-weight: 700;
+            background: #fbfdff;
+        }
+
+        .choice-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .choice-table tbody tr:has(input[type="radio"]:checked) td {
+            background: #eef6ff;
+        }
+
+        .choice-table tbody tr:has(input[type="radio"]:checked) td:first-child {
+            border-left: 4px solid #1f5fcc;
+            padding-left: 9px;
+        }
+
+        .choice-radio-cell {
+            width: 58px;
+            text-align: center;
+        }
+
+        .choice-radio {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .choice-time {
+            color: #1e2a3a;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .choice-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 26px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .choice-badge-toll {
+            border: 1px solid #ead6ca;
+            background: #fff7ed;
+            color: #9f3a17;
+        }
+
+        .choice-badge-reward {
+            border: 1px solid #cfe1ff;
+            background: #eef4ff;
+            color: #1f5fcc;
+        }
+
+        .choice-badge-muted {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        @media (max-width: 575px) {
+            .decision-summary {
+                grid-template-columns: 1fr;
+            }
+
+            .choice-table-head {
+                display: block;
+            }
+
+            .choice-table-note {
+                margin-top: 4px;
+            }
+
+            .choice-table {
+                min-width: 700px;
+                font-size: 13px;
+            }
+
+            .choice-table th,
+            .choice-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+{{ endblock }}
+
 {{ block content }}
     <p class="text-sub">当前为第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请选择你本轮的出发时间。</p>
 
     <div class="card-lite">
-        <p class="text-main">目标到达时间：<b>{{ preferred_arrival_time }}</b></p>
-        <p class="text-sub">如果没有排队，无拥堵基准出发时间为 <b>{{ free_flow_departure_time }}</b>。</p>
+        <div class="decision-summary">
+            <div class="decision-summary-item">
+                <p class="decision-summary-key">目标到达时间</p>
+                <p class="decision-summary-value">{{ preferred_arrival_time }}</p>
+            </div>
+            <div class="decision-summary-item">
+                <p class="decision-summary-key">无排队基准出发时间</p>
+                <p class="decision-summary-value">{{ free_flow_departure_time }}</p>
+            </div>
+        </div>
+        <p class="text-sub">表格中的“相对基准说明”表示相对于准时到达且无排队延误时所需出发时间的提前或延后分钟数。</p>
     </div>
 
     <div class="hint-lite">
@@ -18,22 +205,59 @@
     <p class="text-sub">⏱ 请在 {{ auto_advance_seconds }} 秒内完成选择；若在线超时未操作，系统将随机分配一个出发时间并自动继续。</p>
     <p class="text-sub">📴 若中途关闭页面或网络中断，系统可能在截止后自动补全你错过轮次的选择；你重新通过原参与者入口登录后，追到当前开放轮次时可恢复正常作答。</p>
 
-    <div class="stats-grid" style="margin-bottom: 18px;">
-        {{ for item in slot_preview }}
-            <div class="stat-card">
-                <div class="stat-key">{{ item.departure_time }}</div>
-                <div class="stat-value" style="font-size: 16px; color: #9f3a17;">
-                    收费 {{ item.toll_charge_label }} 成本分
-                </div>
-                <div class="text-sub" style="margin-top: 4px;">
-                    奖励：{{ if item.reward_active }}+{{ item.reward_bonus }}{{ else }}无{{ endif }}
-                </div>
-                <div class="text-sub" style="margin-top: 8px;">{{ item.departure_label }}</div>
-            </div>
-        {{ endfor }}
+    <div class="choice-table-card">
+        <div class="choice-table-head">
+            <p class="choice-table-title">可选出发时间</p>
+            <p class="choice-table-note">点击左侧圆点选择本轮出发时间</p>
+        </div>
+        <div class="choice-table-wrap">
+            <table class="choice-table">
+                <thead>
+                    <tr>
+                        <th class="choice-radio-cell">选择</th>
+                        <th>出发时间</th>
+                        <th>相对基准说明</th>
+                        <th>收费</th>
+                        <th>奖励</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ for item in slot_preview }}
+                        <tr>
+                            <td class="choice-radio-cell">
+                                <input
+                                    class="choice-radio"
+                                    type="radio"
+                                    name="departure_slot"
+                                    id="departure-slot-{{ item.slot }}"
+                                    value="{{ item.slot }}"
+                                    required
+                                >
+                            </td>
+                            <td>
+                                <label class="choice-time" for="departure-slot-{{ item.slot }}">{{ item.departure_time }}</label>
+                            </td>
+                            <td>{{ item.departure_relation }}</td>
+                            <td>
+                                {{ if item.toll_active }}
+                                    <span class="choice-badge choice-badge-toll">收费 {{ item.toll_charge_label }} 成本分</span>
+                                {{ else }}
+                                    <span class="choice-badge choice-badge-muted">无收费</span>
+                                {{ endif }}
+                            </td>
+                            <td>
+                                {{ if item.reward_active }}
+                                    <span class="choice-badge choice-badge-reward">+{{ item.reward_bonus }}</span>
+                                {{ else }}
+                                    <span class="choice-badge choice-badge-muted">无奖励</span>
+                                {{ endif }}
+                            </td>
+                        </tr>
+                    {{ endfor }}
+                </tbody>
+            </table>
+        </div>
     </div>
-
-    {{ formfields }}
 
     <button class="otree-btn-next btn btn-primary">确认本轮选择</button>
 {{ endblock }}

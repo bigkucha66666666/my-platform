@@ -19,6 +19,10 @@ EPSILON = 1e-9
 MAX_EXACT_DISTRIBUTIONS = 500_000
 
 
+class CalibrationError(Exception):
+    """Raised when exact toll calibration cannot be completed safely."""
+
+
 @dataclass(frozen=True)
 class CalibrationConfig:
     players: int
@@ -145,7 +149,7 @@ def count_distributions(total: int, slots_count: int) -> int:
 def ensure_exact_search_size(players: int, slots_count: int):
     distribution_count = count_distributions(players, slots_count)
     if distribution_count > MAX_EXACT_DISTRIBUTIONS:
-        raise SystemExit(
+        raise CalibrationError(
             '精确搜索规模过大：'
             f'{players} 人、{slots_count} 个时点会产生 {distribution_count} 个分布。'
             '请减少 --players，或缩小收费搜索范围后再尝试。'
@@ -389,6 +393,92 @@ def search_configs(
     return candidates[: config.top_k]
 
 
+def build_search_tables(
+    *,
+    players: int,
+    capacity: int,
+    valid_slots: tuple[int, ...] | None = None,
+) -> tuple[
+    tuple[int, ...],
+    tuple[tuple[int, ...], ...],
+    dict[tuple[int, ...], tuple[float, ...]],
+]:
+    if valid_slots is None:
+        valid_slots = tuple(departure_slots())
+
+    ensure_exact_search_size(players, len(valid_slots))
+    count_keys = tuple(generate_count_keys(players, len(valid_slots)))
+    other_count_keys = tuple(generate_count_keys(players - 1, len(valid_slots)))
+    base_cost_table = build_base_cost_table(
+        other_count_keys,
+        valid_slots=valid_slots,
+        capacity=capacity,
+    )
+    return valid_slots, count_keys, base_cost_table
+
+
+def calibrate_candidates(
+    *,
+    players: int,
+    capacity: int = C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT,
+    min_toll: float = 0,
+    max_toll: float = 40,
+    toll_step: float = 1,
+    top_k: int = 10,
+) -> list[EquilibriumCandidate]:
+    if players <= 0:
+        raise CalibrationError('players 必须大于 0。')
+    if capacity <= 0:
+        raise CalibrationError('capacity 必须大于 0。')
+    if toll_step <= 0:
+        raise CalibrationError('toll_step 必须大于 0。')
+    if min_toll > max_toll:
+        raise CalibrationError('min_toll 不能大于 max_toll。')
+
+    valid_slots, count_keys, base_cost_table = build_search_tables(
+        players=players,
+        capacity=capacity,
+    )
+    config = CalibrationConfig(
+        players=players,
+        capacity=capacity,
+        min_toll=min_toll,
+        max_toll=max_toll,
+        toll_step=toll_step,
+        top_k=top_k,
+    )
+    return search_configs(
+        config=config,
+        count_keys=count_keys,
+        base_cost_table=base_cost_table,
+        valid_slots=valid_slots,
+    )
+
+
+def calibrate_best_candidate(
+    *,
+    players: int,
+    capacity: int = C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT,
+    min_toll: float = 0,
+    max_toll: float = 40,
+    toll_step: float = 1,
+) -> EquilibriumCandidate:
+    candidates = calibrate_candidates(
+        players=players,
+        capacity=capacity,
+        min_toll=min_toll,
+        max_toll=max_toll,
+        toll_step=toll_step,
+        top_k=1,
+    )
+    if not candidates:
+        raise CalibrationError(
+            f'未找到可用粗收费配置：players={players}, capacity={capacity}, '
+            f'min_toll={min_toll}, max_toll={max_toll}, toll_step={toll_step}'
+        )
+    return candidates[0]
+
+
 def candidate_to_record(
     candidate: EquilibriumCandidate,
     *,
@@ -502,7 +592,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     window = validate_args(parser, args, valid_slots)
-    ensure_exact_search_size(args.players, len(valid_slots))
+    try:
+        ensure_exact_search_size(args.players, len(valid_slots))
+    except CalibrationError as exc:
+        raise SystemExit(str(exc)) from exc
 
     config = CalibrationConfig(
         players=args.players,

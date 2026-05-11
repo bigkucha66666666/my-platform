@@ -19,6 +19,10 @@ DECISION_SOURCE_DISCONNECT_AUTO = 'disconnect_auto'
 DROPOUT_REASON_TIMEOUT = 'timeout'
 DROPOUT_REASON_DISCONNECT = 'disconnect'
 
+COARSE_TOLL_SOURCE_MANUAL = 'manual'
+COARSE_TOLL_SOURCE_AUTO = 'auto'
+COARSE_TOLL_AUTO_RESULT_VAR = 'single_bottleneck_coarse_toll_auto_result'
+
 
 class C(BaseConstants):
     NAME_IN_URL = 'single_bottleneck'
@@ -48,6 +52,12 @@ class C(BaseConstants):
     EARLY_COST_PER_MINUTE = 1
     LATE_COST_PER_MINUTE = 3
     DEFAULT_REWARD_BONUS_POINTS = 0
+    DEFAULT_COARSE_TOLL_AUTO_ENABLED = 0
+    DEFAULT_COARSE_TOLL_AUTO_MIN_TOLL = 0
+    DEFAULT_COARSE_TOLL_AUTO_MAX_TOLL = 40
+    DEFAULT_COARSE_TOLL_AUTO_TOLL_STEP = 1
+    DEFAULT_COARSE_TOLL_ENABLED = 1
+    DEFAULT_COARSE_TOLL_SLOT_SPEC = '4-8'
     DEFAULT_COARSE_TOLL_POINTS = 8
 
 
@@ -150,6 +160,13 @@ EXPORT_HEADERS = [
     'reward_treatment_enabled',
     'rewarded_slot_spec',
     'reward_bonus_points',
+    'coarse_toll_source',
+    'coarse_toll_auto_enabled',
+    'coarse_toll_calibration_players',
+    'coarse_toll_calibration_cost_gap',
+    'coarse_toll_calibration_nash_count',
+    'coarse_toll_equilibrium_distribution',
+    'coarse_toll_equilibrium_costs',
     'coarse_toll_enabled',
     'coarse_toll_slot_spec',
     'coarse_toll_points',
@@ -426,12 +443,46 @@ def reward_description(session):
     )
 
 
+def coarse_toll_auto_enabled(session) -> bool:
+    return config_flag(session.config.get('coarse_toll_auto_enabled', C.DEFAULT_COARSE_TOLL_AUTO_ENABLED))
+
+
+def coarse_toll_auto_min_toll(session):
+    return max(
+        0,
+        parse_float(
+            session.config.get('coarse_toll_auto_min_toll', C.DEFAULT_COARSE_TOLL_AUTO_MIN_TOLL),
+            C.DEFAULT_COARSE_TOLL_AUTO_MIN_TOLL,
+        ),
+    )
+
+
+def coarse_toll_auto_max_toll(session):
+    return max(
+        0,
+        parse_float(
+            session.config.get('coarse_toll_auto_max_toll', C.DEFAULT_COARSE_TOLL_AUTO_MAX_TOLL),
+            C.DEFAULT_COARSE_TOLL_AUTO_MAX_TOLL,
+        ),
+    )
+
+
+def coarse_toll_auto_toll_step(session):
+    return max(
+        0,
+        parse_float(
+            session.config.get('coarse_toll_auto_toll_step', C.DEFAULT_COARSE_TOLL_AUTO_TOLL_STEP),
+            C.DEFAULT_COARSE_TOLL_AUTO_TOLL_STEP,
+        ),
+    )
+
+
 def coarse_toll_enabled(session) -> bool:
-    return config_flag(session.config.get('coarse_toll_enabled', 0))
+    return config_flag(session.config.get('coarse_toll_enabled', C.DEFAULT_COARSE_TOLL_ENABLED))
 
 
 def coarse_toll_slot_spec(session):
-    return session.config.get('coarse_toll_slot_spec', '')
+    return session.config.get('coarse_toll_slot_spec', C.DEFAULT_COARSE_TOLL_SLOT_SPEC)
 
 
 def coarse_toll_slots_for_session(session):
@@ -443,34 +494,72 @@ def coarse_toll_points(session):
     return cu(max(0, round(parse_float(raw_value, C.DEFAULT_COARSE_TOLL_POINTS), 2)))
 
 
-def coarse_toll_for_slot(session, slot: int):
-    if not coarse_toll_enabled(session):
-        return cu(0)
-    if slot not in coarse_toll_slots_for_session(session):
-        return cu(0)
-    return coarse_toll_points(session)
+def participant_auto_coarse_toll_result(player: Player):
+    result = player.participant.vars.get(COARSE_TOLL_AUTO_RESULT_VAR, {})
+    if isinstance(result, dict) and result.get('enabled'):
+        return result
+    return {}
 
 
-def coarse_toll_description(session):
-    if not coarse_toll_enabled(session):
+def coarse_toll_source_for_player(player: Player):
+    return COARSE_TOLL_SOURCE_AUTO if participant_auto_coarse_toll_result(player) else COARSE_TOLL_SOURCE_MANUAL
+
+
+def coarse_toll_enabled_for_player(player: Player) -> bool:
+    if participant_auto_coarse_toll_result(player):
+        return True
+    return coarse_toll_enabled(player.session)
+
+
+def coarse_toll_slot_spec_for_player(player: Player):
+    auto_result = participant_auto_coarse_toll_result(player)
+    if auto_result:
+        return auto_result.get('slot_spec', C.DEFAULT_COARSE_TOLL_SLOT_SPEC)
+    return coarse_toll_slot_spec(player.session)
+
+
+def coarse_toll_slots_for_player(player: Player):
+    return parse_slot_spec(coarse_toll_slot_spec_for_player(player), 'coarse_toll_slot_spec')
+
+
+def coarse_toll_points_for_player(player: Player):
+    auto_result = participant_auto_coarse_toll_result(player)
+    if auto_result:
+        raw_value = auto_result.get('points', C.DEFAULT_COARSE_TOLL_POINTS)
+    else:
+        raw_value = coarse_toll_points(player.session)
+    return cu(max(0, round(parse_float(raw_value, C.DEFAULT_COARSE_TOLL_POINTS), 2)))
+
+
+def coarse_toll_for_player_slot(player: Player, slot: int):
+    if not coarse_toll_enabled_for_player(player):
+        return cu(0)
+    if slot not in coarse_toll_slots_for_player(player):
+        return cu(0)
+    return coarse_toll_points_for_player(player)
+
+
+def coarse_toll_description_for_player(player: Player):
+    if not coarse_toll_enabled_for_player(player):
         return '当前未开启粗收费处理。'
 
-    tolled_slots = sorted(coarse_toll_slots_for_session(session))
+    tolled_slots = sorted(coarse_toll_slots_for_player(player))
     if not tolled_slots:
         return '粗收费处理已开启，但当前没有配置收费出发时点。'
 
     time_labels = ', '.join(minute_to_clock(departure_minute_for_slot(slot)) for slot in tolled_slots)
+    prefix = '粗收费已自动校准' if coarse_toll_source_for_player(player) == COARSE_TOLL_SOURCE_AUTO else '粗收费已开启'
     return (
-        f'粗收费已开启：若选择 {time_labels} 出发，每轮需支付 '
-        f'{point_value_display(coarse_toll_points(session))} 成本分。'
+        f'{prefix}：若选择 {time_labels} 出发，每轮需支付 '
+        f'{point_value_display(coarse_toll_points_for_player(player))} 成本分。'
     )
 
 
-def slot_preview(session):
-    rewarded_slots = rewarded_slots_for_session(session)
-    reward_bonus = reward_bonus_points(session)
-    tolled_slots = coarse_toll_slots_for_session(session) if coarse_toll_enabled(session) else set()
-    toll_charge = coarse_toll_points(session)
+def slot_preview_for_player(player: Player):
+    rewarded_slots = rewarded_slots_for_session(player.session)
+    reward_bonus = reward_bonus_points(player.session)
+    tolled_slots = coarse_toll_slots_for_player(player) if coarse_toll_enabled_for_player(player) else set()
+    toll_charge = coarse_toll_points_for_player(player)
     preview = []
     for slot in departure_slots():
         preview.append(
@@ -479,14 +568,91 @@ def slot_preview(session):
                 departure_label=departure_label_for_slot(slot),
                 departure_relation=departure_relation_for_slot(slot),
                 departure_time=minute_to_clock(departure_minute_for_slot(slot)),
-                reward_active=slot in rewarded_slots and reward_treatment_enabled(session),
-                reward_bonus=reward_bonus if slot in rewarded_slots and reward_treatment_enabled(session) else cu(0),
-                toll_active=slot in tolled_slots and coarse_toll_enabled(session),
-                toll_charge=toll_charge if slot in tolled_slots and coarse_toll_enabled(session) else cu(0),
-                toll_charge_label=point_value_display(toll_charge) if slot in tolled_slots and coarse_toll_enabled(session) else '0',
+                reward_active=slot in rewarded_slots and reward_treatment_enabled(player.session),
+                reward_bonus=reward_bonus if slot in rewarded_slots and reward_treatment_enabled(player.session) else cu(0),
+                toll_active=slot in tolled_slots and coarse_toll_enabled_for_player(player),
+                toll_charge=toll_charge if slot in tolled_slots and coarse_toll_enabled_for_player(player) else cu(0),
+                toll_charge_label=point_value_display(toll_charge) if slot in tolled_slots and coarse_toll_enabled_for_player(player) else '0',
             )
         )
     return preview
+
+
+def auto_toll_distribution_summary(candidate):
+    items = []
+    for slot, count in zip(departure_slots(), candidate.distribution):
+        if count <= 0:
+            continue
+        items.append(f'slot {slot}({minute_to_clock(departure_minute_for_slot(slot))}): {count}人')
+    return ', '.join(items)
+
+
+def auto_toll_cost_summary(candidate):
+    return ', '.join(
+        f'slot {slot}: {point_value_display(cost)}'
+        for slot, cost in candidate.selected_costs
+    )
+
+
+def build_auto_toll_result(candidate, players_count: int, capacity: int):
+    return dict(
+        enabled=True,
+        source=COARSE_TOLL_SOURCE_AUTO,
+        calibration_players=players_count,
+        capacity=capacity,
+        slot_spec=candidate.window_spec,
+        points=round(float(candidate.toll), 2),
+        cost_gap=round(float(candidate.cost_gap), 6),
+        nash_count=candidate.nash_count,
+        equilibrium_distribution=auto_toll_distribution_summary(candidate),
+        equilibrium_costs=auto_toll_cost_summary(candidate),
+    )
+
+
+def apply_auto_coarse_toll_calibration(session, matrix):
+    for group_players in matrix:
+        for player in group_players:
+            player.participant.vars.pop(COARSE_TOLL_AUTO_RESULT_VAR, None)
+
+    if not coarse_toll_auto_enabled(session):
+        return
+
+    min_toll = coarse_toll_auto_min_toll(session)
+    max_toll = coarse_toll_auto_max_toll(session)
+    toll_step = coarse_toll_auto_toll_step(session)
+    if toll_step <= 0:
+        raise ValueError('coarse_toll_auto_toll_step 必须大于 0。')
+    if min_toll > max_toll:
+        raise ValueError('coarse_toll_auto_min_toll 不能大于 coarse_toll_auto_max_toll。')
+
+    capacity = bottleneck_capacity_per_slot(session)
+    candidate_cache = {}
+
+    from .toll_calibration import CalibrationError, calibrate_best_candidate
+
+    for group_index, group_players in enumerate(matrix, start=1):
+        players_count = len(group_players)
+        if players_count <= 0:
+            continue
+
+        if players_count not in candidate_cache:
+            try:
+                candidate_cache[players_count] = calibrate_best_candidate(
+                    players=players_count,
+                    capacity=capacity,
+                    min_toll=min_toll,
+                    max_toll=max_toll,
+                    toll_step=toll_step,
+                )
+            except CalibrationError as exc:
+                raise ValueError(
+                    f'粗收费自动校准失败：第 {group_index} 组人数={players_count}, '
+                    f'capacity={capacity}, 搜索范围={min_toll}-{max_toll}, 步长={toll_step}。{exc}'
+                ) from exc
+
+        result = build_auto_toll_result(candidate_cache[players_count], players_count, capacity)
+        for player in group_players:
+            player.participant.vars[COARSE_TOLL_AUTO_RESULT_VAR] = result
 
 
 def creating_session(subsession: Subsession):
@@ -510,7 +676,7 @@ def creating_session(subsession: Subsession):
                     'reward_treatment_enabled=1 时，rewarded_slot_spec 不能为空。示例：1-3,9-11'
                 )
 
-        if coarse_toll_enabled(subsession.session):
+        if not coarse_toll_auto_enabled(subsession.session) and coarse_toll_enabled(subsession.session):
             tolled_slots = coarse_toll_slots_for_session(subsession.session)
             if not tolled_slots:
                 raise ValueError(
@@ -526,6 +692,7 @@ def creating_session(subsession: Subsession):
             cohort_size = max(1, int(subsession.session.config.get('cohort_size', len(players) or 1)))
             matrix = build_auto_group_matrix(players, cohort_size)
 
+        apply_auto_coarse_toll_calibration(subsession.session, matrix)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
     else:
@@ -688,7 +855,7 @@ def set_results(group: Group):
             early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
             late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
             reward_bonus = reward_bonus_for_slot(group.session, slot)
-            coarse_toll_charge = coarse_toll_for_slot(group.session, slot)
+            coarse_toll_charge = coarse_toll_for_player_slot(player, slot)
             generalized_cost = (
                 C.QUEUE_COST_PER_MINUTE * queue_delay
                 + C.EARLY_COST_PER_MINUTE * early_minutes
@@ -738,12 +905,20 @@ def export_row_for_player(player: Player):
     reward_enabled = reward_treatment_enabled(player.session)
     rewarded_slot_spec = player.session.config.get('rewarded_slot_spec', '')
     reward_bonus_points_value = reward_bonus_points(player.session)
-    toll_enabled = coarse_toll_enabled(player.session)
-    toll_slot_spec = player.session.config.get('coarse_toll_slot_spec', '')
-    toll_points_value = coarse_toll_points(player.session)
+    auto_toll_result = participant_auto_coarse_toll_result(player)
+    toll_source = coarse_toll_source_for_player(player)
+    toll_auto_enabled = coarse_toll_auto_enabled(player.session)
+    toll_calibration_players = auto_toll_result.get('calibration_players', '')
+    toll_calibration_cost_gap = auto_toll_result.get('cost_gap', '')
+    toll_calibration_nash_count = auto_toll_result.get('nash_count', '')
+    toll_equilibrium_distribution = auto_toll_result.get('equilibrium_distribution', '')
+    toll_equilibrium_costs = auto_toll_result.get('equilibrium_costs', '')
+    toll_enabled = coarse_toll_enabled_for_player(player)
+    toll_slot_spec = coarse_toll_slot_spec_for_player(player)
+    toll_points_value = coarse_toll_points_for_player(player)
     capacity_per_slot = bottleneck_capacity_per_slot(player.session)
     selected_slot = player_departure_slot(player)
-    coarse_toll_charge = coarse_toll_for_slot(player.session, selected_slot) if selected_slot else cu(0)
+    coarse_toll_charge = coarse_toll_for_player_slot(player, selected_slot) if selected_slot else cu(0)
     queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(player, 'queue_delay_minutes', 0), 2)
     early_cost = round(C.EARLY_COST_PER_MINUTE * safe_model_field(player, 'schedule_early_minutes', 0), 2)
     late_cost = round(C.LATE_COST_PER_MINUTE * safe_model_field(player, 'schedule_late_minutes', 0), 2)
@@ -777,6 +952,13 @@ def export_row_for_player(player: Player):
         reward_enabled,
         rewarded_slot_spec,
         reward_bonus_points_value,
+        toll_source,
+        toll_auto_enabled,
+        toll_calibration_players,
+        toll_calibration_cost_gap,
+        toll_calibration_nash_count,
+        toll_equilibrium_distribution,
+        toll_equilibrium_costs,
         toll_enabled,
         toll_slot_spec,
         toll_points_value,
@@ -924,12 +1106,13 @@ def access_allowed(player: Player):
     return bool(player.participant.vars.get('access_granted', False))
 
 
-def result_slot_summaries(group: Group, current_slot: int):
+def result_slot_summaries(player: Player, current_slot: int):
+    group = player.group
     rewarded_slots = rewarded_slots_for_session(group.session)
-    tolled_slots = coarse_toll_slots_for_session(group.session) if coarse_toll_enabled(group.session) else set()
+    tolled_slots = coarse_toll_slots_for_player(player) if coarse_toll_enabled_for_player(player) else set()
     summaries = []
     for slot in departure_slots():
-        count = sum(1 for player in group.get_players() if player_departure_slot(player) == slot)
+        count = sum(1 for round_player in group.get_players() if player_departure_slot(round_player) == slot)
         summaries.append(
             dict(
                 slot=slot,
@@ -937,7 +1120,7 @@ def result_slot_summaries(group: Group, current_slot: int):
                 count=count,
                 is_current=slot == current_slot,
                 is_rewarded=reward_treatment_enabled(group.session) and slot in rewarded_slots,
-                is_tolled=coarse_toll_enabled(group.session) and slot in tolled_slots,
+                is_tolled=coarse_toll_enabled_for_player(player) and slot in tolled_slots,
             )
         )
     return summaries
@@ -959,8 +1142,8 @@ class Introduction(Page):
             late_cost_per_minute=C.LATE_COST_PER_MINUTE,
             base_points=C.BASE_POINTS,
             reward_description=reward_description(player.session),
-            coarse_toll_description=coarse_toll_description(player.session),
-            slot_preview=slot_preview(player.session),
+            coarse_toll_description=coarse_toll_description_for_player(player),
+            slot_preview=slot_preview_for_player(player),
             capacity_per_slot=bottleneck_capacity_per_slot(player.session),
             total_rounds=C.NUM_ROUNDS,
         )
@@ -999,8 +1182,8 @@ class Decision(Page):
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
             reward_description=reward_description(player.session),
-            coarse_toll_description=coarse_toll_description(player.session),
-            slot_preview=slot_preview(player.session),
+            coarse_toll_description=coarse_toll_description_for_player(player),
+            slot_preview=slot_preview_for_player(player),
         )
 
     @staticmethod
@@ -1058,7 +1241,7 @@ class Results(Page):
         late_cost_points = round(C.LATE_COST_PER_MINUTE * late_minutes, 2)
         schedule_cost_points = round(early_cost_points + late_cost_points, 2)
         total_travel_cost_points = round(queue_cost_points + schedule_cost_points, 2)
-        toll_charge_points = round(float(coarse_toll_for_slot(player.session, current_slot)), 2)
+        toll_charge_points = round(float(coarse_toll_for_player_slot(player, current_slot)), 2)
         total_choice_cost_points = round(total_travel_cost_points + toll_charge_points, 2)
         queue_cost_pct = bounded_percent(queue_cost_points, total_choice_cost_points)
         early_cost_pct = bounded_percent(early_cost_points, total_choice_cost_points)
@@ -1089,8 +1272,8 @@ class Results(Page):
             late_cost_pct=late_cost_pct,
             toll_cost_pct=toll_cost_pct,
             cost_bar_min_width_px=cost_bar_min_width_px,
-            coarse_toll_description=coarse_toll_description(player.session),
-            slot_summaries=result_slot_summaries(player.group, current_slot),
+            coarse_toll_description=coarse_toll_description_for_player(player),
+            slot_summaries=result_slot_summaries(player, current_slot),
             auto_advance_seconds=Results.get_timeout_seconds(player),
         )
 

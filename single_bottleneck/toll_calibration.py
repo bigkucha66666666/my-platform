@@ -169,19 +169,34 @@ def service_interval_minutes(capacity: int) -> float:
     return C.SLOT_SIZE_MINUTES / capacity
 
 
+def build_departure_minute_map(
+    valid_slots: tuple[int, ...],
+    *,
+    first_departure_minute: float | None = None,
+    slot_size_minutes: float = C.SLOT_SIZE_MINUTES,
+) -> dict[int, float]:
+    if first_departure_minute is None:
+        return {slot: departure_minute_for_slot(slot) for slot in valid_slots}
+    return {
+        slot: float(first_departure_minute) + (slot - 1) * float(slot_size_minutes)
+        for slot in valid_slots
+    }
+
+
 def base_expected_cost(
     other_counts: tuple[int, ...],
     chosen_index: int,
     *,
     valid_slots: tuple[int, ...],
     capacity: int,
+    departure_minutes: dict[int, float],
 ) -> float:
-    next_available_minute = departure_minute_for_slot(valid_slots[0])
+    next_available_minute = departure_minutes[valid_slots[0]]
     interval = service_interval_minutes(capacity)
     expected_cost = None
 
     for index, slot in enumerate(valid_slots):
-        departure_minute = departure_minute_for_slot(slot)
+        departure_minute = departure_minutes[slot]
         total_in_slot = other_counts[index] + (1 if index == chosen_index else 0)
 
         if total_in_slot <= 0:
@@ -219,6 +234,7 @@ def build_base_cost_table(
     *,
     valid_slots: tuple[int, ...],
     capacity: int,
+    departure_minutes: dict[int, float],
 ) -> dict[tuple[int, ...], tuple[float, ...]]:
     table = {}
     for other_counts in other_count_keys:
@@ -228,6 +244,7 @@ def build_base_cost_table(
                 chosen_index,
                 valid_slots=valid_slots,
                 capacity=capacity,
+                departure_minutes=departure_minutes,
             )
             for chosen_index in range(len(valid_slots))
         )
@@ -398,6 +415,8 @@ def build_search_tables(
     players: int,
     capacity: int,
     valid_slots: tuple[int, ...] | None = None,
+    first_departure_minute: float | None = None,
+    slot_size_minutes: float = C.SLOT_SIZE_MINUTES,
 ) -> tuple[
     tuple[int, ...],
     tuple[tuple[int, ...], ...],
@@ -406,6 +425,11 @@ def build_search_tables(
     if valid_slots is None:
         valid_slots = tuple(departure_slots())
 
+    departure_minutes = build_departure_minute_map(
+        valid_slots,
+        first_departure_minute=first_departure_minute,
+        slot_size_minutes=slot_size_minutes,
+    )
     ensure_exact_search_size(players, len(valid_slots))
     count_keys = tuple(generate_count_keys(players, len(valid_slots)))
     other_count_keys = tuple(generate_count_keys(players - 1, len(valid_slots)))
@@ -413,6 +437,7 @@ def build_search_tables(
         other_count_keys,
         valid_slots=valid_slots,
         capacity=capacity,
+        departure_minutes=departure_minutes,
     )
     return valid_slots, count_keys, base_cost_table
 
@@ -425,6 +450,9 @@ def calibrate_candidates(
     max_toll: float = 40,
     toll_step: float = 1,
     top_k: int = 10,
+    valid_slots: tuple[int, ...] | None = None,
+    first_departure_minute: float | None = None,
+    slot_size_minutes: float = C.SLOT_SIZE_MINUTES,
 ) -> list[EquilibriumCandidate]:
     if players <= 0:
         raise CalibrationError('players 必须大于 0。')
@@ -438,6 +466,9 @@ def calibrate_candidates(
     valid_slots, count_keys, base_cost_table = build_search_tables(
         players=players,
         capacity=capacity,
+        valid_slots=valid_slots,
+        first_departure_minute=first_departure_minute,
+        slot_size_minutes=slot_size_minutes,
     )
     config = CalibrationConfig(
         players=players,
@@ -462,6 +493,9 @@ def calibrate_best_candidate(
     min_toll: float = 0,
     max_toll: float = 40,
     toll_step: float = 1,
+    valid_slots: tuple[int, ...] | None = None,
+    first_departure_minute: float | None = None,
+    slot_size_minutes: float = C.SLOT_SIZE_MINUTES,
 ) -> EquilibriumCandidate:
     candidates = calibrate_candidates(
         players=players,
@@ -470,6 +504,9 @@ def calibrate_best_candidate(
         max_toll=max_toll,
         toll_step=toll_step,
         top_k=1,
+        valid_slots=valid_slots,
+        first_departure_minute=first_departure_minute,
+        slot_size_minutes=slot_size_minutes,
     )
     if not candidates:
         raise CalibrationError(
@@ -607,10 +644,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     count_keys = tuple(generate_count_keys(args.players, len(valid_slots)))
     other_count_keys = tuple(generate_count_keys(args.players - 1, len(valid_slots)))
+    departure_minutes = build_departure_minute_map(valid_slots)
     base_cost_table = build_base_cost_table(
         other_count_keys,
         valid_slots=valid_slots,
         capacity=args.capacity,
+        departure_minutes=departure_minutes,
     )
 
     if window is not None:

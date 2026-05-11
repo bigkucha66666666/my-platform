@@ -119,6 +119,10 @@
             fill: #1e2a3a;
         }
 
+        .route-label-inverse {
+            fill: #ffffff;
+        }
+
         .route-label-muted {
             font-size: 12px;
             fill: #65758a;
@@ -158,7 +162,8 @@
         }
 
         .slot-table-wrap {
-            overflow-x: auto;
+            max-height: min(54vh, 500px);
+            overflow: auto;
             margin-top: 10px;
             border: 1px solid #dbe5f0;
             border-radius: 12px;
@@ -183,6 +188,9 @@
         }
 
         .slot-table th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
             color: #52657c;
             font-size: 12px;
             font-weight: 700;
@@ -311,36 +319,33 @@
         </div>
     </div>
 
-    <div class="bottleneck-route-visual" aria-label="Y 字路与成本示意">
+    <div class="bottleneck-route-visual" aria-label="A 点到 B 点的瓶颈路径与成本示意">
         <p class="bottleneck-route-title">成本路径示意</p>
-        <p class="bottleneck-route-note">两个出发入口汇入同一瓶颈后，沿共同路段到达目标终点；排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
+        <p class="bottleneck-route-note">本轮路径可理解为从 A 点出发，沿一条直线路径经过中途瓶颈，最终到达 B 点；排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
 
-        <svg class="route-svg" viewBox="0 0 620 270" role="img" aria-label="两个出发入口汇入瓶颈并到达同一终点">
+        <svg class="route-svg" viewBox="0 0 620 250" role="img" aria-label="A 点出发，经过中途瓶颈，到达 B 点">
             <defs>
                 <marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
                     <path d="M0 0 L10 5 L0 10 Z" fill="#fff7ed" />
                 </marker>
             </defs>
 
-            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#e7d4c4" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 150 L440 56" fill="none" stroke="#e7d4c4" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 238 L310 150 L180 56" fill="none" stroke="#7c4a2d" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M310 150 L440 56" fill="none" stroke="#7c4a2d" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M190 66 L310 154 L310 226" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" marker-end="url(#route-arrow)" />
-            <path d="M430 66 L310 154 L310 226" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 10" marker-end="url(#route-arrow)" />
+            <path d="M82 126 L538 126" fill="none" stroke="#e7d4c4" stroke-width="40" stroke-linecap="round" />
+            <path d="M82 126 L538 126" fill="none" stroke="#7c4a2d" stroke-width="28" stroke-linecap="round" />
+            <path d="M112 126 L508 126" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-dasharray="12 10" marker-end="url(#route-arrow)" />
 
-            <circle cx="310" cy="150" r="22" fill="#c8551f" stroke="#ffffff" stroke-width="5" />
-            <rect x="282" y="171" width="56" height="24" rx="8" fill="#ffd166" stroke="#7c4a2d" stroke-width="3" />
-            <circle cx="310" cy="238" r="16" fill="#4f6f52" stroke="#ffffff" stroke-width="4" />
-            <circle cx="180" cy="56" r="15" fill="#9f3a17" stroke="#ffffff" stroke-width="4" />
-            <circle cx="440" cy="56" r="15" fill="#9f3a17" stroke="#ffffff" stroke-width="4" />
+            <circle cx="82" cy="126" r="24" fill="#1f5fcc" stroke="#ffffff" stroke-width="5" />
+            <circle cx="538" cy="126" r="24" fill="#4f6f52" stroke="#ffffff" stroke-width="5" />
+            <circle cx="310" cy="126" r="27" fill="#c8551f" stroke="#ffffff" stroke-width="6" />
+            <rect x="282" y="158" width="56" height="24" rx="8" fill="#ffd166" stroke="#7c4a2d" stroke-width="3" />
 
-            <text x="310" y="265" text-anchor="middle" class="route-label">目标终点</text>
-            <text x="310" y="118" text-anchor="middle" class="route-label">瓶颈</text>
-            <text x="310" y="136" text-anchor="middle" class="route-label-muted">排队成本</text>
-            <text x="310" y="187" text-anchor="middle" class="route-label-muted">收费</text>
-            <text x="180" y="28" text-anchor="middle" class="route-label">出发入口</text>
-            <text x="440" y="28" text-anchor="middle" class="route-label">出发入口</text>
+            <text x="82" y="132" text-anchor="middle" class="route-label route-label-inverse">A</text>
+            <text x="538" y="132" text-anchor="middle" class="route-label route-label-inverse">B</text>
+            <text x="82" y="182" text-anchor="middle" class="route-label">出发点</text>
+            <text x="538" y="182" text-anchor="middle" class="route-label">到达点</text>
+            <text x="310" y="82" text-anchor="middle" class="route-label">瓶颈</text>
+            <text x="310" y="102" text-anchor="middle" class="route-label-muted">排队成本</text>
+            <text x="310" y="174" text-anchor="middle" class="route-label-muted">收费</text>
         </svg>
 
         <div class="route-metric-grid">

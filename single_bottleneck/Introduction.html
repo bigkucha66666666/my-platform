@@ -1,244 +1,645 @@
 {{ block title }}
-    单瓶颈出发时间实验说明
+    开始前最后提醒
 {{ endblock }}
 
 {{ block global_styles }}
     {{ super() }}
     <style>
-        .intro-lead {
-            margin: 0 0 16px;
-            color: #334155;
-            font-size: 15px;
-            line-height: 1.8;
+        .final-intro-shell {
+            display: grid;
+            gap: 16px;
         }
 
-        .intro-section {
-            margin-top: 16px;
+        .final-intro-hero {
+            padding: 18px;
             border: 1px solid #dbe5f0;
-            border-radius: 12px;
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 96% 10%, rgba(31, 95, 204, 0.12), transparent 30%),
+                linear-gradient(135deg, #ffffff 0%, #f6f9fc 100%);
+        }
+
+        .final-intro-title {
+            margin: 0 0 8px;
+            color: #172033;
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .final-intro-lead {
+            max-width: 760px;
+            margin: 0;
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.75;
+        }
+
+        .quick-rule-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .quick-rule-card {
+            min-height: 118px;
+            padding: 14px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .quick-rule-key {
+            margin: 0 0 8px;
+            color: #65758a;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .quick-rule-value {
+            margin: 0;
+            color: #172033;
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .quick-rule-note {
+            margin: 7px 0 0;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .demo-panel {
+            border: 1px solid #dbe5f0;
+            border-radius: 16px;
             background: #ffffff;
             overflow: hidden;
         }
 
-        .intro-section-title {
-            margin: 0;
-            padding: 12px 14px;
+        .demo-panel-head {
+            padding: 13px 16px;
             border-bottom: 1px solid #dbe5f0;
             background: #f6f9fc;
-            color: #1e2a3a;
+        }
+
+        .demo-panel-title {
+            margin: 0;
+            color: #172033;
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 800;
         }
 
-        .intro-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
+        .demo-panel-subtitle {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .scenario-board {
+            padding: 16px;
+        }
+
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 0.85fr) minmax(260px, 1.3fr) minmax(210px, 1fr);
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .scenario-card {
+            padding: 14px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        }
+
+        .scenario-card-title {
+            margin: 0 0 10px;
+            color: #172033;
             font-size: 14px;
+            font-weight: 800;
         }
 
-        .intro-table th,
-        .intro-table td {
-            padding: 11px 14px;
-            border-bottom: 1px solid #edf2f7;
-            color: #334155;
+        .scenario-card-text {
+            margin: 10px 0 0;
+            color: #64748b;
+            font-size: 12px;
             line-height: 1.55;
-            text-align: left;
-            vertical-align: top;
-            overflow-wrap: anywhere;
         }
 
-        .intro-table tr:last-child th,
-        .intro-table tr:last-child td,
-        .intro-table tbody tr:last-child td {
+        .time-choice-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .time-choice {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 9px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #ffffff;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .time-choice strong {
+            color: #172033;
+        }
+
+        .time-choice-active {
+            border-color: #cfe1ff;
+            background: #eef6ff;
+        }
+
+        .bottleneck-stage {
+            position: relative;
+            min-height: 186px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            background:
+                linear-gradient(180deg, transparent 0 42%, rgba(148, 163, 184, 0.14) 42% 58%, transparent 58% 100%),
+                linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+            overflow: hidden;
+        }
+
+        .road-line {
+            position: absolute;
+            top: 88px;
+            left: 32px;
+            right: 32px;
+            height: 18px;
+            border-radius: 999px;
+            background: #7c4a2d;
+            box-shadow: 0 0 0 7px #e7d4c4;
+        }
+
+        .road-arrow {
+            position: absolute;
+            top: 80px;
+            right: 49px;
+            color: #fff7ed;
+            font-size: 26px;
+            font-weight: 900;
+        }
+
+        .bottleneck-gate {
+            position: absolute;
+            top: 58px;
+            left: 50%;
+            width: 58px;
+            height: 70px;
+            margin-left: -29px;
+            border: 3px solid #9f3a17;
+            border-radius: 16px;
+            background: #fff7ed;
+            box-shadow: 0 10px 22px rgba(159, 58, 23, 0.12);
+        }
+
+        .bottleneck-gate::after {
+            content: "瓶颈";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 22px;
+            color: #9f3a17;
+            font-size: 13px;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .queue-dots {
+            position: absolute;
+            top: 131px;
+            left: 72px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .route-endpoint {
+            position: absolute;
+            top: 74px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 46px;
+            height: 46px;
+            border: 4px solid #ffffff;
+            border-radius: 999px;
+            color: #ffffff;
+            font-size: 17px;
+            font-weight: 900;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        }
+
+        .route-endpoint-a {
+            left: 13px;
+            background: #1f5fcc;
+        }
+
+        .route-endpoint-b {
+            right: 13px;
+            background: #4f6f52;
+        }
+
+        .queue-dot {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            box-shadow: 0 0 0 3px #ffffff;
+        }
+
+        .queue-dot-self {
+            background: #1f5fcc;
+        }
+
+        .queue-dot-wait {
+            background: #f7b267;
+        }
+
+        .capacity-tag {
+            position: absolute;
+            right: 13px;
+            bottom: 13px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #172033;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .outcome-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px solid #edf2f7;
+            color: #475569;
+            font-size: 13px;
+        }
+
+        .outcome-row strong {
+            color: #172033;
+        }
+
+        .outcome-row:last-of-type {
             border-bottom: 0;
         }
 
-        .intro-table th {
-            width: 30%;
-            color: #52657c;
-            font-weight: 700;
-            background: #fbfdff;
+        .mini-cost-bars {
+            display: grid;
+            gap: 7px;
+            margin-top: 12px;
         }
 
-        .intro-time-table th:nth-child(1),
-        .intro-time-table td:nth-child(1) {
-            width: 22%;
-        }
-
-        .intro-time-table th:nth-child(2),
-        .intro-time-table td:nth-child(2) {
-            width: 48%;
-        }
-
-        .intro-time-table th:nth-child(3),
-        .intro-time-table td:nth-child(3),
-        .intro-time-table th:nth-child(4),
-        .intro-time-table td:nth-child(4) {
-            width: 15%;
-            text-align: right;
-        }
-
-        .intro-reward-value {
-            color: #1f5fcc;
+        .mini-cost-bar {
+            display: grid;
+            grid-template-columns: 64px 1fr;
+            gap: 8px;
+            align-items: center;
+            color: #64748b;
+            font-size: 12px;
             font-weight: 700;
         }
 
-        .intro-toll-value {
+        .mini-cost-track {
+            height: 10px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .mini-cost-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #f7b267 0%, #c8551f 100%);
+        }
+
+        .mini-cost-fill-early {
+            background: linear-gradient(90deg, #9fd3c7 0%, #2f8f7b 100%);
+        }
+
+        .mini-cost-fill-late {
+            background: linear-gradient(90deg, #f4a7a2 0%, #bc3f3a 100%);
+        }
+
+        .scenario-takeaway {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .takeaway-item {
+            padding: 11px 12px;
+            border: 1px solid #dbe5f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .takeaway-item strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #172033;
+            font-size: 13px;
+        }
+
+        .cost-rule-strip {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 12px;
+        }
+
+        .cost-rule-card,
+        .notice-card {
+            padding: 15px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .cost-rule-title,
+        .notice-title {
+            margin: 0 0 10px;
+            color: #172033;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .cost-equation {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .cost-token {
+            padding: 6px 9px;
+            border-radius: 999px;
+            background: #fff7ed;
             color: #9f3a17;
-            font-weight: 700;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .cost-plus {
+            color: #94a3b8;
+            font-weight: 800;
+        }
+
+        .cost-rule-text,
+        .notice-text {
+            margin: 0;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .confirmation-card {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 14px 15px;
+            border: 1px solid #cfe1ff;
+            border-radius: 14px;
+            background: #eef6ff;
+        }
+
+        .confirmation-card input {
+            margin-top: 4px;
+        }
+
+        .confirmation-card label {
+            margin: 0;
+            color: #1e3a5f;
+            font-size: 14px;
+            line-height: 1.65;
         }
 
         .intro-actions {
-            margin-top: 18px;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 900px) {
+            .quick-rule-grid,
+            .cost-rule-strip {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .scenario-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .scenario-takeaway {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 575px) {
-            .intro-lead {
-                font-size: 14px;
-                line-height: 1.7;
+            .final-intro-hero {
+                padding: 15px;
             }
 
-            .intro-section-title {
-                padding: 10px 11px;
-                font-size: 14px;
+            .final-intro-title {
+                font-size: 18px;
             }
 
-            .intro-table {
-                font-size: 12.5px;
+            .quick-rule-grid,
+            .cost-rule-strip {
+                grid-template-columns: 1fr;
             }
 
-            .intro-table th,
-            .intro-table td {
-                padding: 9px 10px;
-            }
-
-            .intro-table th {
-                width: 34%;
-            }
-
-            .intro-time-table th:nth-child(1),
-            .intro-time-table td:nth-child(1) {
-                width: 24%;
-            }
-
-            .intro-time-table th:nth-child(2),
-            .intro-time-table td:nth-child(2) {
-                width: 42%;
-            }
-
-            .intro-time-table th:nth-child(3),
-            .intro-time-table td:nth-child(3),
-            .intro-time-table th:nth-child(4),
-            .intro-time-table td:nth-child(4) {
-                width: 17%;
+            .quick-rule-card {
+                min-height: auto;
             }
         }
     </style>
 {{ endblock }}
 
 {{ block content }}
-    <p class="intro-lead">
-        你将参加 {{ total_rounds }} 轮单瓶颈通勤实验。每轮请选择一个出发时间；所有参与者都会经过同一个瓶颈，集中出发会增加排队延误。
-    </p>
+    <div class="final-intro-shell">
+        <section class="final-intro-hero">
+            <p class="final-intro-title">你即将进入第 1 轮正式选择</p>
+            <p class="final-intro-lead">
+                请把注意力放在“不同出发时间会带来不同成本”上。每轮你只需要选择一个出发时间；
+                系统会根据同组参与者的选择、瓶颈排队和到达时间偏差计算本轮结果。
+            </p>
+        </section>
 
-    <div class="intro-section">
-        <p class="intro-section-title">规则摘要</p>
-        <table class="intro-table">
-            <tbody>
-                <tr>
-                    <th>总轮数</th>
-                    <td>{{ total_rounds }} 轮</td>
-                </tr>
-                <tr>
-                    <th>目标到达时间</th>
-                    <td>{{ preferred_arrival_time }}</td>
-                </tr>
-                <tr>
-                    <th>无排队基准出发时间</th>
-                    <td>{{ free_flow_departure_time }}</td>
-                </tr>
-                <tr>
-                    <th>自由流行程</th>
-                    <td>{{ free_flow_travel_minutes }} 分钟</td>
-                </tr>
-                <tr>
-                    <th>瓶颈通行能力</th>
-                    <td>每个时点窗口最多服务 {{ capacity_per_slot }} 位参与者</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+        <section class="quick-rule-grid" aria-label="核心规则速记">
+            <div class="quick-rule-card">
+                <p class="quick-rule-key">实验轮数</p>
+                <p class="quick-rule-value">{{ total_rounds }} 轮</p>
+                <p class="quick-rule-note">每轮都需要重新选择出发时间。</p>
+            </div>
+            <div class="quick-rule-card">
+                <p class="quick-rule-key">目标到达</p>
+                <p class="quick-rule-value">{{ preferred_arrival_time }}</p>
+                <p class="quick-rule-note">早于或晚于该时间都会形成到达偏差成本。</p>
+            </div>
+            <div class="quick-rule-card">
+                <p class="quick-rule-key">无排队基准</p>
+                <p class="quick-rule-value">{{ free_flow_departure_time }}</p>
+                <p class="quick-rule-note">无排队时，从该时间出发可准时到达。</p>
+            </div>
+            <div class="quick-rule-card">
+                <p class="quick-rule-key">瓶颈容量</p>
+                <p class="quick-rule-value">{{ capacity_per_slot }} 人/时点</p>
+                <p class="quick-rule-note">同一时点选择人数越多，越可能产生排队。</p>
+            </div>
+        </section>
 
-    <div class="intro-section">
-        <p class="intro-section-title">成本与结算规则</p>
-        <table class="intro-table">
-            <tbody>
-                <tr>
-                    <th>基础分</th>
-                    <td>{{ base_points }} points</td>
-                </tr>
-                <tr>
-                    <th>排队延误成本</th>
-                    <td>每分钟扣 {{ queue_cost_per_minute }} 分</td>
-                </tr>
-                <tr>
-                    <th>早到成本</th>
-                    <td>每分钟扣 {{ early_cost_per_minute }} 分</td>
-                </tr>
-                <tr>
-                    <th>晚到成本</th>
-                    <td>每分钟扣 {{ late_cost_per_minute }} 分</td>
-                </tr>
-                <tr>
-                    <th>奖励处理</th>
-                    <td>{{ reward_description }}</td>
-                </tr>
-                <tr>
-                    <th>粗收费处理</th>
-                    <td>{{ coarse_toll_description }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+        <section class="demo-panel" aria-label="规则演示">
+            <div class="demo-panel-head">
+                <p class="demo-panel-title">微型演示：一个选择如何形成成本</p>
+                <p class="demo-panel-subtitle">下方是规则示意，不是你本轮结果；正式结果会由同组所有人的真实选择决定。</p>
+            </div>
+            <div class="scenario-board">
+                <div class="scenario-grid">
+                    <div class="scenario-card">
+                        <p class="scenario-card-title">1. 先选择出发时间</p>
+                        <div class="time-choice-list">
+                            <div class="time-choice">
+                                <strong>偏早出发</strong>
+                                <span>可能早到</span>
+                            </div>
+                            <div class="time-choice time-choice-active">
+                                <strong>{{ free_flow_departure_time }} 附近</strong>
+                                <span>无排队时准时</span>
+                            </div>
+                            <div class="time-choice">
+                                <strong>偏晚出发</strong>
+                                <span>可能晚到</span>
+                            </div>
+                        </div>
+                        <p class="scenario-card-text">
+                            选择并不是只看“离目标最近”，还要考虑别人是否也集中在同一时段。
+                        </p>
+                    </div>
 
-    <div class="intro-section">
-        <p class="intro-section-title">可选出发时间</p>
-        <table class="intro-table intro-time-table">
-            <thead>
-                <tr>
-                    <th>出发时间</th>
-                    <th>相对基准说明</th>
-                    <th>收费</th>
-                    <th>额外奖励</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ for item in slot_preview }}
-                    <tr>
-                        <td>{{ item.departure_time }}</td>
-                        <td>{{ item.departure_relation }}</td>
-                        <td>
-                            {{ if item.toll_active }}
-                                <span class="intro-toll-value">{{ item.toll_charge_label }} 成本分</span>
-                            {{ else }}
-                                无
-                            {{ endif }}
-                        </td>
-                        <td>
-                            {{ if item.reward_active }}
-                                <span class="intro-reward-value">+{{ item.reward_bonus }}</span>
-                            {{ else }}
-                                无
-                            {{ endif }}
-                        </td>
-                    </tr>
-                {{ endfor }}
-            </tbody>
-        </table>
-    </div>
+                    <div class="scenario-card">
+                        <p class="scenario-card-title">2. 从 A 点到 B 点，经过中途瓶颈</p>
+                        <div class="bottleneck-stage" aria-hidden="true">
+                            <div class="road-line"></div>
+                            <div class="road-arrow">→</div>
+                            <div class="route-endpoint route-endpoint-a">A</div>
+                            <div class="route-endpoint route-endpoint-b">B</div>
+                            <div class="queue-dots">
+                                <span class="queue-dot queue-dot-self">你</span>
+                                <span class="queue-dot queue-dot-wait">等</span>
+                                <span class="queue-dot queue-dot-wait">等</span>
+                                <span class="queue-dot queue-dot-wait">等</span>
+                            </div>
+                            <div class="bottleneck-gate"></div>
+                            <div class="capacity-tag">容量 {{ capacity_per_slot }} 人/时点</div>
+                        </div>
+                        <p class="scenario-card-text">
+                            同一时点选择人数超过容量时，会形成队列；排队会推迟实际到达时间。
+                        </p>
+                    </div>
 
-    <div class="intro-actions">
-        <button class="otree-btn-next btn btn-primary">进入第 1 轮</button>
+                    <div class="scenario-card">
+                        <p class="scenario-card-title">3. 到达后形成成本</p>
+                        <div class="outcome-row">
+                            <span>目标到达时间</span>
+                            <strong>{{ preferred_arrival_time }}</strong>
+                        </div>
+                        <div class="outcome-row">
+                            <span>排队延误</span>
+                            <strong>增加行程时间</strong>
+                        </div>
+                        <div class="outcome-row">
+                            <span>到达偏差</span>
+                            <strong>早到或晚到</strong>
+                        </div>
+                        <div class="mini-cost-bars" aria-hidden="true">
+                            <div class="mini-cost-bar">
+                                <span>排队</span>
+                                <span class="mini-cost-track"><span class="mini-cost-fill" style="width: 72%;"></span></span>
+                            </div>
+                            <div class="mini-cost-bar">
+                                <span>早到</span>
+                                <span class="mini-cost-track"><span class="mini-cost-fill mini-cost-fill-early" style="width: 38%;"></span></span>
+                            </div>
+                            <div class="mini-cost-bar">
+                                <span>晚到</span>
+                                <span class="mini-cost-track"><span class="mini-cost-fill mini-cost-fill-late" style="width: 52%;"></span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scenario-takeaway">
+                    <div class="takeaway-item">
+                        <strong>集中出发会带来排队</strong>
+                        同一时段人越多，越可能等待，实际到达时间会被推迟。
+                    </div>
+                    <div class="takeaway-item">
+                        <strong>提前或延后都有代价</strong>
+                        早到和晚到都会形成成本，只是每分钟成本不同。
+                    </div>
+                    <div class="takeaway-item">
+                        <strong>收费改变选择成本</strong>
+                        如果选择收费时段，最终选择成本还会加上粗收费。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cost-rule-strip">
+            <div class="cost-rule-card">
+                <p class="cost-rule-title">成本速记</p>
+                <div class="cost-equation" aria-label="最终选择成本公式">
+                    <span class="cost-token">排队成本</span>
+                    <span class="cost-plus">+</span>
+                    <span class="cost-token">早到成本</span>
+                    <span class="cost-plus">+</span>
+                    <span class="cost-token">晚到成本</span>
+                    <span class="cost-plus">+</span>
+                    <span class="cost-token">粗收费</span>
+                </div>
+                <p class="cost-rule-text">
+                    排队每分钟 {{ queue_cost_per_minute }} 分，早到每分钟 {{ early_cost_per_minute }} 分，
+                    晚到每分钟 {{ late_cost_per_minute }} 分。请优先比较不同选择带来的成本。
+                </p>
+            </div>
+
+            <div class="notice-card">
+                <p class="notice-title">本场处理</p>
+                <p class="notice-text">{{ coarse_toll_description }}</p>
+                <p class="notice-text" style="margin-top: 6px;">{{ reward_description }}</p>
+            </div>
+        </section>
+
+        <div class="confirmation-card">
+            <input id="rules-read-confirmation" type="checkbox" required>
+            <label for="rules-read-confirmation">
+                我已阅读实验前发放的规则说明，理解本实验重点是比较不同出发时间带来的成本。
+            </label>
+        </div>
+
+        <div class="intro-actions">
+            <button class="otree-btn-next btn btn-primary">进入第 1 轮</button>
+        </div>
     </div>
 {{ endblock }}

@@ -65,7 +65,8 @@
         }
 
         .choice-table-wrap {
-            overflow-x: auto;
+            max-height: min(64vh, 620px);
+            overflow: auto;
         }
 
         .choice-table {
@@ -88,6 +89,9 @@
         }
 
         .choice-table th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
             color: #52657c;
             font-size: 12px;
             font-weight: 700;
@@ -170,6 +174,10 @@
             .choice-table {
                 min-width: 700px;
                 font-size: 13px;
+            }
+
+            .choice-table-wrap {
+                max-height: 58vh;
             }
 
             .choice-table th,

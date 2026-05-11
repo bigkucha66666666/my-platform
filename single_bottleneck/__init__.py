@@ -23,6 +23,10 @@ COARSE_TOLL_SOURCE_MANUAL = 'manual'
 COARSE_TOLL_SOURCE_AUTO = 'auto'
 COARSE_TOLL_AUTO_RESULT_VAR = 'single_bottleneck_coarse_toll_auto_result'
 
+DEPARTURE_SCHEDULE_SOURCE_STATIC = 'static'
+DEPARTURE_SCHEDULE_SOURCE_AUTO = 'auto'
+DEPARTURE_SCHEDULE_VAR = 'single_bottleneck_departure_schedule'
+
 
 class C(BaseConstants):
     NAME_IN_URL = 'single_bottleneck'
@@ -40,6 +44,7 @@ class C(BaseConstants):
     FREE_FLOW_TRAVEL_MINUTES = 6
     SLOT_SIZE_MINUTES = 2
     NUM_DEPARTURE_SLOTS = 11
+    MAX_DEPARTURE_SLOT_CHOICES = 401
     FIRST_DEPARTURE_MINUTE = (
         PREFERRED_ARRIVAL_MINUTE
         - FREE_FLOW_TRAVEL_MINUTES
@@ -59,6 +64,8 @@ class C(BaseConstants):
     DEFAULT_COARSE_TOLL_ENABLED = 1
     DEFAULT_COARSE_TOLL_SLOT_SPEC = '4-8'
     DEFAULT_COARSE_TOLL_POINTS = 8
+    DEFAULT_DEPARTURE_SCHEDULE_AUTO_ENABLED = 0
+    DEFAULT_DEPARTURE_SCHEDULE_MIN_SLOTS_EACH_SIDE = 5
 
 
 def minute_to_clock(value):
@@ -87,11 +94,23 @@ def point_value_display(value):
     return minute_value_display(value)
 
 
+def default_slots_each_side():
+    return max(0, (C.NUM_DEPARTURE_SLOTS - 1) // 2)
+
+
 def departure_slots():
     return list(range(1, C.NUM_DEPARTURE_SLOTS + 1))
 
 
-def departure_minute_for_slot(slot: int):
+def departure_slots_from_schedule(schedule):
+    return list(range(1, int(schedule.get('num_slots', C.NUM_DEPARTURE_SLOTS)) + 1))
+
+
+def departure_minute_for_slot(slot: int, schedule=None):
+    if schedule:
+        first_minute = parse_float(schedule.get('first_departure_minute'), C.FIRST_DEPARTURE_MINUTE)
+        slot_size = parse_float(schedule.get('slot_size_minutes'), C.SLOT_SIZE_MINUTES)
+        return first_minute + (slot - 1) * slot_size
     return C.FIRST_DEPARTURE_MINUTE + (slot - 1) * C.SLOT_SIZE_MINUTES
 
 
@@ -99,12 +118,12 @@ def free_flow_departure_minute():
     return C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES
 
 
-def departure_offset_from_free_flow(slot: int):
-    return int(round(departure_minute_for_slot(slot) - free_flow_departure_minute()))
+def departure_offset_from_free_flow(slot: int, schedule=None):
+    return int(round(departure_minute_for_slot(slot, schedule) - free_flow_departure_minute()))
 
 
-def departure_relation_for_slot(slot: int):
-    offset = departure_offset_from_free_flow(slot)
+def departure_relation_for_slot(slot: int, schedule=None):
+    offset = departure_offset_from_free_flow(slot, schedule)
     if offset == 0:
         return '等于准时到达且无排队延误时所需出发时间'
     if offset < 0:
@@ -112,14 +131,14 @@ def departure_relation_for_slot(slot: int):
     return f'相对于准时到达且无排队延误时所需出发时间，延后 {offset} 分钟'
 
 
-def departure_label_for_slot(slot: int):
-    departure_time = minute_to_clock(departure_minute_for_slot(slot))
-    return f'{departure_time}（{departure_relation_for_slot(slot)}）'
+def departure_label_for_slot(slot: int, schedule=None):
+    departure_time = minute_to_clock(departure_minute_for_slot(slot, schedule))
+    return f'{departure_time}（{departure_relation_for_slot(slot, schedule)}）'
 
 
 DEPARTURE_SLOT_CHOICES = [
-    [slot, departure_label_for_slot(slot)]
-    for slot in departure_slots()
+    [slot, str(slot)]
+    for slot in range(1, C.MAX_DEPARTURE_SLOT_CHOICES + 1)
 ]
 
 
@@ -171,6 +190,13 @@ EXPORT_HEADERS = [
     'coarse_toll_slot_spec',
     'coarse_toll_points',
     'bottleneck_capacity_per_slot',
+    'departure_schedule_source',
+    'departure_schedule_auto_enabled',
+    'departure_schedule_calibration_players',
+    'departure_schedule_capacity',
+    'departure_schedule_slot_count',
+    'departure_schedule_first_time',
+    'departure_schedule_last_time',
     'assigned_group_id',
     'assigned_group_label',
     'assigned_group_members',
@@ -237,9 +263,107 @@ def participant_var(player: Player, field_name, default=''):
     return player.participant.vars.get(field_name, default)
 
 
+def departure_schedule_auto_enabled(session) -> bool:
+    return config_flag(
+        session.config.get(
+            'departure_schedule_auto_enabled',
+            C.DEFAULT_DEPARTURE_SCHEDULE_AUTO_ENABLED,
+        )
+    )
+
+
+def departure_schedule_min_slots_each_side(session):
+    return max(
+        0,
+        parse_int(
+            session.config.get(
+                'departure_schedule_min_slots_each_side',
+                C.DEFAULT_DEPARTURE_SCHEDULE_MIN_SLOTS_EACH_SIDE,
+            ),
+            C.DEFAULT_DEPARTURE_SCHEDULE_MIN_SLOTS_EACH_SIDE,
+        ),
+    )
+
+
+def build_departure_schedule_record(
+    *,
+    players_count: int,
+    capacity: int,
+    min_slots_each_side: int,
+    auto_enabled: bool,
+):
+    if auto_enabled:
+        required_occupied_slots = ceil(players_count / capacity)
+        slots_each_side = max(min_slots_each_side, ceil(required_occupied_slots / 2))
+        source = DEPARTURE_SCHEDULE_SOURCE_AUTO
+    else:
+        required_occupied_slots = ''
+        slots_each_side = default_slots_each_side()
+        source = DEPARTURE_SCHEDULE_SOURCE_STATIC
+
+    num_slots = slots_each_side * 2 + 1
+    first_departure_minute = free_flow_departure_minute() - slots_each_side * C.SLOT_SIZE_MINUTES
+    last_departure_minute = first_departure_minute + (num_slots - 1) * C.SLOT_SIZE_MINUTES
+
+    return dict(
+        enabled=True,
+        source=source,
+        auto_enabled=auto_enabled,
+        calibration_players=players_count if auto_enabled else '',
+        capacity=capacity,
+        min_slots_each_side=min_slots_each_side,
+        required_occupied_slots=required_occupied_slots,
+        slots_each_side=slots_each_side,
+        num_slots=num_slots,
+        slot_size_minutes=C.SLOT_SIZE_MINUTES,
+        first_departure_minute=round(first_departure_minute, 2),
+        last_departure_minute=round(last_departure_minute, 2),
+        first_departure_time=minute_to_clock(first_departure_minute),
+        last_departure_time=minute_to_clock(last_departure_minute),
+    )
+
+
+def static_departure_schedule_record():
+    return build_departure_schedule_record(
+        players_count=0,
+        capacity=C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT,
+        min_slots_each_side=default_slots_each_side(),
+        auto_enabled=False,
+    )
+
+
+def departure_schedule_for_player(player: Player):
+    schedule = player.participant.vars.get(DEPARTURE_SCHEDULE_VAR, {})
+    if isinstance(schedule, dict) and schedule.get('enabled'):
+        return schedule
+    return static_departure_schedule_record()
+
+
+def departure_slots_for_player(player: Player):
+    return departure_slots_from_schedule(departure_schedule_for_player(player))
+
+
+def departure_slots_for_group(group: Group):
+    players = group.get_players()
+    if not players:
+        return departure_slots()
+    return departure_slots_for_player(players[0])
+
+
+def departure_minute_for_player_slot(player: Player, slot: int):
+    return departure_minute_for_slot(slot, departure_schedule_for_player(player))
+
+
+def departure_minute_for_group_slot(group: Group, slot: int):
+    players = group.get_players()
+    if not players:
+        return departure_minute_for_slot(slot)
+    return departure_minute_for_player_slot(players[0], slot)
+
+
 def player_departure_slot(player: Player):
     slot = player.field_maybe_none('departure_slot') if hasattr(player, 'field_maybe_none') else None
-    return slot if slot in departure_slots() else None
+    return slot if slot in departure_slots_for_player(player) else None
 
 
 def player_has_departure_slot(player: Player) -> bool:
@@ -355,7 +479,10 @@ def assign_group_metadata(matrix, grouping_enabled: bool):
             participant.vars['assigned_group_members'] = member_labels
 
 
-def parse_slot_spec(spec: str, field_name: str):
+def parse_slot_spec(spec: str, field_name: str, valid_slots=None):
+    if valid_slots is None:
+        valid_slots = departure_slots()
+    valid_slot_set = set(valid_slots)
     selected_slots = set()
     raw_spec = (spec or '').strip()
     if not raw_spec:
@@ -380,7 +507,7 @@ def parse_slot_spec(spec: str, field_name: str):
             raise ValueError(f'非法 {field_name} 项：{token}。示例：1-3,9-11')
         selected_slots.add(slot)
 
-    invalid_slots = sorted(slot for slot in selected_slots if slot not in departure_slots())
+    invalid_slots = sorted(slot for slot in selected_slots if slot not in valid_slot_set)
     if invalid_slots:
         raise ValueError(
             f'{field_name} 中存在超出可选范围的时点：'
@@ -415,6 +542,14 @@ def rewarded_slots_for_session(session):
     return parse_rewarded_slot_spec(session.config.get('rewarded_slot_spec', ''))
 
 
+def rewarded_slots_for_player(player: Player):
+    return parse_slot_spec(
+        player.session.config.get('rewarded_slot_spec', ''),
+        'rewarded_slot_spec',
+        departure_slots_for_player(player),
+    )
+
+
 def reward_bonus_points(session):
     raw_value = session.config.get('reward_bonus_points', C.DEFAULT_REWARD_BONUS_POINTS)
     return cu(max(0, round(parse_float(raw_value, C.DEFAULT_REWARD_BONUS_POINTS), 2)))
@@ -426,6 +561,14 @@ def reward_bonus_for_slot(session, slot: int):
     if slot not in rewarded_slots_for_session(session):
         return cu(0)
     return reward_bonus_points(session)
+
+
+def reward_bonus_for_player_slot(player: Player, slot: int):
+    if not reward_treatment_enabled(player.session):
+        return cu(0)
+    if slot not in rewarded_slots_for_player(player):
+        return cu(0)
+    return reward_bonus_points(player.session)
 
 
 def reward_description(session):
@@ -440,6 +583,24 @@ def reward_description(session):
     return (
         f'奖励处理已开启：若选择 {time_labels}，每轮可额外获得 '
         f'{reward_bonus_points(session)} points。'
+    )
+
+
+def reward_description_for_player(player: Player):
+    if not reward_treatment_enabled(player.session):
+        return '当前未开启奖励处理。'
+
+    rewarded_slots = sorted(rewarded_slots_for_player(player))
+    if not rewarded_slots:
+        return '奖励处理已开启，但当前没有配置可获得奖励的出发时点。'
+
+    time_labels = ', '.join(
+        minute_to_clock(departure_minute_for_player_slot(player, slot))
+        for slot in rewarded_slots
+    )
+    return (
+        f'奖励处理已开启：若选择 {time_labels}，每轮可额外获得 '
+        f'{reward_bonus_points(player.session)} points。'
     )
 
 
@@ -519,7 +680,11 @@ def coarse_toll_slot_spec_for_player(player: Player):
 
 
 def coarse_toll_slots_for_player(player: Player):
-    return parse_slot_spec(coarse_toll_slot_spec_for_player(player), 'coarse_toll_slot_spec')
+    return parse_slot_spec(
+        coarse_toll_slot_spec_for_player(player),
+        'coarse_toll_slot_spec',
+        departure_slots_for_player(player),
+    )
 
 
 def coarse_toll_points_for_player(player: Player):
@@ -547,7 +712,10 @@ def coarse_toll_description_for_player(player: Player):
     if not tolled_slots:
         return '粗收费处理已开启，但当前没有配置收费出发时点。'
 
-    time_labels = ', '.join(minute_to_clock(departure_minute_for_slot(slot)) for slot in tolled_slots)
+    time_labels = ', '.join(
+        minute_to_clock(departure_minute_for_player_slot(player, slot))
+        for slot in tolled_slots
+    )
     prefix = '粗收费已自动校准' if coarse_toll_source_for_player(player) == COARSE_TOLL_SOURCE_AUTO else '粗收费已开启'
     return (
         f'{prefix}：若选择 {time_labels} 出发，每轮需支付 '
@@ -556,18 +724,19 @@ def coarse_toll_description_for_player(player: Player):
 
 
 def slot_preview_for_player(player: Player):
-    rewarded_slots = rewarded_slots_for_session(player.session)
+    schedule = departure_schedule_for_player(player)
+    rewarded_slots = rewarded_slots_for_player(player)
     reward_bonus = reward_bonus_points(player.session)
     tolled_slots = coarse_toll_slots_for_player(player) if coarse_toll_enabled_for_player(player) else set()
     toll_charge = coarse_toll_points_for_player(player)
     preview = []
-    for slot in departure_slots():
+    for slot in departure_slots_from_schedule(schedule):
         preview.append(
             dict(
                 slot=slot,
-                departure_label=departure_label_for_slot(slot),
-                departure_relation=departure_relation_for_slot(slot),
-                departure_time=minute_to_clock(departure_minute_for_slot(slot)),
+                departure_label=departure_label_for_slot(slot, schedule),
+                departure_relation=departure_relation_for_slot(slot, schedule),
+                departure_time=minute_to_clock(departure_minute_for_slot(slot, schedule)),
                 reward_active=slot in rewarded_slots and reward_treatment_enabled(player.session),
                 reward_bonus=reward_bonus if slot in rewarded_slots and reward_treatment_enabled(player.session) else cu(0),
                 toll_active=slot in tolled_slots and coarse_toll_enabled_for_player(player),
@@ -578,23 +747,24 @@ def slot_preview_for_player(player: Player):
     return preview
 
 
-def auto_toll_distribution_summary(candidate):
+def auto_toll_distribution_summary(candidate, valid_slots, schedule):
     items = []
-    for slot, count in zip(departure_slots(), candidate.distribution):
+    for slot, count in zip(valid_slots, candidate.distribution):
         if count <= 0:
             continue
-        items.append(f'slot {slot}({minute_to_clock(departure_minute_for_slot(slot))}): {count}人')
+        items.append(f'slot {slot}({minute_to_clock(departure_minute_for_slot(slot, schedule))}): {count}人')
     return ', '.join(items)
 
 
-def auto_toll_cost_summary(candidate):
+def auto_toll_cost_summary(candidate, schedule):
     return ', '.join(
-        f'slot {slot}: {point_value_display(cost)}'
+        f'slot {slot}({minute_to_clock(departure_minute_for_slot(slot, schedule))}): {point_value_display(cost)}'
         for slot, cost in candidate.selected_costs
     )
 
 
-def build_auto_toll_result(candidate, players_count: int, capacity: int):
+def build_auto_toll_result(candidate, players_count: int, capacity: int, schedule):
+    valid_slots = tuple(departure_slots_from_schedule(schedule))
     return dict(
         enabled=True,
         source=COARSE_TOLL_SOURCE_AUTO,
@@ -604,9 +774,53 @@ def build_auto_toll_result(candidate, players_count: int, capacity: int):
         points=round(float(candidate.toll), 2),
         cost_gap=round(float(candidate.cost_gap), 6),
         nash_count=candidate.nash_count,
-        equilibrium_distribution=auto_toll_distribution_summary(candidate),
-        equilibrium_costs=auto_toll_cost_summary(candidate),
+        equilibrium_distribution=auto_toll_distribution_summary(candidate, valid_slots, schedule),
+        equilibrium_costs=auto_toll_cost_summary(candidate, schedule),
     )
+
+
+def apply_departure_schedules(session, matrix):
+    auto_enabled = departure_schedule_auto_enabled(session)
+    min_slots_each_side = departure_schedule_min_slots_each_side(session)
+    capacity = bottleneck_capacity_per_slot(session)
+
+    for group_players in matrix:
+        players_count = len(group_players)
+        if players_count <= 0:
+            continue
+
+        schedule = build_departure_schedule_record(
+            players_count=players_count,
+            capacity=capacity,
+            min_slots_each_side=min_slots_each_side,
+            auto_enabled=auto_enabled,
+        )
+        for player in group_players:
+            player.participant.vars[DEPARTURE_SCHEDULE_VAR] = schedule
+
+
+def validate_group_slot_configs(session, matrix):
+    if reward_treatment_enabled(session):
+        for group_index, group_players in enumerate(matrix, start=1):
+            if not group_players:
+                continue
+            rewarded_slots = rewarded_slots_for_player(group_players[0])
+            if not rewarded_slots:
+                raise ValueError(
+                    f'第 {group_index} 组：reward_treatment_enabled=1 时，'
+                    'rewarded_slot_spec 不能为空且必须落在该组可选出发时点内。'
+                )
+
+    if not coarse_toll_auto_enabled(session) and coarse_toll_enabled(session):
+        for group_index, group_players in enumerate(matrix, start=1):
+            if not group_players:
+                continue
+            tolled_slots = coarse_toll_slots_for_player(group_players[0])
+            if not tolled_slots:
+                raise ValueError(
+                    f'第 {group_index} 组：coarse_toll_enabled=1 时，'
+                    'coarse_toll_slot_spec 不能为空且必须落在该组可选出发时点内。'
+                )
 
 
 def apply_auto_coarse_toll_calibration(session, matrix):
@@ -635,22 +849,36 @@ def apply_auto_coarse_toll_calibration(session, matrix):
         if players_count <= 0:
             continue
 
-        if players_count not in candidate_cache:
+        schedule = departure_schedule_for_player(group_players[0])
+        valid_slots = tuple(departure_slots_from_schedule(schedule))
+        cache_key = (
+            players_count,
+            capacity,
+            tuple(valid_slots),
+            schedule.get('first_departure_minute'),
+            schedule.get('slot_size_minutes'),
+        )
+
+        if cache_key not in candidate_cache:
             try:
-                candidate_cache[players_count] = calibrate_best_candidate(
+                candidate_cache[cache_key] = calibrate_best_candidate(
                     players=players_count,
                     capacity=capacity,
                     min_toll=min_toll,
                     max_toll=max_toll,
                     toll_step=toll_step,
+                    valid_slots=valid_slots,
+                    first_departure_minute=schedule.get('first_departure_minute'),
+                    slot_size_minutes=schedule.get('slot_size_minutes', C.SLOT_SIZE_MINUTES),
                 )
             except CalibrationError as exc:
                 raise ValueError(
                     f'粗收费自动校准失败：第 {group_index} 组人数={players_count}, '
-                    f'capacity={capacity}, 搜索范围={min_toll}-{max_toll}, 步长={toll_step}。{exc}'
+                    f'capacity={capacity}, 时点数={len(valid_slots)}, '
+                    f'搜索范围={min_toll}-{max_toll}, 步长={toll_step}。{exc}'
                 ) from exc
 
-        result = build_auto_toll_result(candidate_cache[players_count], players_count, capacity)
+        result = build_auto_toll_result(candidate_cache[cache_key], players_count, capacity, schedule)
         for player in group_players:
             player.participant.vars[COARSE_TOLL_AUTO_RESULT_VAR] = result
 
@@ -669,20 +897,6 @@ def creating_session(subsession: Subsession):
         grouping_enabled = config_flag(subsession.session.config.get('grouping_enabled', 0))
         manual_grouping_spec = subsession.session.config.get('manual_grouping_spec', '')
 
-        if reward_treatment_enabled(subsession.session):
-            rewarded_slots = rewarded_slots_for_session(subsession.session)
-            if not rewarded_slots:
-                raise ValueError(
-                    'reward_treatment_enabled=1 时，rewarded_slot_spec 不能为空。示例：1-3,9-11'
-                )
-
-        if not coarse_toll_auto_enabled(subsession.session) and coarse_toll_enabled(subsession.session):
-            tolled_slots = coarse_toll_slots_for_session(subsession.session)
-            if not tolled_slots:
-                raise ValueError(
-                    'coarse_toll_enabled=1 时，coarse_toll_slot_spec 不能为空。示例：4-8'
-                )
-
         if session_name != 'single_bottleneck_prod' and (grouping_enabled or manual_grouping_spec.strip()):
             raise ValueError('仅正式场次 single_bottleneck_prod 支持配置 participant_label 手动分组。')
 
@@ -692,6 +906,8 @@ def creating_session(subsession: Subsession):
             cohort_size = max(1, int(subsession.session.config.get('cohort_size', len(players) or 1)))
             matrix = build_auto_group_matrix(players, cohort_size)
 
+        apply_departure_schedules(subsession.session, matrix)
+        validate_group_slot_configs(subsession.session, matrix)
         apply_auto_coarse_toll_calibration(subsession.session, matrix)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
@@ -784,7 +1000,7 @@ def fill_missing_departure_slots(group: Group):
     for player in group.get_players():
         if player_has_departure_slot(player):
             continue
-        player.departure_slot = random.choice(departure_slots())
+        player.departure_slot = random.choice(departure_slots_for_player(player))
         player.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
         mark_disconnect_dropout(player)
 
@@ -827,11 +1043,12 @@ def set_results(group: Group):
         fill_missing_departure_slots(group)
 
     players = group.get_players()
-    players_by_slot = {slot: [] for slot in departure_slots()}
+    group_slots = departure_slots_for_group(group)
+    players_by_slot = {slot: [] for slot in group_slots}
     for player in players:
         slot = player_departure_slot(player)
         if slot is None:
-            slot = random.choice(departure_slots())
+            slot = random.choice(departure_slots_for_player(player))
             player.departure_slot = slot
             player.decision_source = DECISION_SOURCE_DISCONNECT_AUTO
             mark_disconnect_dropout(player)
@@ -840,11 +1057,11 @@ def set_results(group: Group):
     for slot_players in players_by_slot.values():
         random.shuffle(slot_players)
 
-    next_available_bottleneck_minute = departure_minute_for_slot(1)
+    next_available_bottleneck_minute = departure_minute_for_group_slot(group, group_slots[0])
     slot_service_interval = service_interval_minutes(group.session)
 
-    for slot in departure_slots():
-        departure_minute = departure_minute_for_slot(slot)
+    for slot in group_slots:
+        departure_minute = departure_minute_for_group_slot(group, slot)
         slot_players = players_by_slot[slot]
         slot_load = len(slot_players)
 
@@ -854,7 +1071,7 @@ def set_results(group: Group):
             arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
             early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
             late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
-            reward_bonus = reward_bonus_for_slot(group.session, slot)
+            reward_bonus = reward_bonus_for_player_slot(player, slot)
             coarse_toll_charge = coarse_toll_for_player_slot(player, slot)
             generalized_cost = (
                 C.QUEUE_COST_PER_MINUTE * queue_delay
@@ -917,6 +1134,20 @@ def export_row_for_player(player: Player):
     toll_slot_spec = coarse_toll_slot_spec_for_player(player)
     toll_points_value = coarse_toll_points_for_player(player)
     capacity_per_slot = bottleneck_capacity_per_slot(player.session)
+    departure_schedule = departure_schedule_for_player(player)
+    departure_schedule_source = departure_schedule.get('source', DEPARTURE_SCHEDULE_SOURCE_STATIC)
+    departure_schedule_auto = departure_schedule_auto_enabled(player.session)
+    departure_schedule_players = departure_schedule.get('calibration_players', '')
+    departure_schedule_capacity = departure_schedule.get('capacity', capacity_per_slot)
+    departure_schedule_slot_count = departure_schedule.get('num_slots', C.NUM_DEPARTURE_SLOTS)
+    departure_schedule_first_time = departure_schedule.get(
+        'first_departure_time',
+        minute_to_clock(departure_minute_for_slot(1)),
+    )
+    departure_schedule_last_time = departure_schedule.get(
+        'last_departure_time',
+        minute_to_clock(departure_minute_for_slot(C.NUM_DEPARTURE_SLOTS)),
+    )
     selected_slot = player_departure_slot(player)
     coarse_toll_charge = coarse_toll_for_player_slot(player, selected_slot) if selected_slot else cu(0)
     queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(player, 'queue_delay_minutes', 0), 2)
@@ -963,6 +1194,13 @@ def export_row_for_player(player: Player):
         toll_slot_spec,
         toll_points_value,
         capacity_per_slot,
+        departure_schedule_source,
+        departure_schedule_auto,
+        departure_schedule_players,
+        departure_schedule_capacity,
+        departure_schedule_slot_count,
+        departure_schedule_first_time,
+        departure_schedule_last_time,
         assigned_group_id,
         assigned_group_label,
         assigned_group_members,
@@ -1108,15 +1346,16 @@ def access_allowed(player: Player):
 
 def result_slot_summaries(player: Player, current_slot: int):
     group = player.group
-    rewarded_slots = rewarded_slots_for_session(group.session)
+    rewarded_slots = rewarded_slots_for_player(player)
     tolled_slots = coarse_toll_slots_for_player(player) if coarse_toll_enabled_for_player(player) else set()
+    schedule = departure_schedule_for_player(player)
     summaries = []
-    for slot in departure_slots():
+    for slot in departure_slots_from_schedule(schedule):
         count = sum(1 for round_player in group.get_players() if player_departure_slot(round_player) == slot)
         summaries.append(
             dict(
                 slot=slot,
-                departure_time=minute_to_clock(departure_minute_for_slot(slot)),
+                departure_time=minute_to_clock(departure_minute_for_slot(slot, schedule)),
                 count=count,
                 is_current=slot == current_slot,
                 is_rewarded=reward_treatment_enabled(group.session) and slot in rewarded_slots,
@@ -1141,7 +1380,7 @@ class Introduction(Page):
             early_cost_per_minute=C.EARLY_COST_PER_MINUTE,
             late_cost_per_minute=C.LATE_COST_PER_MINUTE,
             base_points=C.BASE_POINTS,
-            reward_description=reward_description(player.session),
+            reward_description=reward_description_for_player(player),
             coarse_toll_description=coarse_toll_description_for_player(player),
             slot_preview=slot_preview_for_player(player),
             capacity_per_slot=bottleneck_capacity_per_slot(player.session),
@@ -1181,15 +1420,20 @@ class Decision(Page):
             auto_advance_seconds=Decision.get_timeout_seconds(player),
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
-            reward_description=reward_description(player.session),
+            reward_description=reward_description_for_player(player),
             coarse_toll_description=coarse_toll_description_for_player(player),
             slot_preview=slot_preview_for_player(player),
         )
 
     @staticmethod
+    def error_message(player: Player, values):
+        if values.get('departure_slot') not in departure_slots_for_player(player):
+            return '请选择表格中的有效出发时间。'
+
+    @staticmethod
     def before_next_page(player: Player, timeout_happened):
         if timeout_happened and not player_has_departure_slot(player):
-            player.departure_slot = random.choice(departure_slots())
+            player.departure_slot = random.choice(departure_slots_for_player(player))
             player.decision_source = DECISION_SOURCE_TIMEOUT_AUTO
             mark_timeout_dropout(player)
             return
@@ -1232,7 +1476,8 @@ class Results(Page):
     @staticmethod
     def vars_for_template(player: Player):
         maybe_prepare_results(player.group)
-        current_slot = player_departure_slot(player) or departure_slots()[0]
+        schedule = departure_schedule_for_player(player)
+        current_slot = player_departure_slot(player) or departure_slots_from_schedule(schedule)[0]
         queue_delay = safe_model_field(player, 'queue_delay_minutes', 0)
         early_minutes = safe_model_field(player, 'schedule_early_minutes', 0)
         late_minutes = safe_model_field(player, 'schedule_late_minutes', 0)
@@ -1258,7 +1503,7 @@ class Results(Page):
             schedule_late_minutes=minute_value_display(late_minutes),
             slot_load=safe_model_field(player, 'slot_load', 0),
             current_slot=current_slot,
-            current_slot_time=minute_to_clock(departure_minute_for_slot(current_slot)),
+            current_slot_time=minute_to_clock(departure_minute_for_slot(current_slot, schedule)),
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             queue_cost_points=minute_value_display(queue_cost_points),
             early_cost_points=minute_value_display(early_cost_points),

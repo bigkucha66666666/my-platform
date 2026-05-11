@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>单瓶颈拥堵排队 — 3D 动态演示</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel-bg: rgba(13,17,23,0.92);
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #f0883e;
+    --danger: #f85149;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --yellow: #d29922;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+  }
+
+  /* ── top stat bar ── */
+  .stat-bar {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 16px;
+    background: var(--panel-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 18px;
+    border-radius: 12px;
+    min-width: 72px;
+    transition: background 200ms;
+  }
+  .stat-item:hover { background: rgba(255,255,255,0.04); }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stat-queue .stat-value { color: var(--accent); }
+  .stat-done  .stat-value { color: var(--green); }
+  .stat-wait  .stat-value { color: var(--danger); }
+  .stat-flow  .stat-value { color: var(--blue); }
+
+  .stat-divider {
+    width: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 4px 0;
+    border-radius: 1px;
+  }
+
+  /* ── bottom controls ── */
+  .ctrl-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 16px;
+    background: var(--panel-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .ctrl-bar button {
+    padding: 8px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: all 180ms ease;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .ctrl-bar button:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+  }
+  .ctrl-bar button:active { transform: translateY(0); }
+
+  .btn-burst {
+    background: rgba(240,136,62,0.15) !important;
+    border-color: rgba(240,136,62,0.3) !important;
+    color: var(--accent) !important;
+  }
+  .btn-burst:hover {
+    background: rgba(240,136,62,0.25) !important;
+  }
+
+  .ctrl-bar .sep {
+    width: 1px;
+    height: 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 1px;
+    margin: 0 4px;
+  }
+
+  .ctrl-bar label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .ctrl-bar input[type=range] {
+    width: 72px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .speed-display {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 32px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── legend ── */
+  .legend {
+    position: fixed;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    display: grid;
+    gap: 10px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: var(--panel-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .dot-free  { background: var(--blue);   box-shadow: 0 0 10px var(--blue); }
+  .dot-queue { background: var(--accent);  box-shadow: 0 0 10px var(--accent); }
+  .dot-pass  { background: var(--green);   box-shadow: 0 0 10px var(--green); }
+
+  /* ── hint ── */
+  .hint-bar {
+    position: fixed;
+    bottom: 86px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+    display: flex;
+    gap: 16px;
+  }
+  .hint-bar span { opacity: 0.7; }
+
+  /* ── congestion indicator ── */
+  .congestion-badge {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(-40px);
+    z-index: 10;
+    pointer-events: none;
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    opacity: 0;
+    transition: opacity 300ms;
+  }
+  .congestion-badge.visible { opacity: 1; }
+  .congestion-badge.critical { color: var(--danger); }
+  .congestion-badge.warning  { color: var(--accent); }
+
+  @media (max-width: 768px) {
+    .stat-bar { gap: 2px; padding: 4px; border-radius: 12px; }
+    .stat-item { padding: 6px 10px; min-width: 56px; }
+    .stat-value { font-size: 17px; }
+    .stat-label { font-size: 9px; }
+    .legend { right: 4px; padding: 10px 12px; gap: 6px; font-size: 10px; }
+    .ctrl-bar { gap: 4px; padding: 6px 10px; border-radius: 12px; }
+    .ctrl-bar button { padding: 6px 10px; font-size: 11px; }
+    .hint-bar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- stat bar -->
+<div class="stat-bar">
+  <div class="stat-item stat-queue">
+    <span class="stat-value" id="stat-queue">0</span>
+    <span class="stat-label">排队车辆</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-item stat-done">
+    <span class="stat-value" id="stat-done">0</span>
+    <span class="stat-label">已通过</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-item stat-wait">
+    <span class="stat-value" id="stat-wait">0s</span>
+    <span class="stat-label">最长等待</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat-item stat-flow">
+    <span class="stat-value" id="stat-flow">0</span>
+    <span class="stat-label">通行效率</span>
+  </div>
+</div>
+
+<!-- congestion badge -->
+<div class="congestion-badge" id="congestion-badge"></div>
+
+<!-- legend -->
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot dot-free"></span> 自由流驶入</div>
+  <div class="legend-item"><span class="legend-dot dot-queue"></span> 排队等待</div>
+  <div class="legend-item"><span class="legend-dot dot-pass"></span> 瓶颈通过</div>
+  <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--muted);">
+    <div>瓶颈容量: <b style="color:var(--text)">1 辆/时点</b></div>
+    <div>自由流时间: <b style="color:var(--text)">6 分钟</b></div>
+  </div>
+</div>
+
+<!-- controls -->
+<div class="ctrl-bar">
+  <label>模拟速度</label>
+  <input type="range" id="rate-slider" min="0.3" max="2.5" step="0.1" value="1.0">
+  <span class="speed-display" id="rate-label">1.0×</span>
+  <span class="sep"></span>
+  <button id="btn-burst" class="btn-burst">⚡ 高峰涌入</button>
+  <span class="sep"></span>
+  <button id="btn-camera-top">俯视</button>
+  <button id="btn-camera-chase">跟车</button>
+  <button id="btn-camera-default">默认</button>
+  <span class="sep"></span>
+  <button id="btn-reset">↻ 重置</button>
+</div>
+
+<div class="hint-bar">
+  <span>🖱 拖拽旋转</span>
+  <span>滚轮缩放</span>
+  <span>右键平移</span>
+  <span>B 涌入</span>
+  <span>R 重置</span>
+  <span>0 俯视</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ════════════════════════════════════════════════════════════
+   CONFIGURATION
+   ════════════════════════════════════════════════════════════ */
+const CFG = {
+  freeflowSpeed: 5.5,
+  bottleneckCapacity: 1,
+  serviceWindow: 2.2,
+  carLength: 0.65,
+  carWidth: 0.42,
+  carHeight: 0.32,
+  roadY: 0.02,
+  bottleneckX0: -3.5,
+  bottleneckX1: 3.5,
+  spawnX: -16,
+  despawnX: 16,
+  roadZHalf: 3.2,
+  bottleneckZHalf: 0.7,
+};
+
+/* ════════════════════════════════════════════════════════════
+   SCENE SETUP
+   ════════════════════════════════════════════════════════════ */
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0d1117');
+scene.fog = new THREE.FogExp2('#0d1117', 0.00015);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 60);
+camera.position.set(2, 10, 15);
+camera.lookAt(0, 0, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -0.3, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 4;
+controls.maxDistance = 28;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.update();
+
+/* ════════════════════════════════════════════════════════════
+   LIGHTING
+   ════════════════════════════════════════════════════════════ */
+const ambient = new THREE.AmbientLight('#8899bb', 1.2);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight('#fff5e8', 5.5);
+sun.position.set(12, 18, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 55;
+sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
+sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -8;
+sun.shadow.bias = -0.0003;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight('#8899cc', 1.0);
+fill.position.set(-6, 4, -10);
+scene.add(fill);
+
+const rimL = new THREE.DirectionalLight('#ffccaa', 1.6);
+rimL.position.set(0, 1.5, 8);
+scene.add(rimL);
+
+/* ════════════════════════════════════════════════════════════
+   GROUND
+   ════════════════════════════════════════════════════════════ */
+const groundGeo = new THREE.PlaneGeometry(60, 60);
+const groundMat = new THREE.MeshStandardMaterial({ color: '#1a1f26', roughness: 0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.1;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ════════════════════════════════════════════════════════════
+   ROAD SURFACE WITH BUILT-IN TEXTURE
+   ␐═══════════════════════════════════════════════════════════ */
+function buildRoadSurface() {
+  const shape = new THREE.Shape();
+  const { roadZHalf, bottleneckZHalf, bottleneckX0, bottleneckX1 } = CFG;
+  shape.moveTo(-20, -roadZHalf);
+  shape.lineTo(bottleneckX0, -roadZHalf);
+  shape.lineTo(bottleneckX0, -bottleneckZHalf);
+  shape.lineTo(bottleneckX1, -bottleneckZHalf);
+  shape.lineTo(bottleneckX1, -roadZHalf);
+  shape.lineTo(20, -roadZHalf);
+  shape.lineTo(20, roadZHalf);
+  shape.lineTo(bottleneckX1, roadZHalf);
+  shape.lineTo(bottleneckX1, bottleneckZHalf);
+  shape.lineTo(bottleneckX0, bottleneckZHalf);
+  shape.lineTo(bottleneckX0, roadZHalf);
+  shape.lineTo(-20, roadZHalf);
+  shape.closePath();
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.06,
+    bevelEnabled: true,
+    bevelThickness: 0.04,
+    bevelSize: 0.04,
+    bevelSegments: 5,
+  });
+
+  // canvas-generated asphalt texture
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width = 512; texCanvas.height = 512;
+  const ctx = texCanvas.getContext('2d');
+  ctx.fillStyle = '#3a3e45';
+  ctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 3000; i++) {
+    const x = Math.random() * 512, y = Math.random() * 512;
+    const v = 50 + Math.random() * 30;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(x, y, 2 + Math.random() * 3, 2 + Math.random() * 3);
+  }
+  const roadTex = new THREE.CanvasTexture(texCanvas);
+  roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
+  roadTex.repeat.set(8, 8);
+
+  const mat = new THREE.MeshStandardMaterial({
+    map: roadTex,
+    color: '#4a4e55',
+    roughness: 0.5,
+    metalness: 0.1,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = CFG.roadY;
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+  scene.add(mesh);
+}
+
+/* ════════════════════════════════════════════════════════════
+   LANE MARKINGS
+   ════════════════════════════════════════════════════════════ */
+function buildLaneMarkings() {
+  const group = new THREE.Group();
+  const dashGeo = new THREE.PlaneGeometry(0.55, 0.1);
+  const dashMat = new THREE.MeshStandardMaterial({
+    color: '#ddddd8',
+    roughness: 0.25,
+    emissive: '#111111',
+    emissiveIntensity: 0.15,
+  });
+
+  for (let x = -18.5; x <= 18.5; x += 1.35) {
+    if (x > CFG.bottleneckX0 - 0.6 && x < CFG.bottleneckX1 + 0.6) continue;
+    const dash = new THREE.Mesh(dashGeo, dashMat);
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(x, CFG.roadY + 0.04, 0);
+    dash.receiveShadow = true;
+    group.add(dash);
+  }
+  scene.add(group);
+}
+
+/* ════════════════════════════════════════════════════════════
+   BOTTLENECK BARRIERS — enhanced
+   ════════════════════════════════════════════════════════════ */
+function buildBarriers() {
+  const group = new THREE.Group();
+  const { roadZHalf, bottleneckZHalf, bottleneckX0, bottleneckX1, roadY } = CFG;
+
+  function barrierWall(cx, cz, dx, dz, h) {
+    const geo = new THREE.BoxGeometry(dx, h, dz);
+    const mat = new THREE.MeshStandardMaterial({
+      color: '#e07030',
+      roughness: 0.3,
+      metalness: 0.35,
+      emissive: '#1a0800',
+      emissiveIntensity: 0.5,
+    });
+    const box = new THREE.Mesh(geo, mat);
+    box.position.set(cx, roadY + h / 2, cz);
+    box.castShadow = true;
+    box.receiveShadow = true;
+    group.add(box);
+
+    // hazard stripes
+    const sg = new THREE.BoxGeometry(dx * 0.85, h * 0.18, dz * 0.35);
+    const sm = new THREE.MeshStandardMaterial({
+      color: '#ffe680',
+      roughness: 0.25,
+      emissive: '#331100',
+      emissiveIntensity: 0.6,
+    });
+    const stripe = new THREE.Mesh(sg, sm);
+    stripe.position.copy(box.position);
+    stripe.position.y += h * 0.28;
+    group.add(stripe);
+  }
+
+  const h = 0.6;
+  // left approach
+  barrierWall(bottleneckX0 - 1.4, roadZHalf + 0.05, 1.2, 2.0, h);
+  barrierWall(bottleneckX0 + 0.3, bottleneckZHalf + 0.4, 2.4, 0.7, h);
+  barrierWall(bottleneckX1 - 0.3, bottleneckZHalf + 0.4, 2.4, 0.7, h);
+  barrierWall(bottleneckX1 + 1.4, roadZHalf + 0.05, 1.2, 2.0, h);
+  // right approach
+  barrierWall(bottleneckX0 - 1.4, -roadZHalf - 0.05, 1.2, 2.0, h);
+  barrierWall(bottleneckX0 + 0.3, -bottleneckZHalf - 0.4, 2.4, 0.7, h);
+  barrierWall(bottleneckX1 - 0.3, -bottleneckZHalf - 0.4, 2.4, 0.7, h);
+  barrierWall(bottleneckX1 + 1.4, -roadZHalf - 0.05, 1.2, 2.0, h);
+
+  // overhead gantry
+  const gantryGeo = new THREE.BoxGeometry(3.5, 0.15, 1.6);
+  const gantryMat = new THREE.MeshStandardMaterial({
+    color: '#cc4422',
+    roughness: 0.25,
+    emissive: '#1a0000',
+    emissiveIntensity: 0.7,
+  });
+  const gantry = new THREE.Mesh(gantryGeo, gantryMat);
+  gantry.position.set(0, 2.0, 0);
+  gantry.castShadow = true;
+  group.add(gantry);
+
+  // gantry signal lights
+  const sigGeo = new THREE.SphereGeometry(0.18, 12, 8);
+  const sigGreen = new THREE.Mesh(sigGeo, new THREE.MeshStandardMaterial({
+    color: '#00ff44', roughness: 0.15, emissive: '#00ff22', emissiveIntensity: 2.5,
+  }));
+  sigGreen.position.set(0.8, 1.82, 0.35);
+  const sigRed = new THREE.Mesh(sigGeo, new THREE.MeshStandardMaterial({
+    color: '#ff2222', roughness: 0.15, emissive: '#ff0000', emissiveIntensity: 2.5,
+  }));
+  sigRed.position.set(-0.8, 1.82, -0.35);
+  group.add(sigGreen, sigRed);
+  group.userData = { sigGreen, sigRed };
+
+  // poles
+  const poleGeo = new THREE.CylinderGeometry(0.07, 0.09, 2.1, 8);
+  const poleMat = new THREE.MeshStandardMaterial({ color: '#555', roughness: 0.4, metalness: 0.7 });
+  [[-1.5, 0], [1.5, 0]].forEach(([px, pz]) => {
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(px, 1.0, pz);
+    pole.castShadow = true;
+    group.add(pole);
+  });
+
+  scene.add(group);
+}
+
+/* ════════════════════════════════════════════════════════════
+   CONGESTION HEAT GRID — dynamic road overlay
+   ════════════════════════════════════════════════════════════ */
+const heatGridSize = 60;
+const heatData = new Float32Array(heatGridSize).fill(0);
+const heatMeshes = [];
+
+function buildHeatGrid() {
+  const group = new THREE.Group();
+  const cellW = (CFG.bottleneckX0 - CFG.spawnX) / heatGridSize;
+  const geo = new THREE.PlaneGeometry(cellW * 0.9, CFG.roadZHalf * 1.9);
+
+  for (let i = 0; i < heatGridSize; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: '#ff4400',
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const cell = new THREE.Mesh(geo, mat);
+    cell.rotation.x = -Math.PI / 2;
+    cell.position.set(CFG.spawnX + i * cellW + cellW / 2, CFG.roadY + 0.06, 0);
+    heatMeshes.push({ mesh: cell, material: mat, index: i });
+    group.add(cell);
+  }
+  scene.add(group);
+}
+
+function updateHeatGrid() {
+  heatData.fill(0);
+  // accumulate car density per cell
+  const cellW = (CFG.bottleneckX0 - CFG.spawnX) / heatGridSize;
+  for (const car of cars) {
+    if (car.x < CFG.spawnX || car.x > CFG.bottleneckX0) continue;
+    const idx = Math.floor((car.x - CFG.spawnX) / cellW);
+    if (idx >= 0 && idx < heatGridSize) heatData[idx]++;
+  }
+  const maxCount = Math.max(1, ...heatData);
+  for (const item of heatMeshes) {
+    const v = heatData[item.index] / maxCount;
+    item.material.opacity = v * 0.55;
+    // color from green → yellow → orange → red
+    const r = Math.min(1, v * 2);
+    const g = Math.min(1, (1 - v) * 1.5);
+    const b = 0;
+    item.material.color.setRGB(r, g, b);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SCENERY
+   ════════════════════════════════════════════════════════════ */
+function buildScenery() {
+  const group = new THREE.Group();
+  const treeColors = ['#2d4a2d', '#3a5535', '#2a3d2a', '#3d5c38'];
+  for (let i = 0; i < 50; i++) {
+    const x = (Math.random() - 0.5) * 36;
+    const z = (Math.random() > 0.5 ? 1 : -1) * (4.2 + Math.random() * 8);
+    const h = 0.35 + Math.random() * 0.8;
+    const tGeo = new THREE.CylinderGeometry(0.06, 0.1, h, 6);
+    const trunk = new THREE.Mesh(tGeo, new THREE.MeshStandardMaterial({ color: '#4a3a2e', roughness: 0.7 }));
+    trunk.position.set(x, CFG.roadY + h / 2, z);
+    trunk.castShadow = true; trunk.receiveShadow = true;
+    group.add(trunk);
+
+    const cr = 0.2 + Math.random() * 0.5;
+    const cGeo = new THREE.SphereGeometry(cr, 8, 6);
+    const cMesh = new THREE.Mesh(cGeo, new THREE.MeshStandardMaterial({
+      color: treeColors[Math.floor(Math.random() * 4)],
+      roughness: 0.5,
+    }));
+    cMesh.position.set(x, CFG.roadY + h + cr * 0.6, z);
+    cMesh.castShadow = true;
+    group.add(cMesh);
+  }
+  scene.add(group);
+}
+
+/* ════════════════════════════════════════════════════════════
+   CAR MODEL — improved with details
+   ════════════════════════════════════════════════════════════ */
+function createCar(hexColor) {
+  const group = new THREE.Group();
+  const { carLength, carWidth, carHeight } = CFG;
+
+  // body
+  const bodyGeo = new THREE.BoxGeometry(carLength, carHeight, carWidth);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: hexColor,
+    roughness: 0.2,
+    metalness: 0.5,
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = carHeight / 2;
+  body.castShadow = true; body.receiveShadow = true;
+  group.add(body);
+
+  // roof cabin
+  const cabinGeo = new THREE.BoxGeometry(carLength * 0.44, carHeight * 0.6, carWidth * 0.82);
+  const cabinMat = new THREE.MeshStandardMaterial({
+    color: '#d4e4f0',
+    roughness: 0.18, metalness: 0.55,
+    opacity: 0.72, transparent: true,
+  });
+  const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+  cabin.position.set(carLength * 0.04, carHeight + carHeight * 0.28, 0);
+  cabin.castShadow = true;
+  group.add(cabin);
+
+  // wheels
+  const wGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.1, 10);
+  const wMat = new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.6 });
+  [
+    [carLength * 0.30, 0.09, carWidth * 0.52],
+    [carLength * 0.30, 0.09, -carWidth * 0.52],
+    [-carLength * 0.30, 0.09, carWidth * 0.52],
+    [-carLength * 0.30, 0.09, -carWidth * 0.52],
+  ].forEach(([wx, wy, wz]) => {
+    const w = new THREE.Mesh(wGeo, wMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(wx, wy, wz);
+    w.castShadow = true;
+    group.add(w);
+  });
+
+  // headlights
+  const hlGeo = new THREE.BoxGeometry(0.06, 0.08, carWidth * 0.24);
+  const hlMat = new THREE.MeshStandardMaterial({
+    color: '#ffffdd',
+    roughness: 0.15,
+    emissive: '#ffffbb',
+    emissiveIntensity: 0.7,
+  });
+  const hl = new THREE.Mesh(hlGeo, hlMat);
+  hl.position.set(carLength * 0.46, carHeight * 0.42, 0);
+  group.add(hl);
+
+  // taillights
+  const tlMat = new THREE.MeshStandardMaterial({
+    color: '#ff3322',
+    roughness: 0.15,
+    emissive: '#ff1100',
+    emissiveIntensity: 0.5,
+  });
+  const tl = new THREE.Mesh(hlGeo, tlMat);
+  tl.position.set(-carLength * 0.46, carHeight * 0.42, 0);
+  group.add(tl);
+
+  // exhaust particle emitter marker
+  group.userData = { bodyMat, body };
+  return group;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PARTICLE SYSTEM — exhaust / dust
+   ════════════════════════════════════════════════════════════ */
+const MAX_PARTICLES = 300;
+const particleData = [];
+const particleGeo = new THREE.SphereGeometry(0.04, 4, 4);
+let particleGroup;
+
+function buildParticleSystem() {
+  particleGroup = new THREE.Group();
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: '#cccccc',
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const dot = new THREE.Mesh(particleGeo, mat);
+    dot.visible = false;
+    particleGroup.add(dot);
+    particleData.push({
+      mesh: dot, material: mat,
+      life: 0, maxLife: 0,
+      x: 0, y: 0, z: 0,
+      vx: 0, vy: 0, vz: 0,
+      alive: false,
+    });
+  }
+  scene.add(particleGroup);
+}
+
+let particleSpawnIdx = 0;
+function emitParticle(x, y, z, vx, vy, vz, color, life) {
+  const p = particleData[particleSpawnIdx];
+  p.mesh.visible = true;
+  p.material.opacity = 0.6;
+  p.material.color.set(color);
+  p.x = x; p.y = y; p.z = z;
+  p.vx = vx; p.vy = vy; p.vz = vz;
+  p.life = life; p.maxLife = life;
+  p.alive = true;
+  p.mesh.position.set(x, y, z);
+  particleSpawnIdx = (particleSpawnIdx + 1) % MAX_PARTICLES;
+}
+
+function updateParticles(dt) {
+  for (const p of particleData) {
+    if (!p.alive) continue;
+    p.life -= dt;
+    if (p.life <= 0) {
+      p.alive = false;
+      p.mesh.visible = false;
+      p.material.opacity = 0;
+      continue;
+    }
+    const t = p.life / p.maxLife;
+    p.material.opacity = t * 0.55;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.z += p.vz * dt;
+    p.mesh.position.set(p.x, p.y, p.z);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIMULATION STATE
+   ════════════════════════════════════════════════════════════ */
+const CAR_COLORS = [
+  '#5599dd', '#e8c040', '#e85040', '#40b880', '#9b70cc',
+  '#f08850', '#5ca8b0', '#d46888', '#88b040', '#c888e0',
+];
+let cars = [];
+let simTime = 0;
+let timeScale = 1.0;
+let totalPassed = 0;
+let maxWaitTime = 0;
+let nextSpawnTime = 0;
+let bottleneckBusyUntil = 0;
+
+const STATE = { FREE: 0, QUEUING: 1, IN_TUNNEL: 2, DONE: 3 };
+
+function spawnCar() {
+  const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+  const mesh = createCar(color);
+  mesh.position.set(CFG.spawnX, CFG.roadY + CFG.carHeight / 2, (Math.random() - 0.5) * 1.2);
+  scene.add(mesh);
+  cars.push({
+    mesh, x: CFG.spawnX, z: mesh.position.z,
+    state: STATE.FREE, waitStart: 0, passed: false,
+  });
+}
+
+function resetSimulation() {
+  cars.forEach(c => { scene.remove(c.mesh); disposeMesh(c.mesh); });
+  cars = [];
+  simTime = 0;
+  totalPassed = 0;
+  maxWaitTime = 0;
+  nextSpawnTime = 0;
+  bottleneckBusyUntil = 0;
+  // start with 3 spread-out cars so the scene isn't empty
+  for (let i = 0; i < 3; i++) {
+    spawnCar();
+    cars[i].x = CFG.spawnX + i * 3.0;
+    cars[i].mesh.position.x = cars[i].x;
+  }
+}
+
+function disposeMesh(m) {
+  m.traverse(c => {
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) {
+      if (Array.isArray(c.material)) c.material.forEach(x => x.dispose());
+      else c.material.dispose();
+    }
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   PHYSICS — car-following queue model
+   ════════════════════════════════════════════════════════════ */
+const FOLLOW_GAP = 0.95;      // nose-to-tail gap between queued cars
+const QUEUE_ENTRY_X = CFG.bottleneckX0 - 0.25;  // where the lead queued car waits
+
+function updatePhysics(dt) {
+  const { bottleneckX0, bottleneckX1, freeflowSpeed, serviceWindow, bottleneckCapacity } = CFG;
+
+  // ── 1. cars in tunnel: move through ──
+  for (const c of cars) {
+    if (c.state === STATE.IN_TUNNEL) {
+      c.x += freeflowSpeed * 0.85 * dt;
+      c.z += (0 - c.z) * 5 * dt;
+      if (c.x >= bottleneckX1) {
+        c.state = STATE.DONE;
+        if (!c.passed) {
+          c.passed = true;
+          totalPassed++;
+          if (c.waitStart > 0) {
+            const w = simTime - c.waitStart;
+            if (w > maxWaitTime) maxWaitTime = w;
+          }
+        }
+      }
+    }
+  }
+
+  // ── 2. done cars: drive away or despawn ──
+  cars = cars.filter(c => {
+    if (c.state === STATE.DONE && c.x > CFG.despawnX) {
+      scene.remove(c.mesh); disposeMesh(c.mesh); return false;
+    }
+    if (c.state === STATE.DONE) {
+      c.x += freeflowSpeed * 0.9 * dt;
+      c.mesh.position.x = c.x;
+      if (Math.random() < 0.2) {
+        emitParticle(c.x - 0.3, CFG.roadY + 0.15, c.mesh.position.z,
+          -0.3 + Math.random() * 0.2, 0.2 + Math.random() * 0.6, (Math.random() - 0.5) * 0.3,
+          '#aaaaaa', 0.5 + Math.random() * 0.8);
+      }
+    }
+    return true;
+  });
+
+  // ── 3. build queue chain: sort by x descending (front → back) ──
+  const active = cars.filter(c => c.state === STATE.FREE || c.state === STATE.QUEUING);
+  active.sort((a, b) => b.x - a.x);
+
+  // assign each car its target x based on the car ahead
+  for (let i = 0; i < active.length; i++) {
+    const c = active[i];
+    const ahead = i > 0 ? active[i - 1] : null; // car at index i-1 is the one directly ahead (closer to bottleneck)
+
+    if (c.state === STATE.IN_TUNNEL || c.state === STATE.DONE) continue;
+
+    // ── determine desired x ──
+    let desiredX;
+    if (ahead) {
+      // follow the car ahead at safe gap
+      desiredX = ahead.x - FOLLOW_GAP;
+    } else {
+      // this is the front-most car — wait at bottleneck entry
+      desiredX = QUEUE_ENTRY_X;
+    }
+
+    // ── FREE state: cruising ──
+    if (c.state === STATE.FREE) {
+      if (c.x < bottleneckX0 - 2.5 && (!ahead || ahead.x - c.x > 3.0)) {
+        // open road — cruise at freeflow speed
+        c.x += freeflowSpeed * dt;
+        c.z += (0 - c.z) * 1.5 * dt;
+        if (Math.random() < 0.12) {
+          emitParticle(c.x - 0.3, CFG.roadY + 0.05, c.mesh.position.z,
+            -0.2, 0.15 + Math.random() * 0.4, (Math.random() - 0.5) * 0.4,
+            '#999999', 0.4 + Math.random() * 0.6);
+        }
+        // snap if approaching desiredX
+        if (c.x >= desiredX - 0.2) {
+          c.x = desiredX;
+        }
+      } else {
+        // approaching queue — slow down and merge
+        const approachSpeed = freeflowSpeed * 0.35;
+        c.x += (desiredX - c.x) * Math.min(1, approachSpeed * dt / Math.max(0.3, Math.abs(desiredX - c.x))) * 8 * dt;
+        if (c.x > desiredX && c.x - desiredX < 0.15) c.x = desiredX;
+        if (c.x > desiredX + 0.1) c.x = Math.max(desiredX, c.x - approachSpeed * dt);
+        c.z += (0 - c.z) * 2 * dt;
+
+        // transition to queuing when close to queue
+        if (Math.abs(c.x - desiredX) < 0.25 && !ahead) {
+          // front car reached bottleneck entry
+          if (bottleneckBusyUntil <= simTime) {
+            c.state = STATE.IN_TUNNEL;
+            c.waitStart = simTime;
+            bottleneckBusyUntil = simTime + serviceWindow / bottleneckCapacity;
+          } else {
+            c.state = STATE.QUEUING;
+            if (!c.waitStart) c.waitStart = simTime;
+          }
+        } else if (c.x <= desiredX + 0.3 && ahead && ahead.state === STATE.QUEUING) {
+          c.state = STATE.QUEUING;
+          if (!c.waitStart) c.waitStart = simTime;
+        }
+      }
+    }
+
+    // ── QUEUING state: hold position in queue ──
+    if (c.state === STATE.QUEUING) {
+      // stick to desired position
+      c.x += (desiredX - c.x) * 6 * dt;
+      if (Math.abs(c.x - desiredX) < 0.02) c.x = desiredX;
+      c.z += (0 - c.z) * 2.5 * dt;
+      if (!c.waitStart) c.waitStart = simTime;
+
+      // brake dust
+      if (Math.random() < 0.15) {
+        emitParticle(c.x - 0.2, CFG.roadY + 0.04, c.mesh.position.z,
+          0, 0.1 + Math.random() * 0.3, (Math.random() - 0.5) * 0.2,
+          '#ddaa88', 0.3 + Math.random() * 0.4);
+      }
+
+      // if I'm the front car and bottleneck is free → go!
+      if (!ahead && bottleneckBusyUntil <= simTime) {
+        c.state = STATE.IN_TUNNEL;
+        bottleneckBusyUntil = simTime + serviceWindow / bottleneckCapacity;
+      }
+    }
+
+    // ensure car pos doesn't go past desired
+    if (c.state !== STATE.IN_TUNNEL && c.state !== STATE.DONE) {
+      if (c.x > QUEUE_ENTRY_X + 0.05) {
+        c.x = Math.min(c.x, QUEUE_ENTRY_X);
+      }
+    }
+  }
+
+  // ── 4. update mesh positions / rotation ──
+  for (const c of cars) {
+    c.mesh.position.x = c.x;
+    c.mesh.position.z += (c.z - c.mesh.position.z) * 10 * dt;
+    const tr = c.state === STATE.QUEUING ? 0.1 : 0;
+    c.mesh.rotation.y += (tr - c.mesh.rotation.y) * 4 * dt;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   CAR COLOR UPDATES & EMISSIVE GLOW
+   ════════════════════════════════════════════════════════════ */
+function updateCarVisuals() {
+  for (const c of cars) {
+    const body = c.mesh.children[0];
+    if (!body || !body.material) continue;
+    const m = body.material;
+    if (c.state === STATE.FREE) {
+      m.emissive?.set('#000000');
+    } else if (c.state === STATE.QUEUING) {
+      m.emissive?.set('#331100');
+    } else if (c.state === STATE.IN_TUNNEL) {
+      m.emissive?.set('#002200');
+    } else if (c.state === STATE.DONE) {
+      m.emissive?.set('#001100');
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SPAWN LOGIC — moderate rate for visible steady-state queueing
+   ════════════════════════════════════════════════════════════ */
+function updateSpawning() {
+  // average gap between spawns: ~2.5-4.5 seconds at 1× speed
+  const baseGap = 2.0 / timeScale;
+  if (simTime >= nextSpawnTime) {
+    spawnCar();
+    nextSpawnTime = simTime + baseGap * (0.6 + Math.random() * 1.6);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIGNAL LIGHTS
+   ════════════════════════════════════════════════════════════ */
+let signalPulse = 0;
+function updateSignals(dt) {
+  signalPulse += dt * 2;
+  const barriers = scene.children.find(c => c.userData?.sigGreen);
+  if (!barriers) return;
+  const { sigGreen, sigRed } = barriers.userData;
+  // green when bottleneck is free
+  const free = simTime >= bottleneckBusyUntil;
+  sigGreen.material.emissiveIntensity = free ? 2.5 + Math.sin(signalPulse) * 0.8 : 0.3;
+  sigRed.material.emissiveIntensity = free ? 0.3 : 2.5 + Math.sin(signalPulse) * 0.8;
+}
+
+/* ════════════════════════════════════════════════════════════
+   UI UPDATE
+   ════════════════════════════════════════════════════════════ */
+function updateUI() {
+  const qLen = cars.filter(c => c.state === STATE.QUEUING).length;
+  document.getElementById('stat-queue').textContent = qLen;
+  document.getElementById('stat-done').textContent = totalPassed;
+  document.getElementById('stat-wait').textContent = maxWaitTime.toFixed(1) + 's';
+  document.getElementById('stat-flow').textContent = Math.round(totalPassed / Math.max(1, simTime) * 60);
+
+  // congestion badge
+  const badge = document.getElementById('congestion-badge');
+  if (qLen >= 8) {
+    badge.textContent = '严重拥堵';
+    badge.className = 'congestion-badge visible critical';
+  } else if (qLen >= 4) {
+    badge.textContent = '排队形成';
+    badge.className = 'congestion-badge visible warning';
+  } else {
+    badge.className = 'congestion-badge';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   BURST — modest surge to demonstrate queue formation
+   ════════════════════════════════════════════════════════════ */
+function burstSpawn(n = 5) {
+  for (let i = 0; i < n; i++) {
+    spawnCar();
+    const car = cars[cars.length - 1];
+    car.x = CFG.bottleneckX0 - 4 - i * (FOLLOW_GAP + 0.05);
+    car.mesh.position.x = car.x;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   CAMERA PRESETS
+   ════════════════════════════════════════════════════════════ */
+function animateCamera(pos, target, duration = 0.8) {
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const endPos = new THREE.Vector3(...pos);
+  const endTarget = new THREE.Vector3(...target);
+  const startTime = performance.now();
+
+  function step(now) {
+    const t = Math.min((now - startTime) / (duration * 1000), 1);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    camera.position.lerpVectors(startPos, endPos, ease);
+    controls.target.lerpVectors(startTarget, endTarget, ease);
+    controls.update();
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function camTopDown()    { animateCamera([0, 22, 0.5], [0, 0, 0]); }
+function camDefault()    { animateCamera([2, 10, 15], [0, -0.3, 0]); }
+function camChase()      { animateCamera([CFG.bottleneckX0 - 5, 3.5, 4], [CFG.bottleneckX0, 0, 0]); }
+
+/* ════════════════════════════════════════════════════════════
+   MAIN LOOP
+   ════════════════════════════════════════════════════════════ */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const raw = Math.min(clock.getDelta(), 0.1);
+  const dt = raw * timeScale;
+  simTime += dt;
+
+  updateSpawning();
+  updatePhysics(dt);
+  updateCarVisuals();
+  updateParticles(dt);
+  updateHeatGrid();
+  updateSignals(dt);
+  updateUI();
+
+  // done cars keep moving
+  for (const c of cars) {
+    if (c.state === STATE.DONE) c.mesh.position.x = c.x;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ════════════════════════════════════════════════════════════
+   EVENT BINDINGS
+   ════════════════════════════════════════════════════════════ */
+document.getElementById('rate-slider').addEventListener('input', e => {
+  timeScale = +e.target.value;
+  document.getElementById('rate-label').textContent = timeScale.toFixed(1) + '×';
+});
+document.getElementById('btn-burst').addEventListener('click', () => burstSpawn(5));
+document.getElementById('btn-reset').addEventListener('click', resetSimulation);
+document.getElementById('btn-camera-top').addEventListener('click', camTopDown);
+document.getElementById('btn-camera-chase').addEventListener('click', camChase);
+document.getElementById('btn-camera-default').addEventListener('click', camDefault);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+window.addEventListener('keydown', e => {
+  switch (e.key.toLowerCase()) {
+    case 'r': resetSimulation(); break;
+    case 'b': burstSpawn(5); break;
+    case '0': camTopDown(); break;
+    case '1': camDefault(); break;
+    case '2': camChase(); break;
+    case 'arrowleft':
+      timeScale = Math.max(0.3, timeScale - 0.2);
+      document.getElementById('rate-slider').value = timeScale;
+      document.getElementById('rate-label').textContent = timeScale.toFixed(1) + '×';
+      break;
+    case 'arrowright':
+      timeScale = Math.min(2.5, timeScale + 0.2);
+      document.getElementById('rate-slider').value = timeScale;
+      document.getElementById('rate-label').textContent = timeScale.toFixed(1) + '×';
+      break;
+  }
+});
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════ */
+buildRoadSurface();
+buildLaneMarkings();
+buildBarriers();
+buildHeatGrid();
+buildScenery();
+buildParticleSystem();
+resetSimulation();
+animate();
+</script>
+</body>
+</html>

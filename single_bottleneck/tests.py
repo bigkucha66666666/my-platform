@@ -1,6 +1,6 @@
 from otree.api import Bot, Submission, expect
 
-from . import C, Decision, Introduction, Results, ResultsSync, departure_slots
+from . import C, Decision, Introduction, Results, ResultsSync, departure_slots_for_player
 
 
 class PlayerBot(Bot):
@@ -8,7 +8,7 @@ class PlayerBot(Bot):
         if self.round_number == 1:
             yield Submission(Introduction, check_html=False)
 
-        available_slots = departure_slots()
+        available_slots = departure_slots_for_player(self.player)
         chosen_slot = available_slots[(self.player.id_in_group + self.round_number - 2) % len(available_slots)]
 
         yield Submission(

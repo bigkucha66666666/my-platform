@@ -161,6 +161,152 @@
             color: #9f3a17;
         }
 
+        .result-viz-card {
+            margin-top: 16px;
+            padding: 15px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .result-viz-title {
+            margin: 0 0 4px;
+            color: #1e2a3a;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .result-viz-note {
+            margin: 0 0 12px;
+            color: #5a6b82;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .cost-trend-svg {
+            display: block;
+            width: 100%;
+            max-width: 680px;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        .trend-axis {
+            stroke: #cbd5e1;
+            stroke-width: 1.5;
+        }
+
+        .trend-grid {
+            stroke: #e2e8f0;
+            stroke-width: 1;
+            stroke-dasharray: 5 7;
+        }
+
+        .trend-line {
+            fill: none;
+            stroke: #1f5fcc;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .trend-dot {
+            fill: #ffffff;
+            stroke: #1f5fcc;
+            stroke-width: 4;
+        }
+
+        .trend-dot-current {
+            fill: #1f5fcc;
+            stroke: #ffffff;
+            stroke-width: 4;
+        }
+
+        .trend-label {
+            fill: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .trend-current-label {
+            fill: #1e2a3a;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .slot-bar-chart-wrap {
+            overflow-x: auto;
+            margin-top: 10px;
+            padding: 14px 12px 10px;
+            border: 1px solid #dbe5f0;
+            border-radius: 12px;
+            background: #ffffff;
+        }
+
+        .slot-bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            min-width: 560px;
+            height: 210px;
+        }
+
+        .slot-bar-item {
+            display: grid;
+            grid-template-rows: 22px 1fr 34px;
+            justify-items: center;
+            min-width: 48px;
+            height: 100%;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .slot-bar-count {
+            color: #334155;
+            font-weight: 800;
+        }
+
+        .slot-bar-track {
+            display: flex;
+            align-items: flex-end;
+            width: 100%;
+            height: 100%;
+            border-radius: 999px 999px 8px 8px;
+            background: #edf2f7;
+            overflow: hidden;
+        }
+
+        .slot-bar-fill {
+            width: 100%;
+            min-height: 0;
+            border-radius: inherit;
+            background: linear-gradient(180deg, #8fb8ff 0%, #1f5fcc 100%);
+        }
+
+        .slot-bar-label {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            color: #64748b;
+            font-size: 11px;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+
+        .slot-bar-item-current .slot-bar-track {
+            background: #fff7ed;
+            box-shadow: inset 0 0 0 2px #f7b267;
+        }
+
+        .slot-bar-item-current .slot-bar-fill {
+            background: linear-gradient(180deg, #f7b267 0%, #c8551f 100%);
+        }
+
+        .slot-bar-item-current .slot-bar-label,
+        .slot-bar-item-current .slot-bar-count {
+            color: #9f3a17;
+        }
+
         .slot-table-wrap {
             max-height: min(54vh, 500px);
             overflow: auto;
@@ -232,6 +378,15 @@
                 grid-template-columns: 1fr;
             }
 
+            .result-viz-card {
+                padding: 12px;
+            }
+
+            .slot-bar-chart {
+                min-width: 620px;
+                height: 190px;
+            }
+
             .slot-table {
                 min-width: 0;
                 font-size: 13px;
@@ -256,7 +411,7 @@
         <p>排队延误：<b>{{ queue_delay_minutes }}</b> 分钟</p>
         <p>早到时间：<b>{{ schedule_early_minutes }}</b> 分钟</p>
         <p>晚到时间：<b>{{ schedule_late_minutes }}</b> 分钟</p>
-        <p>本时点总选择人数：<b>{{ slot_load }}</b></p>
+        <p>同一分钟选择人数：<b>{{ slot_load }}</b></p>
         <p>出行成本：<b>{{ total_travel_cost_points }}</b> 成本分</p>
         <p>粗收费：<b>{{ toll_charge_points }}</b> 成本分</p>
         <p>最终选择成本：<b>{{ total_choice_cost_points }}</b> 成本分</p>
@@ -364,7 +519,54 @@
         </div>
     </div>
 
-    <p class="text-sub">本轮各时点选择分布：</p>
+    <div class="result-viz-card" aria-label="个人成本随轮次变化折线图">
+        <p class="result-viz-title">个人成本变化</p>
+        <p class="result-viz-note">折线展示你从第 1 轮到当前轮的最终选择成本，数值越低表示该轮选择成本越低。</p>
+
+        <svg class="cost-trend-svg" viewBox="0 0 620 220" role="img" aria-label="个人最终选择成本随轮次变化">
+            <line x1="42" y1="24" x2="42" y2="174" class="trend-axis" />
+            <line x1="42" y1="174" x2="596" y2="174" class="trend-axis" />
+            <line x1="42" y1="99" x2="596" y2="99" class="trend-grid" />
+            <text x="12" y="28" class="trend-label">{{ cost_history_axis_max_label }}</text>
+            <text x="24" y="178" class="trend-label">0</text>
+
+            {{ if cost_history_has_multiple_points }}
+                <polyline points="{{ cost_history_line_points }}" class="trend-line" />
+            {{ endif }}
+
+            {{ for item in cost_history_points }}
+                <circle
+                    cx="{{ item.x }}"
+                    cy="{{ item.y }}"
+                    r="{{ if item.is_current }}7{{ else }}5{{ endif }}"
+                    class="{{ if item.is_current }}trend-dot-current{{ else }}trend-dot{{ endif }}"
+                >
+                    <title>第 {{ item.round_number }} 轮：{{ item.cost_label }} 成本分</title>
+                </circle>
+                {{ if item.is_current }}
+                    <text x="{{ item.x }}" y="{{ item.y }}" dy="-13" text-anchor="middle" class="trend-current-label">{{ item.cost_label }}</text>
+                {{ endif }}
+                <text x="{{ item.x }}" y="205" text-anchor="middle" class="trend-label">R{{ item.round_number }}</text>
+            {{ endfor }}
+        </svg>
+    </div>
+
+    <p class="text-sub">本轮各出发时间选择人数：</p>
+    <div class="slot-bar-chart-wrap" aria-label="本轮各出发时点选择人数柱状图">
+        <div class="slot-bar-chart">
+            {{ for item in slot_summaries }}
+                <div class="slot-bar-item {{ if item.is_current }}slot-bar-item-current{{ endif }}">
+                    <div class="slot-bar-count">{{ item.count }}</div>
+                    <div class="slot-bar-track" title="{{ item.departure_time }}：{{ item.count }} 人">
+                        <div class="slot-bar-fill" style="height: {{ item.bar_height_pct }}%;"></div>
+                    </div>
+                    <div class="slot-bar-label">{{ item.departure_time }}</div>
+                </div>
+            {{ endfor }}
+        </div>
+    </div>
+
+    <p class="text-sub">本轮各出发时间选择分布表：</p>
     <div class="slot-table-wrap">
         <table class="slot-table">
             <thead>

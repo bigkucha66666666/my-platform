@@ -7,9 +7,9 @@
     <style>
         .decision-summary {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
 
         .decision-summary-item {
@@ -23,109 +23,265 @@
             margin: 0 0 4px;
             color: #65758a;
             font-size: 12px;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .decision-summary-value {
             margin: 0;
             color: #1e2a3a;
             font-size: 17px;
+            font-weight: 800;
+        }
+
+        .slider-card {
+            margin: 14px 0 18px;
+            border: 1px solid #dbe5f0;
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 12% 10%, rgba(31, 95, 204, 0.08), transparent 34%),
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            padding: 18px;
+        }
+
+        .slider-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .slider-title {
+            margin: 0;
+            color: #1e2a3a;
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .slider-note {
+            margin: 4px 0 0;
+            color: #65758a;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .selected-time-panel {
+            min-width: 160px;
+            padding: 10px 12px;
+            border: 1px solid #ead6ca;
+            border-radius: 14px;
+            background: #fff7ed;
+            text-align: right;
+        }
+
+        .selected-time-label {
+            display: block;
+            color: #9f3a17;
+            font-size: 12px;
             font-weight: 700;
         }
 
-        .choice-table-card {
-            margin: 14px 0 18px;
+        .selected-time-value {
+            display: block;
+            margin-top: 2px;
+            color: #7c2d12;
+            font-size: 28px;
+            font-weight: 900;
+            line-height: 1.05;
+        }
+
+        .time-wheel-area {
+            display: grid;
+            grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);
+            gap: 14px;
+            align-items: stretch;
+        }
+
+        .time-wheel-shell {
+            position: relative;
+            min-width: 0;
+        }
+
+        .time-wheel-focus {
+            position: absolute;
+            z-index: 2;
+            top: 50%;
+            left: 12px;
+            right: 12px;
+            height: 62px;
+            transform: translateY(-50%);
+            border: 2px solid #f7b267;
+            border-radius: 16px;
+            background: rgba(255, 247, 237, 0.62);
+            box-shadow: 0 12px 34px rgba(124, 45, 18, 0.12);
+            pointer-events: none;
+        }
+
+        .time-wheel {
+            position: relative;
+            z-index: 1;
+            height: 258px;
+            overflow-y: auto;
+            padding: 96px 10px;
+            border: 1px solid #dbe5f0;
+            border-radius: 18px;
+            background:
+                linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0) 28%),
+                linear-gradient(0deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0) 28%),
+                #ffffff;
+            scroll-snap-type: y mandatory;
+            scrollbar-width: thin;
+        }
+
+        .time-wheel-option {
+            display: grid;
+            grid-template-columns: 82px 1fr auto;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+            min-height: 58px;
+            margin: 4px 0;
+            padding: 9px 12px;
+            border: 0;
+            border-radius: 14px;
+            background: transparent;
+            color: #64748b;
+            text-align: left;
+            cursor: pointer;
+            opacity: 0.48;
+            scroll-snap-align: center;
+            transition: background 140ms ease, color 140ms ease, opacity 140ms ease, transform 140ms ease;
+        }
+
+        .time-wheel-option:hover,
+        .time-wheel-option:focus-visible {
+            outline: none;
+            background: #eef6ff;
+            opacity: 0.9;
+        }
+
+        .time-wheel-option.is-selected {
+            position: relative;
+            z-index: 3;
+            background: #fff7ed;
+            color: #7c2d12;
+            opacity: 1;
+            transform: scale(1.015);
+        }
+
+        .time-wheel-time {
+            color: inherit;
+            font-size: 19px;
+            font-weight: 900;
+            letter-spacing: 0.01em;
+        }
+
+        .time-wheel-relation {
+            color: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .time-wheel-tag {
+            justify-self: end;
+            padding: 3px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .time-wheel-option.is-tolled .time-wheel-tag {
+            border-color: #ead6ca;
+            background: #fff7ed;
+            color: #9f3a17;
+        }
+
+        .time-wheel-help {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .time-wheel-boundary {
             border: 1px solid #dbe5f0;
             border-radius: 14px;
             background: #ffffff;
-            overflow: hidden;
+            padding: 12px;
         }
 
-        .choice-table-head {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 13px 15px;
-            border-bottom: 1px solid #dbe5f0;
-            background: #f6f9fc;
-        }
-
-        .choice-table-title {
-            margin: 0;
-            color: #1e2a3a;
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        .choice-table-note {
+        .time-wheel-boundary p {
             margin: 0;
             color: #65758a;
             font-size: 12px;
+            line-height: 1.5;
         }
 
-        .choice-table-wrap {
-            max-height: min(64vh, 620px);
-            overflow: auto;
-        }
-
-        .choice-table {
-            width: 100%;
-            min-width: 760px;
-            border-collapse: separate;
-            border-spacing: 0;
-            table-layout: fixed;
-            font-size: 14px;
-        }
-
-        .choice-table th,
-        .choice-table td {
-            padding: 11px 13px;
-            border-bottom: 1px solid #edf2f7;
-            color: #334155;
-            text-align: left;
-            vertical-align: middle;
-            line-height: 1.45;
-        }
-
-        .choice-table th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            color: #52657c;
-            font-size: 12px;
-            font-weight: 700;
-            background: #fbfdff;
-        }
-
-        .choice-table tbody tr:last-child td {
-            border-bottom: 0;
-        }
-
-        .choice-table tbody tr:has(input[type="radio"]:checked) td {
-            background: #eef6ff;
-        }
-
-        .choice-table tbody tr:has(input[type="radio"]:checked) td:first-child {
-            border-left: 4px solid #1f5fcc;
-            padding-left: 9px;
-        }
-
-        .choice-radio-cell {
-            width: 58px;
-            text-align: center;
-        }
-
-        .choice-radio {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .choice-time {
+        .time-wheel-boundary strong {
+            display: block;
+            margin-top: 2px;
             color: #1e2a3a;
             font-size: 16px;
+        }
+
+        .time-wheel-controls {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .time-wheel-control {
+            width: 100%;
+            border: 1px solid #cfe1ff;
+            border-radius: 12px;
+            background: #eef4ff;
+            color: #1f5fcc;
+            font-size: 14px;
+            font-weight: 800;
+            padding: 10px 12px;
+        }
+
+        .time-wheel-control:hover,
+        .time-wheel-control:focus-visible {
+            border-color: #1f5fcc;
+            outline: none;
+            background: #e1ecff;
+        }
+
+        .selected-detail-grid {
+            display: grid;
+            grid-template-columns: 2fr repeat(2, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .selected-detail {
+            border: 1px solid #dbe5f0;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 11px 12px;
+        }
+
+        .selected-detail-key {
+            display: block;
+            margin-bottom: 4px;
+            color: #65758a;
+            font-size: 12px;
             font-weight: 700;
+        }
+
+        .selected-detail-value {
+            display: block;
+            color: #1e2a3a;
+            font-size: 14px;
+            font-weight: 800;
+            line-height: 1.45;
         }
 
         .choice-badge {
@@ -135,7 +291,7 @@
             padding: 3px 9px;
             border-radius: 999px;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             white-space: nowrap;
         }
 
@@ -155,41 +311,89 @@
             border: 1px solid #e2e8f0;
             background: #f8fafc;
             color: #64748b;
-            font-weight: 600;
+            font-weight: 700;
+        }
+
+        .rule-table-wrap {
+            margin-top: 14px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .rule-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .rule-table th,
+        .rule-table td {
+            padding: 11px 13px;
+            border-bottom: 1px solid #edf2f7;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .rule-table th {
+            width: 34%;
+            color: #52657c;
+            background: #f6f9fc;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .rule-table tr:last-child th,
+        .rule-table tr:last-child td {
+            border-bottom: 0;
         }
 
         @media (max-width: 575px) {
-            .decision-summary {
+            .decision-summary,
+            .selected-detail-grid {
                 grid-template-columns: 1fr;
             }
 
-            .choice-table-head {
+            .slider-card {
+                padding: 14px;
+            }
+
+            .slider-head {
                 display: block;
             }
 
-            .choice-table-note {
-                margin-top: 4px;
+            .selected-time-panel {
+                margin-top: 12px;
+                text-align: left;
             }
 
-            .choice-table {
-                min-width: 700px;
-                font-size: 13px;
+            .selected-time-value {
+                font-size: 25px;
             }
 
-            .choice-table-wrap {
-                max-height: 58vh;
+            .time-wheel-area {
+                grid-template-columns: 1fr;
             }
 
-            .choice-table th,
-            .choice-table td {
-                padding: 10px;
+            .time-wheel {
+                height: 238px;
+                padding: 88px 8px;
+            }
+
+            .time-wheel-option {
+                grid-template-columns: 76px 1fr;
+            }
+
+            .time-wheel-tag {
+                display: none;
             }
         }
     </style>
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">当前为第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请选择你本轮的出发时间。</p>
+    <p class="text-sub">当前为第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮，请用滚轮选择你本轮的出发时间。</p>
 
     <div class="card-lite">
         <div class="decision-summary">
@@ -201,8 +405,12 @@
                 <p class="decision-summary-key">无排队基准出发时间</p>
                 <p class="decision-summary-value">{{ free_flow_departure_time }}</p>
             </div>
+            <div class="decision-summary-item">
+                <p class="decision-summary-key">选择精度</p>
+                <p class="decision-summary-value">{{ departure_time_step_minutes }} 分钟</p>
+            </div>
         </div>
-        <p class="text-sub">表格中的“相对基准说明”表示相对于准时到达且无排队延误时所需出发时间的提前或延后分钟数。</p>
+        <p class="text-sub">可选范围为 {{ departure_time_min_label }} 到 {{ departure_time_max_label }}。系统会按照所有人的实际出发时间先后顺序计算瓶颈排队；同一分钟出发的人，系统随机决定通过顺序。</p>
     </div>
 
     <div class="hint-lite">
@@ -213,59 +421,242 @@
     <p class="text-sub">⏱ 请在 {{ auto_advance_seconds }} 秒内完成选择；若在线超时未操作，系统将随机分配一个出发时间并自动继续。</p>
     <p class="text-sub">📴 若中途关闭页面或网络中断，系统可能在截止后自动补全你错过轮次的选择；你重新通过原参与者入口登录后，追到当前开放轮次时可恢复正常作答。</p>
 
-    <div class="choice-table-card">
-        <div class="choice-table-head">
-            <p class="choice-table-title">可选出发时间</p>
-            <p class="choice-table-note">点击左侧圆点选择本轮出发时间</p>
+    <div class="slider-card">
+        <div class="slider-head">
+            <div>
+                <p class="slider-title">滚动选择出发时间</p>
+                <p class="slider-note">鼠标滚轮、触控板或手指上下滑动均可操作；中间高亮项就是本轮提交的选择。</p>
+            </div>
+            <div class="selected-time-panel">
+                <span class="selected-time-label">当前选择</span>
+                <span class="selected-time-value" id="selected-time">{{ default_departure_time }}</span>
+            </div>
         </div>
-        <div class="choice-table-wrap">
-            <table class="choice-table">
-                <thead>
-                    <tr>
-                        <th class="choice-radio-cell">选择</th>
-                        <th>出发时间</th>
-                        <th>相对基准说明</th>
-                        <th>收费</th>
-                        <th>奖励</th>
-                    </tr>
-                </thead>
-                <tbody>
+
+        <input type="hidden" id="departure-minute" name="departure_minute" value="{{ default_departure_minute }}">
+
+        <div class="time-wheel-area">
+            <div class="time-wheel-shell">
+                <div class="time-wheel-focus" aria-hidden="true"></div>
+                <div id="time-wheel" class="time-wheel" role="listbox" tabindex="0" aria-label="可选出发时间">
                     {{ for item in slot_preview }}
-                        <tr>
-                            <td class="choice-radio-cell">
-                                <input
-                                    class="choice-radio"
-                                    type="radio"
-                                    name="departure_slot"
-                                    id="departure-slot-{{ item.slot }}"
-                                    value="{{ item.slot }}"
-                                    required
-                                >
-                            </td>
-                            <td>
-                                <label class="choice-time" for="departure-slot-{{ item.slot }}">{{ item.departure_time }}</label>
-                            </td>
-                            <td>{{ item.departure_relation }}</td>
-                            <td>
-                                {{ if item.toll_active }}
-                                    <span class="choice-badge choice-badge-toll">收费 {{ item.toll_charge_label }} 成本分</span>
-                                {{ else }}
-                                    <span class="choice-badge choice-badge-muted">无收费</span>
-                                {{ endif }}
-                            </td>
-                            <td>
-                                {{ if item.reward_active }}
-                                    <span class="choice-badge choice-badge-reward">+{{ item.reward_bonus }}</span>
-                                {{ else }}
-                                    <span class="choice-badge choice-badge-muted">无奖励</span>
-                                {{ endif }}
-                            </td>
-                        </tr>
+                        <button
+                            type="button"
+                            class="time-wheel-option {{ if item.toll_active }}is-tolled{{ endif }}"
+                            data-minute="{{ item.departure_minute }}"
+                            role="option"
+                            aria-selected="false"
+                        >
+                            <span class="time-wheel-time">{{ item.departure_time }}</span>
+                            <span class="time-wheel-relation">{{ item.departure_relation }}</span>
+                            <span class="time-wheel-tag">{{ if item.toll_active }}收费{{ else }}无收费{{ endif }}</span>
+                        </button>
                     {{ endfor }}
-                </tbody>
-            </table>
+                </div>
+            </div>
+
+            <div class="time-wheel-help">
+                <div class="time-wheel-boundary">
+                    <p>最早可选</p>
+                    <strong>{{ departure_time_min_label }}</strong>
+                    <p style="margin-top: 10px;">最晚可选</p>
+                    <strong>{{ departure_time_max_label }}</strong>
+                    <p style="margin-top: 10px;">无排队基准</p>
+                    <strong>{{ free_flow_departure_time }}</strong>
+                </div>
+                <div class="time-wheel-controls">
+                    <button class="time-wheel-control" type="button" id="time-prev">提前 {{ departure_time_step_minutes }} 分钟</button>
+                    <button class="time-wheel-control" type="button" id="time-next">延后 {{ departure_time_step_minutes }} 分钟</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="selected-detail-grid">
+            <div class="selected-detail">
+                <span class="selected-detail-key">相对基准说明</span>
+                <span class="selected-detail-value" id="selected-relation">{{ default_departure_relation }}</span>
+            </div>
+            <div class="selected-detail">
+                <span class="selected-detail-key">收费</span>
+                <span class="selected-detail-value">
+                    <span id="selected-toll" class="choice-badge choice-badge-muted">无收费</span>
+                </span>
+            </div>
+            <div class="selected-detail">
+                <span class="selected-detail-key">奖励</span>
+                <span class="selected-detail-value">
+                    <span id="selected-reward" class="choice-badge choice-badge-muted">无奖励</span>
+                </span>
+            </div>
         </div>
     </div>
+
+    <div class="rule-table-wrap">
+        <table class="rule-table">
+            <tbody>
+                <tr>
+                    <th>通过顺序</th>
+                    <td>系统按实际出发时间从早到晚处理瓶颈；同一分钟出发的人随机排序。</td>
+                </tr>
+                <tr>
+                    <th>排队成本</th>
+                    <td>如果到达瓶颈时前面仍有人等待，你会产生排队延误，延误越长成本越高。</td>
+                </tr>
+                <tr>
+                    <th>到达偏差成本</th>
+                    <td>最终到达早于或晚于目标到达时间，都会形成成本。</td>
+                </tr>
+                <tr>
+                    <th>最终选择成本</th>
+                    <td>结果页会展示排队成本、早到成本、晚到成本和粗收费。</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script id="choice-preview-data" type="application/json">{{ choice_preview_json|safe }}</script>
+    <script>
+        (function () {
+            var hiddenInput = document.getElementById('departure-minute');
+            var wheel = document.getElementById('time-wheel');
+            var previousButton = document.getElementById('time-prev');
+            var nextButton = document.getElementById('time-next');
+            var timeEl = document.getElementById('selected-time');
+            var relationEl = document.getElementById('selected-relation');
+            var tollEl = document.getElementById('selected-toll');
+            var rewardEl = document.getElementById('selected-reward');
+            var dataEl = document.getElementById('choice-preview-data');
+            var choiceMap = {};
+            var options = Array.prototype.slice.call(wheel.querySelectorAll('.time-wheel-option'));
+            var selectedIndex = 0;
+            var scrollTimer = null;
+
+            try {
+                choiceMap = JSON.parse(dataEl.textContent || '{}');
+            } catch (error) {
+                choiceMap = {};
+            }
+
+            function keyForMinute(value) {
+                return String(Math.round(Number(value)));
+            }
+
+            function setBadge(element, text, activeClass, isActive) {
+                element.textContent = text;
+                element.className = 'choice-badge ' + (isActive ? activeClass : 'choice-badge-muted');
+            }
+
+            function optionMinute(option) {
+                return Number(option.getAttribute('data-minute'));
+            }
+
+            function optionForMinute(value) {
+                var key = keyForMinute(value);
+                for (var index = 0; index < options.length; index += 1) {
+                    if (keyForMinute(optionMinute(options[index])) === key) {
+                        return options[index];
+                    }
+                }
+                return null;
+            }
+
+            function nearestOption() {
+                var wheelRect = wheel.getBoundingClientRect();
+                var wheelCenter = wheelRect.top + wheelRect.height / 2;
+                var nearest = options[0];
+                var nearestDistance = Infinity;
+
+                options.forEach(function (option) {
+                    var optionRect = option.getBoundingClientRect();
+                    var optionCenter = optionRect.top + optionRect.height / 2;
+                    var distance = Math.abs(optionCenter - wheelCenter);
+                    if (distance < nearestDistance) {
+                        nearest = option;
+                        nearestDistance = distance;
+                    }
+                });
+
+                return nearest;
+            }
+
+            function centerOption(option, smooth) {
+                var targetTop = option.offsetTop - (wheel.clientHeight - option.offsetHeight) / 2;
+                wheel.scrollTo({
+                    top: Math.max(0, targetTop),
+                    behavior: smooth ? 'smooth' : 'auto'
+                });
+            }
+
+            function updateSelectedChoice(option, shouldCenter, smooth) {
+                if (!option) {
+                    return;
+                }
+
+                selectedIndex = options.indexOf(option);
+                hiddenInput.value = String(optionMinute(option));
+
+                options.forEach(function (candidate) {
+                    var isSelected = candidate === option;
+                    candidate.classList.toggle('is-selected', isSelected);
+                    candidate.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+                });
+
+                var key = keyForMinute(hiddenInput.value);
+                var item = choiceMap[key];
+                if (!item) {
+                    return;
+                }
+                timeEl.textContent = item.time;
+                relationEl.textContent = item.relation;
+                setBadge(tollEl, item.toll_label, 'choice-badge-toll', item.toll_active);
+                setBadge(rewardEl, item.reward_label, 'choice-badge-reward', item.reward_active);
+
+                if (shouldCenter) {
+                    centerOption(option, smooth);
+                }
+            }
+
+            function moveSelection(delta) {
+                var nextIndex = Math.max(0, Math.min(options.length - 1, selectedIndex + delta));
+                updateSelectedChoice(options[nextIndex], true, true);
+            }
+
+            options.forEach(function (option) {
+                option.addEventListener('click', function () {
+                    updateSelectedChoice(option, true, true);
+                });
+            });
+
+            wheel.addEventListener('scroll', function () {
+                window.clearTimeout(scrollTimer);
+                updateSelectedChoice(nearestOption(), false, false);
+                scrollTimer = window.setTimeout(function () {
+                    updateSelectedChoice(nearestOption(), true, true);
+                }, 120);
+            });
+
+            wheel.addEventListener('keydown', function (event) {
+                if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    moveSelection(-1);
+                }
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    moveSelection(1);
+                }
+            });
+
+            previousButton.addEventListener('click', function () {
+                moveSelection(-1);
+            });
+
+            nextButton.addEventListener('click', function () {
+                moveSelection(1);
+            });
+
+            updateSelectedChoice(optionForMinute(hiddenInput.value) || options[0], true, false);
+        })();
+    </script>
 
     <button class="otree-btn-next btn btn-primary">确认本轮选择</button>
 {{ endblock }}

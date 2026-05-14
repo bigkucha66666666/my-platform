@@ -178,18 +178,29 @@ DEMO_PAGE_TITLE = "实验控制台"
 DEMO_PAGE_INTRO_HTML = """
 <style>
   #admin-page-container {
-    max-width: 1260px !important;
+    max-width: 1080px !important;
   }
 
   #admin-page-container .page-header {
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  #admin-page-container .page-header h1 {
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    color: #374151;
+    letter-spacing: 0;
   }
 
   #admin-page-container > div > .row {
     display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
-    gap: 26px;
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 0.88fr);
+    gap: 32px;
     align-items: start;
+    margin-top: 20px;
   }
 
   #admin-page-container > div > .row > .col-md-9,
@@ -203,172 +214,183 @@ DEMO_PAGE_INTRO_HTML = """
 
   #admin-page-container .list-group {
     display: grid;
-    gap: 14px;
+    gap: 2px;
+  }
+
+  #admin-page-container .list-group-item {
+    border: none;
+    border-left: 2px solid transparent;
+    border-radius: 0;
+    padding: 14px 16px;
+    margin: 0;
+    background: #ffffff;
+    color: #374151;
+    font-size: 15px;
+    font-weight: 500;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+
+  #admin-page-container .list-group-item:hover,
+  #admin-page-container .list-group-item:focus {
+    border-left-color: #0066cc;
+    background: #fafbfc;
+    text-decoration: none;
+  }
+
+  #admin-page-container .list-group-item:first-child {
+    border-left-color: #0066cc;
+    background: #f8faff;
+  }
+
+  #admin-page-container .list-group-item:nth-child(2) {
+    border-left-color: #6b7280;
+    background: #f9fafb;
   }
 
   #admin-page-container .session-config {
-    position: relative;
     display: grid;
-    gap: 10px;
-    padding: 22px 24px 22px;
-    border: 1px solid #d9e4f5;
-    border-radius: 22px;
-    background:
-      linear-gradient(180deg, rgba(249, 251, 255, 0.95) 0%, rgba(238, 245, 255, 0.98) 100%);
-    color: #153357;
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1.25;
-    box-shadow: 0 14px 34px rgba(14, 34, 61, 0.07);
-    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    gap: 6px;
+    padding: 16px 18px;
+    border: none;
+    border-left: 2px solid #e5e7eb;
+    border-radius: 0;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    transition: border-color 120ms ease, background 120ms ease;
   }
 
   #admin-page-container .session-config:hover,
   #admin-page-container .session-config:focus {
-    transform: translateY(-2px);
-    border-color: #b9cfee;
-    box-shadow: 0 18px 36px rgba(33, 70, 120, 0.12);
+    border-left-color: #0066cc;
+    background: #fafbfc;
     text-decoration: none;
   }
 
   #admin-page-container .session-config::before {
-    display: inline-flex;
-    width: fit-content;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid #cddbf1;
-    background: rgba(255, 255, 255, 0.84);
-    color: #56749c;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  #admin-page-container .session-config:nth-child(1)::before {
-    content: "Formal Run";
-  }
-
-  #admin-page-container .session-config:nth-child(2)::before {
-    content: "Demo Run";
+    content: none;
   }
 
   #admin-page-container .session-config::after {
     content: "进入创建页，设置人数与实验参数";
-    color: #5b6f89;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.55;
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+
+  #admin-page-container .session-config:nth-child(1) {
+    border-left-color: #0066cc;
+    background: #f8faff;
+  }
+
+  #admin-page-container .session-config:nth-child(1)::after {
+    color: #6b7280;
+  }
+
+  #admin-page-container .session-config:nth-child(2) {
+    border-left-color: #6b7280;
+    background: #f9fafb;
   }
 
   #admin-page-container .col-md-3.card.bg-light {
-    border: 1px solid #d9e4f5;
-    border-radius: 26px;
-    background:
-      radial-gradient(circle at top right, rgba(130, 182, 255, 0.16), transparent 34%),
-      linear-gradient(180deg, #f9fbff 0%, #edf4ff 100%);
-    box-shadow: 0 20px 44px rgba(16, 35, 61, 0.08);
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
+    background: #ffffff;
+    box-shadow: none;
   }
 
   #admin-page-container .col-md-3.card.bg-light > .card-body {
-    padding: 22px;
+    padding: 20px;
+  }
+
+  #admin-page-container .col-md-3.card.bg-light .card-title {
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0;
+    margin-bottom: 14px;
   }
 
   .landing-shell {
-    position: relative;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    color: #10233d;
-  }
-
-  .landing-header,
-  .landing-grid,
-  .landing-note {
-    position: relative;
-    z-index: 1;
-  }
-
-  .landing-kicker {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 11px;
-    border: 1px solid #c7d8f3;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.78);
-    color: #47668d;
-    font-size: 11px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    color: #1f2937;
   }
 
   .landing-header {
-    display: grid;
-    gap: 10px;
+    margin-bottom: 28px;
   }
 
   .landing-title {
-    margin: 0;
-    max-width: 14ch;
-    font-size: clamp(26px, 2.1vw, 38px);
-    line-height: 1.05;
-    font-weight: 700;
-    letter-spacing: -0.03em;
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #111827;
   }
 
   .landing-subtitle {
     margin: 0;
-    max-width: 42ch;
-    color: #506785;
-    font-size: 14px;
-    line-height: 1.7;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 44ch;
   }
 
   .landing-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 14px;
-    margin-top: 20px;
+    margin-bottom: 22px;
   }
 
   .landing-path {
+    border: 1px solid #e5e7eb;
+    border-left: 2px solid #d1d5db;
+    border-radius: 2px;
+    background: #ffffff;
     padding: 18px 18px 16px;
-    border: 1px solid #d6e1f2;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.82);
-    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    transition: border-color 120ms ease;
+  }
+
+  .landing-path.is-formal {
+    border-left-color: #0066cc;
   }
 
   .landing-path:hover {
-    transform: translateY(-2px);
-    border-color: #b7cbeb;
-    box-shadow: 0 12px 26px rgba(47, 88, 148, 0.10);
+    border-color: #9ca3af;
+    border-left-color: #0066cc;
   }
 
   .landing-path-label {
-    display: inline-block;
-    margin-bottom: 10px;
-    color: #5677a4;
+    display: block;
+    margin-bottom: 4px;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
     font-size: 11px;
-    letter-spacing: 0.1em;
+    font-weight: 500;
+    color: #9ca3af;
     text-transform: uppercase;
   }
 
+  .landing-path.is-formal .landing-path-label {
+    color: #0066cc;
+  }
+
   .landing-path-title {
-    margin: 0 0 8px;
-    font-size: 20px;
-    line-height: 1.2;
-    font-weight: 700;
+    margin: 0 0 5px;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
   }
 
   .landing-path-copy {
-    margin: 0 0 12px;
-    color: #586d88;
+    margin: 0 0 14px;
+    color: #6b7280;
     font-size: 13px;
-    line-height: 1.55;
+    line-height: 1.5;
   }
 
   .landing-flow {
@@ -378,12 +400,12 @@ DEMO_PAGE_INTRO_HTML = """
   }
 
   .landing-flow li {
-    display: grid;
-    grid-template-columns: 24px 1fr;
+    display: flex;
+    align-items: baseline;
     gap: 10px;
     padding: 8px 0;
-    border-top: 1px solid #e6edf8;
-    color: #183152;
+    border-top: 1px solid #f3f4f6;
+    color: #374151;
     font-size: 13px;
     line-height: 1.55;
   }
@@ -394,31 +416,36 @@ DEMO_PAGE_INTRO_HTML = """
   }
 
   .landing-step {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #e8f0ff;
-    color: #315789;
-    font-size: 11px;
-    font-weight: 700;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 2px;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  .landing-path.is-formal .landing-step {
+    background: #eff6ff;
+    color: #0066cc;
   }
 
   .landing-note {
     display: grid;
-    gap: 8px;
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #d9e4f5;
-    color: #5d718b;
+    gap: 5px;
+    padding-top: 12px;
+    border-top: 1px dotted #d1d5db;
+    color: #9ca3af;
     font-size: 12px;
     line-height: 1.6;
   }
 
   .landing-note strong {
-    color: #10233d;
+    color: #374151;
     font-weight: 600;
   }
 
@@ -429,57 +456,56 @@ DEMO_PAGE_INTRO_HTML = """
 
     #admin-page-container > div > .row {
       grid-template-columns: 1fr;
-      gap: 18px;
+      gap: 22px;
     }
 
     #admin-page-container .session-config {
-      font-size: 18px;
-      padding: 18px 18px 20px;
+      font-size: 15px;
+      padding: 14px 16px;
     }
   }
 </style>
 
 <section class="landing-shell">
   <div class="landing-header">
-    <div class="landing-kicker">实验管理员入口</div>
-    <h1 class="landing-title">创建 session，再安排正式或演示流程</h1>
+    <h1 class="landing-title">实验控制台</h1>
     <p class="landing-subtitle">
-      左侧是创建入口，右侧是执行顺序。先新建 session 并设置人数，再按正式房间或演示房间组织进入。
+      选择实验类型新建 session 并设置参数，创建完成后通过对应房间组织参与者进入。
     </p>
   </div>
 
   <div class="landing-grid">
-    <section class="landing-path">
-      <span class="landing-path-label">Formal Run</span>
+    <section class="landing-path is-formal">
+      <span class="landing-path-label">Formal</span>
       <h2 class="landing-path-title">正式实验</h2>
       <p class="landing-path-copy">
-        真实被试使用，保留正式数据与支付结果。
+        真实被试使用，数据纳入正式记录并用于报酬发放。
       </p>
       <ol class="landing-flow">
-        <li><span class="landing-step">1</span><span>在 Sessions 中点击 <strong>Create new session</strong>。</span></li>
-        <li><span class="landing-step">2</span><span>选择 <strong>正式实验 · 新建 Session</strong>，填写人数，必要时设置手动分组。</span></li>
-        <li><span class="landing-step">3</span><span>创建完成后，通过 <strong>prod_room</strong> 的安全链接组织正式被试进入。</span></li>
+        <li><span class="landing-step">1</span><span>在左侧面板点击 <strong>Create new session</strong></span></li>
+        <li><span class="landing-step">2</span><span>选择 <strong>正式实验 &middot; 新建 Session</strong>，填写人数，必要时设置手动分组</span></li>
+        <li><span class="landing-step">3</span><span>通过 <strong>prod_room</strong> 安全链接组织被试进入</span></li>
       </ol>
     </section>
 
     <section class="landing-path">
-      <span class="landing-path-label">Demo Run</span>
+      <span class="landing-path-label">Demo</span>
       <h2 class="landing-path-title">演示测试</h2>
       <p class="landing-path-copy">
-        用于页面走查、功能验证和排错。
+        用于页面走查、功能验证和流程测试，数据不纳入正式记录。
       </p>
       <ol class="landing-flow">
-        <li><span class="landing-step">1</span><span>在 Sessions 中点击 <strong>Create new session</strong>。</span></li>
-        <li><span class="landing-step">2</span><span>选择 <strong>演示测试 · 快速走查</strong>，填写测试人数。</span></li>
-        <li><span class="landing-step">3</span><span>创建后使用 <strong>demo_room</strong> 进入，测试完成后到 report 查看该 session 数据。</span></li>
+        <li><span class="landing-step">1</span><span>在左侧面板点击 <strong>Create new session</strong></span></li>
+        <li><span class="landing-step">2</span><span>选择 <strong>演示测试 &middot; 快速走查</strong>，填写测试人数</span></li>
+        <li><span class="landing-step">3</span><span>使用 <strong>demo_room</strong> 进入，结束后到 Report 查看数据</span></li>
       </ol>
     </section>
   </div>
 
   <div class="landing-note">
-    <span><strong>正式数据：</strong>仅 `route_choice_prod` 的 session 作为正式实验记录与发放依据。</span>
-    <span><strong>分组规则：</strong>未启用手动分组时，系统按 `cohort_size` 自动分组。</span>
-    <span><strong>报告查看：</strong>每个 session 创建后，都可进入对应 report 查看本 session 的摘要与明细。</span>
+    <span><strong>正式数据</strong> &mdash; 仅 formal run 的 session 作为正式实验记录与发放依据。</span>
+    <span><strong>分组规则</strong> &mdash; 未启用手动分组时，系统按 cohort_size 自动分组。</span>
+    <span><strong>报告查看</strong> &mdash; 每个 session 创建后可进入对应 Report 查看摘要与明细。</span>
   </div>
 </section>
 """

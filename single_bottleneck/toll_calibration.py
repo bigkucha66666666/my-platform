@@ -25,6 +25,7 @@ from . import (
 
 EPSILON = 1e-9
 MAX_EXACT_DISTRIBUTIONS = 500_000
+MAX_FULL_SUPPORT_EXACT_DISTRIBUTIONS = 2_500
 CALIBRATION_MODE_AUTO = 'auto'
 CALIBRATION_MODE_EXACT = 'exact'
 CALIBRATION_MODE_LARGE_GROUP = 'large-group'
@@ -252,6 +253,13 @@ def default_equilibrium_slots(valid_slots: tuple[int, ...]) -> tuple[int, ...]:
 
     step_ratio = max(1, int(round(C.SLOT_SIZE_MINUTES / C.DEPARTURE_CHOICE_STEP_MINUTES)))
     return tuple(slot for index, slot in enumerate(valid_slots) if index % step_ratio == 0)
+
+
+def exact_equilibrium_slots(valid_slots: tuple[int, ...], players: int) -> tuple[int, ...]:
+    """Use all 1-minute choices for small groups; compress support only when needed."""
+    if exact_search_distribution_count(players, len(valid_slots)) <= MAX_FULL_SUPPORT_EXACT_DISTRIBUTIONS:
+        return valid_slots
+    return default_equilibrium_slots(valid_slots)
 
 
 def generate_supported_count_keys(
@@ -894,7 +902,7 @@ def build_search_tables(
     if valid_slots is None:
         valid_slots = tuple(departure_slots())
     if equilibrium_slots is None:
-        equilibrium_slots = default_equilibrium_slots(valid_slots)
+        equilibrium_slots = exact_equilibrium_slots(valid_slots, players)
 
     departure_minutes = build_departure_minute_map(
         valid_slots,
@@ -952,6 +960,8 @@ def calibrate_candidates(
         toll_step=toll_step,
         top_k=top_k,
     )
+    if window_slots is None:
+        window_slots = equilibrium_slots
     return search_configs(
         config=config,
         count_keys=count_keys,
@@ -1030,7 +1040,7 @@ def calibrate_candidates_by_mode(
     if valid_slots is None:
         valid_slots = tuple(departure_slots())
     if equilibrium_slots is None:
-        equilibrium_slots = default_equilibrium_slots(valid_slots)
+        equilibrium_slots = exact_equilibrium_slots(valid_slots, players)
 
     resolved_mode = resolve_calibration_mode(calibration_mode, players, len(equilibrium_slots))
     if resolved_mode == CALIBRATION_MODE_LARGE_GROUP:
@@ -1261,7 +1271,7 @@ def main(argv: list[str] | None = None) -> int:
         first_departure_minute = schedule.get('first_departure_minute')
         slot_size_minutes = schedule.get('slot_size_minutes', C.DEPARTURE_CHOICE_STEP_MINUTES)
 
-    equilibrium_slots = default_equilibrium_slots(valid_slots)
+    equilibrium_slots = exact_equilibrium_slots(valid_slots, args.players)
     window_slots = equilibrium_slots
     output_departure_minutes = build_departure_minute_map(
         valid_slots,

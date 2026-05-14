@@ -336,9 +336,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
    CONFIGURATION
    ════════════════════════════════════════════════════════════ */
 const CFG = {
-  freeflowSpeed: 5.5,
+  freeflowSpeed: 8.0,
   bottleneckCapacity: 1,
-  serviceWindow: 2.2,
+  serviceWindow: 1.2,
   carLength: 0.65,
   carWidth: 0.42,
   carHeight: 0.32,
@@ -870,7 +870,7 @@ function updatePhysics(dt) {
   // ── 1. cars in tunnel: move through ──
   for (const c of cars) {
     if (c.state === STATE.IN_TUNNEL) {
-      c.x += freeflowSpeed * 0.85 * dt;
+      c.x += freeflowSpeed * 1.0 * dt;
       c.z += (0 - c.z) * 5 * dt;
       if (c.x >= bottleneckX1) {
         c.state = STATE.DONE;

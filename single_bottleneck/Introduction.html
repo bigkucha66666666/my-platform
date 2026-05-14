@@ -301,41 +301,88 @@
             border-bottom: 0;
         }
 
-        .mini-cost-bars {
+        .cost-blocks {
             display: grid;
-            gap: 7px;
-            margin-top: 12px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 10px;
         }
 
-        .mini-cost-bar {
-            display: grid;
-            grid-template-columns: 64px 1fr;
-            gap: 8px;
+        .cost-block {
+            display: flex;
+            flex-direction: column;
             align-items: center;
+            gap: 4px;
+            padding: 12px 8px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #ffffff;
+            text-align: center;
+        }
+
+        .cost-block-type {
             color: #64748b;
             font-size: 12px;
             font-weight: 700;
         }
 
-        .mini-cost-track {
-            height: 10px;
+        .cost-block-rate {
+            color: #0f172a;
+            font-size: 34px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .cost-block-unit {
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .cost-block-track {
+            width: 100%;
+            height: 6px;
+            margin-top: 6px;
             border-radius: 999px;
-            background: #e2e8f0;
+            background: #f1f5f9;
             overflow: hidden;
         }
 
-        .mini-cost-fill {
+        .cost-block-fill {
+            display: block;
             height: 100%;
             border-radius: inherit;
-            background: linear-gradient(90deg, #f7b267 0%, #c8551f 100%);
         }
 
-        .mini-cost-fill-early {
-            background: linear-gradient(90deg, #9fd3c7 0%, #2f8f7b 100%);
+        .cost-block-queue {
+            border-color: #fed7aa;
+        }
+        .cost-block-queue .cost-block-rate {
+            color: #c2410c;
+        }
+        .cost-block-queue .cost-block-fill {
+            background: #f7b267;
         }
 
-        .mini-cost-fill-late {
-            background: linear-gradient(90deg, #f4a7a2 0%, #bc3f3a 100%);
+        .cost-block-early {
+            border-color: #a7f3d0;
+        }
+        .cost-block-early .cost-block-rate {
+            color: #0f766e;
+        }
+        .cost-block-early .cost-block-fill {
+            background: #5ee4be;
+        }
+
+        .cost-block-late {
+            border-color: #fecaca;
+        }
+        .cost-block-late .cost-block-rate {
+            color: #b91c1c;
+        }
+        .cost-block-late .cost-block-fill {
+            background: #f87171;
         }
 
         .scenario-takeaway {
@@ -564,28 +611,29 @@
                             <span>目标到达时间</span>
                             <strong>{{ preferred_arrival_time }}</strong>
                         </div>
-                        <div class="outcome-row">
-                            <span>排队延误</span>
-                            <strong>增加行程时间</strong>
-                        </div>
-                        <div class="outcome-row">
-                            <span>到达偏差</span>
-                            <strong>早到或晚到</strong>
-                        </div>
-                        <div class="mini-cost-bars" aria-hidden="true">
-                            <div class="mini-cost-bar">
-                                <span>排队</span>
-                                <span class="mini-cost-track"><span class="mini-cost-fill" style="width: 72%;"></span></span>
+                        <div class="cost-blocks">
+                            <div class="cost-block cost-block-queue">
+                                <span class="cost-block-type">排队</span>
+                                <span class="cost-block-rate">{{ queue_cost_per_minute }}</span>
+                                <span class="cost-block-unit">分 / 分钟</span>
+                                <span class="cost-block-track"><span class="cost-block-fill" style="width:72%"></span></span>
                             </div>
-                            <div class="mini-cost-bar">
-                                <span>早到</span>
-                                <span class="mini-cost-track"><span class="mini-cost-fill mini-cost-fill-early" style="width: 38%;"></span></span>
+                            <div class="cost-block cost-block-early">
+                                <span class="cost-block-type">早到</span>
+                                <span class="cost-block-rate">{{ early_cost_per_minute }}</span>
+                                <span class="cost-block-unit">分 / 分钟</span>
+                                <span class="cost-block-track"><span class="cost-block-fill" style="width:36%"></span></span>
                             </div>
-                            <div class="mini-cost-bar">
-                                <span>晚到</span>
-                                <span class="mini-cost-track"><span class="mini-cost-fill mini-cost-fill-late" style="width: 52%;"></span></span>
+                            <div class="cost-block cost-block-late">
+                                <span class="cost-block-type">晚到</span>
+                                <span class="cost-block-rate">{{ late_cost_per_minute }}</span>
+                                <span class="cost-block-unit">分 / 分钟</span>
+                                <span class="cost-block-track"><span class="cost-block-fill" style="width:100%"></span></span>
                             </div>
                         </div>
+                        <p class="scenario-card-text">
+                            以上三种成本每分钟的代价各不相同：晚到 &gt; 排队 &gt; 早到。
+                        </p>
                     </div>
                 </div>
 

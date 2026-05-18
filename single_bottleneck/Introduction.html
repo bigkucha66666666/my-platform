@@ -159,46 +159,133 @@
 
         .bottleneck-stage {
             position: relative;
-            min-height: 186px;
-            border: 1px dashed #cbd5e1;
-            border-radius: 14px;
+            min-height: 224px;
+            border: 1px solid rgba(148, 163, 184, 0.34);
+            border-radius: 22px;
             background:
-                linear-gradient(180deg, transparent 0 42%, rgba(148, 163, 184, 0.14) 42% 58%, transparent 58% 100%),
-                linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+                radial-gradient(circle at 18% 22%, rgba(31, 95, 204, 0.16) 0 14%, transparent 25%),
+                radial-gradient(circle at 82% 78%, rgba(79, 111, 82, 0.15) 0 16%, transparent 27%),
+                linear-gradient(135deg, rgba(15, 23, 42, 0.045) 25%, transparent 25%) 0 0 / 20px 20px,
+                linear-gradient(180deg, #fbfdff 0%, #f7fafc 58%, #ffffff 100%);
             overflow: hidden;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                0 22px 44px rgba(15, 23, 42, 0.10);
+        }
+
+        .bottleneck-stage::before {
+            content: "";
+            position: absolute;
+            inset: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 18px;
+            background:
+                linear-gradient(90deg, transparent 0 calc(50% - 1px), rgba(15, 23, 42, 0.09) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+                repeating-linear-gradient(90deg, transparent 0 31px, rgba(148, 163, 184, 0.12) 31px 32px);
+            pointer-events: none;
+        }
+
+        .bottleneck-stage::after {
+            content: "";
+            position: absolute;
+            left: 11%;
+            right: 11%;
+            top: 88px;
+            height: 74px;
+            border-radius: 999px;
+            background: radial-gradient(ellipse at center, rgba(247, 178, 103, 0.18) 0%, transparent 68%);
+            pointer-events: none;
         }
 
         .road-line {
             position: absolute;
-            top: 88px;
-            left: 32px;
-            right: 32px;
-            height: 18px;
+            top: 99px;
+            left: 58px;
+            right: 58px;
+            height: 34px;
             border-radius: 999px;
-            background: #7c4a2d;
-            box-shadow: 0 0 0 7px #e7d4c4;
+            background:
+                linear-gradient(90deg, #273449 0 41%, #131c2b 41% 59%, #273449 59% 100%);
+            box-shadow:
+                0 0 0 12px rgba(233, 213, 196, 0.92),
+                0 18px 30px rgba(39, 52, 73, 0.26);
+        }
+
+        .road-line::before {
+            content: "";
+            position: absolute;
+            left: 28px;
+            right: 28px;
+            top: 50%;
+            height: 3px;
+            transform: translateY(-50%);
+            border-radius: 999px;
+            background: repeating-linear-gradient(
+                90deg,
+                rgba(255, 247, 237, 0.95) 0 18px,
+                transparent 18px 32px
+            );
+            filter: drop-shadow(0 0 4px rgba(255, 247, 237, 0.55));
+        }
+
+        .road-line::after {
+            content: "";
+            position: absolute;
+            left: 42%;
+            right: 42%;
+            top: -8px;
+            bottom: -8px;
+            border-radius: 999px;
+            background:
+                linear-gradient(90deg, #9f3a17 0 7px, #172033 7px calc(100% - 7px), #9f3a17 calc(100% - 7px));
+            box-shadow:
+                0 0 0 8px #f8fafc,
+                0 0 0 13px rgba(200, 85, 31, 0.18);
         }
 
         .road-arrow {
             position: absolute;
-            top: 80px;
-            right: 49px;
+            top: 54px;
+            right: 24px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #172033, #314159);
             color: #fff7ed;
-            font-size: 26px;
-            font-weight: 900;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
         }
 
         .bottleneck-gate {
             position: absolute;
-            top: 58px;
+            top: 62px;
             left: 50%;
-            width: 58px;
-            height: 70px;
-            margin-left: -29px;
-            border: 3px solid #9f3a17;
-            border-radius: 16px;
-            background: #fff7ed;
-            box-shadow: 0 10px 22px rgba(159, 58, 23, 0.12);
+            width: 94px;
+            height: 106px;
+            margin-left: -47px;
+            border-radius: 22px;
+            background:
+                linear-gradient(90deg, #9f3a17 0 13px, transparent 13px calc(100% - 13px), #9f3a17 calc(100% - 13px) 100%),
+                linear-gradient(180deg, rgba(255, 247, 237, 0.98), rgba(255, 237, 213, 0.92));
+            box-shadow:
+                0 18px 34px rgba(159, 58, 23, 0.22),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+        }
+
+        .bottleneck-gate::before {
+            content: "";
+            position: absolute;
+            left: 29px;
+            right: 29px;
+            top: 33px;
+            bottom: 33px;
+            border-radius: 999px;
+            background:
+                repeating-linear-gradient(45deg, #172033 0 6px, #263346 6px 12px);
+            box-shadow:
+                inset 0 0 0 3px #fff7ed,
+                0 0 0 8px rgba(23, 32, 51, 0.08);
         }
 
         .bottleneck-gate::after {
@@ -206,8 +293,8 @@
             position: absolute;
             left: 0;
             right: 0;
-            top: 22px;
-            color: #9f3a17;
+            top: 9px;
+            color: #7c2d12;
             font-size: 13px;
             font-weight: 800;
             text-align: center;
@@ -215,51 +302,55 @@
 
         .queue-dots {
             position: absolute;
-            top: 131px;
-            left: 72px;
+            top: 149px;
+            left: 96px;
             display: flex;
             gap: 8px;
             align-items: center;
+            z-index: 3;
         }
 
         .route-endpoint {
             position: absolute;
-            top: 74px;
+            top: 82px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 46px;
-            height: 46px;
+            width: 56px;
+            height: 56px;
             border: 4px solid #ffffff;
             border-radius: 999px;
             color: #ffffff;
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 900;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+            box-shadow:
+                0 14px 26px rgba(15, 23, 42, 0.20),
+                inset 0 1px 0 rgba(255, 255, 255, 0.26);
+            z-index: 3;
         }
 
         .route-endpoint-a {
-            left: 13px;
-            background: #1f5fcc;
+            left: 18px;
+            background: linear-gradient(135deg, #1f5fcc, #174f9f);
         }
 
         .route-endpoint-b {
-            right: 13px;
-            background: #4f6f52;
+            right: 18px;
+            background: linear-gradient(135deg, #4f6f52, #2f5131);
         }
 
         .queue-dot {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 28px;
-            height: 28px;
+            width: 31px;
+            height: 31px;
             border-radius: 999px;
             background: #dbeafe;
             color: #ffffff;
             font-size: 11px;
             font-weight: 800;
-            box-shadow: 0 0 0 3px #ffffff;
+            box-shadow: 0 0 0 3px #ffffff, 0 8px 16px rgba(15, 23, 42, 0.16);
         }
 
         .queue-dot-self {
@@ -267,19 +358,44 @@
         }
 
         .queue-dot-wait {
-            background: #f7b267;
+            background: linear-gradient(135deg, #f7b267, #c8551f);
         }
 
         .capacity-tag {
             position: absolute;
-            right: 13px;
-            bottom: 13px;
+            right: 16px;
+            bottom: 15px;
             padding: 7px 10px;
             border-radius: 999px;
-            background: #172033;
+            background: linear-gradient(135deg, #172033, #314159);
             color: #ffffff;
             font-size: 12px;
             font-weight: 800;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.16);
+        }
+
+        .route-flow-label {
+            position: absolute;
+            left: 20px;
+            top: 18px;
+            padding: 6px 10px;
+            border: 1px solid rgba(23, 32, 51, 0.10);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.82);
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        }
+
+        .queue-caption {
+            position: absolute;
+            left: 96px;
+            bottom: 18px;
+            color: #7c2d12;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .outcome-row {
@@ -519,6 +635,57 @@
             .quick-rule-card {
                 min-height: auto;
             }
+
+            .bottleneck-stage {
+                min-height: 246px;
+            }
+
+            .road-line {
+                left: 34px;
+                right: 34px;
+            }
+
+            .route-endpoint {
+                width: 46px;
+                height: 46px;
+                font-size: 16px;
+            }
+
+            .route-endpoint-a {
+                left: 10px;
+            }
+
+            .route-endpoint-b {
+                right: 10px;
+            }
+
+            .bottleneck-gate {
+                width: 74px;
+                margin-left: -37px;
+            }
+
+            .queue-dots {
+                left: 58px;
+                top: 153px;
+                gap: 6px;
+            }
+
+            .queue-dot {
+                width: 28px;
+                height: 28px;
+                font-size: 10px;
+            }
+
+            .queue-caption {
+                left: 16px;
+                right: 16px;
+                bottom: 48px;
+            }
+
+            .capacity-tag {
+                right: 12px;
+                bottom: 12px;
+            }
         }
     </style>
 {{ endblock }}
@@ -587,8 +754,9 @@
                     <div class="scenario-card">
                         <p class="scenario-card-title">2. 从 A 点到 B 点，经过中途瓶颈</p>
                         <div class="bottleneck-stage" aria-hidden="true">
+                            <div class="route-flow-label">A → B 单一路径</div>
                             <div class="road-line"></div>
-                            <div class="road-arrow">→</div>
+                            <div class="road-arrow">通行方向 →</div>
                             <div class="route-endpoint route-endpoint-a">A</div>
                             <div class="route-endpoint route-endpoint-b">B</div>
                             <div class="queue-dots">
@@ -598,6 +766,7 @@
                                 <span class="queue-dot queue-dot-wait">等</span>
                             </div>
                             <div class="bottleneck-gate"></div>
+                            <div class="queue-caption">同一分钟集中出发会形成等待队列</div>
                             <div class="capacity-tag">容量 {{ capacity_per_slot }} 人/时点</div>
                         </div>
                         <p class="scenario-card-text">

@@ -27,6 +27,17 @@
             color: #5a6b82;
         }
 
+        .same-time-cost-note {
+            margin: 6px 0 0;
+            padding: 10px 12px;
+            border-left: 3px solid #c8551f;
+            border-radius: 10px;
+            background: #fff7ed;
+            color: #7c2d12;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
         .result-cost-row + .result-cost-row {
             margin-top: 14px;
         }
@@ -84,11 +95,17 @@
 
         .bottleneck-route-visual {
             margin-top: 16px;
-            padding: 16px;
-            border: 1px solid #dbe5f0;
-            border-radius: 14px;
+            padding: 20px;
+            border: 1px solid rgba(148, 163, 184, 0.34);
+            border-radius: 22px;
             background:
+                radial-gradient(circle at 15% 18%, rgba(31, 95, 204, 0.15) 0 15%, transparent 28%),
+                radial-gradient(circle at 84% 80%, rgba(79, 111, 82, 0.15) 0 16%, transparent 29%),
+                linear-gradient(135deg, rgba(15, 23, 42, 0.04) 25%, transparent 25%) 0 0 / 20px 20px,
                 linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.92),
+                0 22px 44px rgba(15, 23, 42, 0.10);
         }
 
         .bottleneck-route-title {
@@ -108,13 +125,13 @@
         .route-svg {
             display: block;
             width: 100%;
-            max-width: 620px;
+            max-width: 760px;
             height: auto;
             margin: 0 auto;
         }
 
         .route-label {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             fill: #1e2a3a;
         }
@@ -126,6 +143,19 @@
         .route-label-muted {
             font-size: 12px;
             fill: #65758a;
+        }
+
+        .route-label-chip {
+            font-size: 12px;
+            font-weight: 800;
+            fill: #7c2d12;
+        }
+
+        .route-label-small {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            fill: #64748b;
         }
 
         .route-metric-grid {
@@ -237,10 +267,11 @@
         .slot-bar-chart-wrap {
             overflow-x: auto;
             margin-top: 10px;
-            padding: 14px 12px 10px;
+            padding: 16px 14px 12px;
             border: 1px solid #dbe5f0;
-            border-radius: 12px;
-            background: #ffffff;
+            border-radius: 16px;
+            background:
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
 
         .slot-bar-chart {
@@ -248,12 +279,12 @@
             align-items: flex-end;
             gap: 10px;
             min-width: 560px;
-            height: 210px;
+            height: 226px;
         }
 
         .slot-bar-item {
             display: grid;
-            grid-template-rows: 22px 1fr 34px;
+            grid-template-rows: 28px 1fr 34px;
             justify-items: center;
             min-width: 48px;
             height: 100%;
@@ -262,8 +293,13 @@
         }
 
         .slot-bar-count {
+            align-self: start;
+            padding: 4px 7px;
+            border-radius: 999px;
+            background: #ffffff;
             color: #334155;
             font-weight: 800;
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
         }
 
         .slot-bar-track {
@@ -272,15 +308,36 @@
             width: 100%;
             height: 100%;
             border-radius: 999px 999px 8px 8px;
-            background: #edf2f7;
+            background: #eef2f7;
             overflow: hidden;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.24);
         }
 
         .slot-bar-fill {
             width: 100%;
             min-height: 0;
             border-radius: inherit;
+            transition: height 220ms ease;
+        }
+
+        .slot-bar-level-zero .slot-bar-fill {
+            background: #d7dee8;
+        }
+
+        .slot-bar-level-low .slot-bar-fill {
+            background: linear-gradient(180deg, #b9d7ff 0%, #5b93df 100%);
+        }
+
+        .slot-bar-level-medium .slot-bar-fill {
             background: linear-gradient(180deg, #8fb8ff 0%, #1f5fcc 100%);
+        }
+
+        .slot-bar-level-high .slot-bar-fill {
+            background: linear-gradient(180deg, #f7b267 0%, #d96b2a 100%);
+        }
+
+        .slot-bar-level-peak .slot-bar-fill {
+            background: linear-gradient(180deg, #f97316 0%, #9f3a17 100%);
         }
 
         .slot-bar-label {
@@ -294,73 +351,105 @@
         }
 
         .slot-bar-item-current .slot-bar-track {
-            background: #fff7ed;
-            box-shadow: inset 0 0 0 2px #f7b267;
-        }
-
-        .slot-bar-item-current .slot-bar-fill {
-            background: linear-gradient(180deg, #f7b267 0%, #c8551f 100%);
+            box-shadow:
+                inset 0 0 0 3px #172033,
+                0 0 0 4px rgba(247, 178, 103, 0.18);
         }
 
         .slot-bar-item-current .slot-bar-label,
         .slot-bar-item-current .slot-bar-count {
-            color: #9f3a17;
+            color: #172033;
         }
 
-        .slot-table-wrap {
-            max-height: min(54vh, 500px);
-            overflow: auto;
-            margin-top: 10px;
+        .time-spent-card {
+            margin-top: 16px;
+            padding: 16px;
             border: 1px solid #dbe5f0;
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 12% 16%, rgba(31, 95, 204, 0.08), transparent 28%),
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .time-spent-title {
+            margin: 0 0 4px;
+            color: #1e2a3a;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .time-spent-note {
+            margin: 0 0 14px;
+            color: #5a6b82;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .time-spent-axis {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .time-spent-track {
+            display: flex;
+            overflow: hidden;
+            min-height: 34px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.26);
+        }
+
+        .time-spent-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .time-spent-free {
+            background: linear-gradient(90deg, #1f5fcc 0%, #4f8fe8 100%);
+        }
+
+        .time-spent-queue {
+            background: linear-gradient(90deg, #f7b267 0%, #c8551f 100%);
+        }
+
+        .time-spent-summary {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .time-spent-stat {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             background: #ffffff;
         }
 
-        .slot-table {
-            width: 100%;
-            min-width: 360px;
-            border-collapse: separate;
-            border-spacing: 0;
-            table-layout: fixed;
-            font-size: 14px;
-        }
-
-        .slot-table th,
-        .slot-table td {
-            padding: 11px 14px;
-            border-bottom: 1px solid #edf2f7;
-            text-align: left;
-            vertical-align: middle;
-        }
-
-        .slot-table th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            color: #52657c;
+        .time-spent-key {
+            display: block;
+            margin-bottom: 3px;
+            color: #64748b;
             font-size: 12px;
             font-weight: 700;
-            background: #f6f9fc;
         }
 
-        .slot-table th:last-child,
-        .slot-table td:last-child {
-            text-align: right;
-        }
-
-        .slot-table tbody tr:last-child td {
-            border-bottom: 0;
-        }
-
-        .slot-table-row-current td {
-            background: #eef6ff;
-        }
-
-        .slot-table-row-current td:first-child {
-            border-left: 4px solid #1f5fcc;
-            padding-left: 10px;
-            font-weight: 700;
-            color: #174f9f;
+        .time-spent-value {
+            display: block;
+            color: #172033;
+            font-size: 15px;
+            font-weight: 800;
         }
 
         @media (max-width: 575px) {
@@ -387,14 +476,12 @@
                 height: 190px;
             }
 
-            .slot-table {
-                min-width: 0;
-                font-size: 13px;
+            .time-spent-summary {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
-            .slot-table th,
-            .slot-table td {
-                padding: 10px;
+            .time-spent-segment {
+                font-size: 11px;
             }
         }
     </style>
@@ -415,6 +502,7 @@
         <p>出行成本：<b>{{ total_travel_cost_points }}</b> 成本分</p>
         <p>粗收费：<b>{{ toll_charge_points }}</b> 成本分</p>
         <p>最终选择成本：<b>{{ total_choice_cost_points }}</b> 成本分</p>
+        <p class="same-time-cost-note">若多人选择同一分钟，系统按该分钟随机通过顺序的平均排队成本计算，因此同一分钟参与者的排队延误、到达时间和成本相同。</p>
 
         <div class="result-cost-chart" aria-label="成本分解可视化">
             <p class="result-cost-chart-title">成本分解</p>
@@ -478,29 +566,97 @@
         <p class="bottleneck-route-title">成本路径示意</p>
         <p class="bottleneck-route-note">本轮路径可理解为从 A 点出发，沿一条直线路径经过中途瓶颈，最终到达 B 点；排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
 
-        <svg class="route-svg" viewBox="0 0 620 250" role="img" aria-label="A 点出发，经过中途瓶颈，到达 B 点">
+        <svg class="route-svg" viewBox="0 0 760 330" role="img" aria-label="A 点出发，经过中途瓶颈，到达 B 点">
             <defs>
-                <marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <linearGradient id="routeRoadGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+                    <stop offset="0%" stop-color="#273449" />
+                    <stop offset="43%" stop-color="#34465f" />
+                    <stop offset="50%" stop-color="#111827" />
+                    <stop offset="57%" stop-color="#34465f" />
+                    <stop offset="100%" stop-color="#273449" />
+                </linearGradient>
+                <linearGradient id="routeStartGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#2c7be5" />
+                    <stop offset="100%" stop-color="#174f9f" />
+                </linearGradient>
+                <linearGradient id="routeEndGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#6f8f5f" />
+                    <stop offset="100%" stop-color="#2f5131" />
+                </linearGradient>
+                <linearGradient id="routeBottleneckGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#f7b267" />
+                    <stop offset="100%" stop-color="#c8551f" />
+                </linearGradient>
+                <linearGradient id="routeSignalGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+                    <stop offset="0%" stop-color="#fff7ed" stop-opacity="0.15" />
+                    <stop offset="50%" stop-color="#fff7ed" />
+                    <stop offset="100%" stop-color="#fff7ed" stop-opacity="0.15" />
+                </linearGradient>
+                <filter id="routeSoftShadow" x="-20%" y="-30%" width="140%" height="170%">
+                    <feDropShadow dx="0" dy="14" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.18" />
+                </filter>
+                <filter id="routeGlow" x="-30%" y="-80%" width="160%" height="260%">
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                </filter>
+                <pattern id="routeGrid" width="22" height="22" patternUnits="userSpaceOnUse">
+                    <path d="M22 0H0V22" fill="none" stroke="#e2e8f0" stroke-width="1" opacity="0.55" />
+                </pattern>
+                <pattern id="routeHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <rect width="4" height="10" fill="#fed7aa" opacity="0.68" />
+                </pattern>
+                <marker id="route-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
                     <path d="M0 0 L10 5 L0 10 Z" fill="#fff7ed" />
                 </marker>
             </defs>
 
-            <path d="M82 126 L538 126" fill="none" stroke="#e7d4c4" stroke-width="40" stroke-linecap="round" />
-            <path d="M82 126 L538 126" fill="none" stroke="#7c4a2d" stroke-width="28" stroke-linecap="round" />
-            <path d="M112 126 L508 126" fill="none" stroke="#fff7ed" stroke-width="3" stroke-linecap="round" stroke-dasharray="12 10" marker-end="url(#route-arrow)" />
+            <rect x="22" y="20" width="716" height="272" rx="34" fill="url(#routeGrid)" opacity="0.82" />
+            <path d="M68 270 C154 220 234 308 322 252 S492 214 676 276" fill="none" stroke="#dbe5f0" stroke-width="2" opacity="0.72" />
+            <path d="M66 62 C156 100 246 28 332 78 S515 108 690 48" fill="none" stroke="#dbe5f0" stroke-width="2" opacity="0.72" />
 
-            <circle cx="82" cy="126" r="24" fill="#1f5fcc" stroke="#ffffff" stroke-width="5" />
-            <circle cx="538" cy="126" r="24" fill="#4f6f52" stroke="#ffffff" stroke-width="5" />
-            <circle cx="310" cy="126" r="27" fill="#c8551f" stroke="#ffffff" stroke-width="6" />
-            <rect x="282" y="158" width="56" height="24" rx="8" fill="#ffd166" stroke="#7c4a2d" stroke-width="3" />
+            <rect x="48" y="38" width="130" height="32" rx="16" fill="#ffffff" stroke="#dbe5f0" />
+            <text x="113" y="59" text-anchor="middle" class="route-label-small">A → B 单一路径</text>
+            <rect x="500" y="38" width="210" height="32" rx="16" fill="#ffffff" stroke="#dbe5f0" />
+            <text x="605" y="59" text-anchor="middle" class="route-label-small">{{ departure_time_label }} 出发 / {{ arrival_time_label }} 到达</text>
 
-            <text x="82" y="132" text-anchor="middle" class="route-label route-label-inverse">A</text>
-            <text x="538" y="132" text-anchor="middle" class="route-label route-label-inverse">B</text>
-            <text x="82" y="182" text-anchor="middle" class="route-label">出发点</text>
-            <text x="538" y="182" text-anchor="middle" class="route-label">到达点</text>
-            <text x="310" y="82" text-anchor="middle" class="route-label">瓶颈</text>
-            <text x="310" y="102" text-anchor="middle" class="route-label-muted">排队成本</text>
-            <text x="310" y="174" text-anchor="middle" class="route-label-muted">收费</text>
+            <path d="M90 162 H324" fill="none" stroke="#e9d5c4" stroke-width="68" stroke-linecap="round" filter="url(#routeSoftShadow)" />
+            <path d="M436 162 H670" fill="none" stroke="#e9d5c4" stroke-width="68" stroke-linecap="round" filter="url(#routeSoftShadow)" />
+            <path d="M324 162 H436" fill="none" stroke="#e9d5c4" stroke-width="40" stroke-linecap="round" filter="url(#routeSoftShadow)" />
+            <path d="M90 162 H324" fill="none" stroke="url(#routeRoadGradient)" stroke-width="44" stroke-linecap="round" />
+            <path d="M436 162 H670" fill="none" stroke="url(#routeRoadGradient)" stroke-width="44" stroke-linecap="round" />
+            <path d="M324 162 H436" fill="none" stroke="#111827" stroke-width="24" stroke-linecap="round" />
+            <path d="M124 162 H636" fill="none" stroke="url(#routeSignalGradient)" stroke-width="5" stroke-linecap="round" stroke-dasharray="20 15" marker-end="url(#route-arrow)" filter="url(#routeGlow)" />
+
+            <rect x="320" y="82" width="22" height="160" rx="11" fill="#9f3a17" />
+            <rect x="418" y="82" width="22" height="160" rx="11" fill="#9f3a17" />
+            <rect x="343" y="98" width="74" height="128" rx="28" fill="url(#routeHatch)" opacity="0.88" />
+            <rect x="344" y="112" width="72" height="100" rx="24" fill="url(#routeBottleneckGradient)" stroke="#ffffff" stroke-width="6" filter="url(#routeSoftShadow)" />
+            <rect x="356" y="146" width="48" height="32" rx="16" fill="#172033" opacity="0.95" />
+            <text x="380" y="79" text-anchor="middle" class="route-label">瓶颈通行口</text>
+            <text x="380" y="253" text-anchor="middle" class="route-label-muted">排队、收费与到达偏差在此转化为成本</text>
+
+            <g filter="url(#routeSoftShadow)">
+                <circle cx="88" cy="162" r="34" fill="url(#routeStartGradient)" stroke="#ffffff" stroke-width="7" />
+                <circle cx="672" cy="162" r="34" fill="url(#routeEndGradient)" stroke="#ffffff" stroke-width="7" />
+                <circle cx="190" cy="224" r="16" fill="#1f5fcc" stroke="#ffffff" stroke-width="4" />
+                <circle cx="232" cy="224" r="16" fill="#f7b267" stroke="#ffffff" stroke-width="4" />
+                <circle cx="274" cy="224" r="16" fill="#f7b267" stroke="#ffffff" stroke-width="4" />
+                <circle cx="316" cy="224" r="16" fill="#f7b267" stroke="#ffffff" stroke-width="4" />
+            </g>
+
+            <path d="M190 199 C228 184 270 184 316 199" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5 6" />
+            <rect x="326" y="270" width="108" height="30" rx="15" fill="#fff7ed" stroke="#fed7aa" stroke-width="2" />
+            <text x="380" y="290" text-anchor="middle" class="route-label-chip">成本汇集</text>
+
+            <text x="88" y="170" text-anchor="middle" class="route-label route-label-inverse">A</text>
+            <text x="672" y="170" text-anchor="middle" class="route-label route-label-inverse">B</text>
+            <text x="88" y="217" text-anchor="middle" class="route-label">出发点</text>
+            <text x="672" y="217" text-anchor="middle" class="route-label">到达点</text>
+            <text x="253" y="262" text-anchor="middle" class="route-label-muted">同分钟等待队列</text>
+            <text x="380" y="167" text-anchor="middle" class="route-label route-label-inverse">窄</text>
         </svg>
 
         <div class="route-metric-grid">
@@ -555,8 +711,8 @@
     <div class="slot-bar-chart-wrap" aria-label="本轮各出发时点选择人数柱状图">
         <div class="slot-bar-chart">
             {{ for item in slot_summaries }}
-                <div class="slot-bar-item {{ if item.is_current }}slot-bar-item-current{{ endif }}">
-                    <div class="slot-bar-count">{{ item.count }}</div>
+                <div class="slot-bar-item slot-bar-level-{{ item.bar_level }} {{ if item.is_current }}slot-bar-item-current{{ endif }}">
+                    <div class="slot-bar-count">{{ item.count }}人</div>
                     <div class="slot-bar-track" title="{{ item.departure_time }}：{{ item.count }} 人">
                         <div class="slot-bar-fill" style="height: {{ item.bar_height_pct }}%;"></div>
                     </div>
@@ -566,24 +722,41 @@
         </div>
     </div>
 
-    <p class="text-sub">本轮各出发时间选择分布表：</p>
-    <div class="slot-table-wrap">
-        <table class="slot-table">
-            <thead>
-                <tr>
-                    <th>出发时间</th>
-                    <th>选择人数</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ for item in slot_summaries }}
-                    <tr class="{{ if item.is_current }}slot-table-row-current{{ endif }}">
-                        <td>{{ item.departure_time }}</td>
-                        <td>{{ item.count }}</td>
-                    </tr>
-                {{ endfor }}
-            </tbody>
-        </table>
+    <div class="time-spent-card" aria-label="你的本轮用时示意图">
+        <p class="time-spent-title">你的本轮用时</p>
+        <p class="time-spent-note">总行程时间由自由流行程和排队延误组成；这里只展示你自己的本轮用时。</p>
+
+        <div class="time-spent-axis">
+            <span>{{ departure_time_label }} 出发</span>
+            <span>{{ arrival_time_label }} 到达</span>
+        </div>
+        <div class="time-spent-track">
+            <div class="time-spent-segment time-spent-free" style="width: {{ free_flow_time_pct }}%;">
+                自由流 {{ free_flow_travel_minutes }} 分钟
+            </div>
+            <div class="time-spent-segment time-spent-queue" style="width: {{ queue_time_pct }}%;">
+                {{ if has_queue_delay }}排队 {{ queue_delay_minutes }} 分钟{{ endif }}
+            </div>
+        </div>
+
+        <div class="time-spent-summary">
+            <div class="time-spent-stat">
+                <span class="time-spent-key">自由流行程</span>
+                <span class="time-spent-value">{{ free_flow_travel_minutes }} 分钟</span>
+            </div>
+            <div class="time-spent-stat">
+                <span class="time-spent-key">排队延误</span>
+                <span class="time-spent-value">{{ if has_queue_delay }}{{ queue_delay_minutes }} 分钟{{ else }}无排队延误{{ endif }}</span>
+            </div>
+            <div class="time-spent-stat">
+                <span class="time-spent-key">总行程时间</span>
+                <span class="time-spent-value">{{ travel_time_minutes }} 分钟</span>
+            </div>
+            <div class="time-spent-stat">
+                <span class="time-spent-key">目标到达</span>
+                <span class="time-spent-value">{{ preferred_arrival_time }}</span>
+            </div>
+        </div>
     </div>
 
     <p class="text-sub">该页面会在 {{ auto_advance_seconds }} 秒后自动继续。</p>

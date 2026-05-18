@@ -1,5 +1,6 @@
 from math import ceil
 import json
+from pathlib import Path
 import random
 import time
 
@@ -25,6 +26,10 @@ COARSE_TOLL_AUTO_RESULT_VAR = 'single_bottleneck_coarse_toll_auto_result'
 COARSE_TOLL_AUTO_MODE_AUTO = 'auto'
 COARSE_TOLL_AUTO_MODE_EXACT = 'exact'
 COARSE_TOLL_AUTO_MODE_LARGE_GROUP = 'large-group'
+COARSE_TOLL_CALIBRATION_SOURCE_CACHE = 'cache'
+COARSE_TOLL_CALIBRATION_SOURCE_COMPUTED = 'computed'
+COARSE_TOLL_CALIBRATION_CACHE_FILE = 'toll_calibration_cache.json'
+COARSE_TOLL_CALIBRATION_CACHE = None
 
 DEPARTURE_SCHEDULE_SOURCE_STATIC = 'static'
 DEPARTURE_SCHEDULE_SOURCE_AUTO = 'auto'
@@ -35,8 +40,8 @@ class C(BaseConstants):
     NAME_IN_URL = 'single_bottleneck'
     PLAYERS_PER_GROUP = None
     NUM_ROUNDS = 10
-    DECISION_TIMEOUT_SECONDS = 45
-    RESULTS_TIMEOUT_SECONDS = 30
+    DECISION_TIMEOUT_SECONDS = 60
+    RESULTS_TIMEOUT_SECONDS = 45
     DROPOUT_TIMEOUT_SECONDS = 1
     ROUND1_JOIN_GRACE_SECONDS = 20
     WAIT_GRACE_SECONDS = 5
@@ -249,6 +254,7 @@ EXPORT_HEADERS = [
     'reward_bonus_points',
     'coarse_toll_source',
     'coarse_toll_auto_enabled',
+    'coarse_toll_calibration_source',
     'coarse_toll_calibration_mode',
     'coarse_toll_calibration_players',
     'coarse_toll_calibration_cost_gap',
@@ -417,22 +423,8 @@ def departure_slots_for_player(player: Player):
     return departure_slots_from_schedule(departure_schedule_for_player(player))
 
 
-def departure_slots_for_group(group: Group):
-    players = group.get_players()
-    if not players:
-        return departure_slots()
-    return departure_slots_for_player(players[0])
-
-
 def departure_minute_for_player_slot(player: Player, slot: int):
     return departure_minute_for_slot(slot, departure_schedule_for_player(player))
-
-
-def departure_minute_for_group_slot(group: Group, slot: int):
-    players = group.get_players()
-    if not players:
-        return departure_minute_for_slot(slot)
-    return departure_minute_for_player_slot(players[0], slot)
 
 
 def player_departure_minute(player: Player):
@@ -478,13 +470,6 @@ def set_player_departure_choice(player: Player, departure_minute, decision_sourc
     if decision_source is not None:
         player.decision_source = decision_source
     return True
-
-
-def cumulative_payoff_so_far(player: Player):
-    total_payoff = cu(0)
-    for round_player in player.in_rounds(1, player.round_number):
-        total_payoff += safe_model_field(round_player, 'payoff', cu(0))
-    return total_payoff
 
 
 def bounded_percent(value, max_value):
@@ -749,14 +734,6 @@ def reward_bonus_points(session):
     return cu(max(0, round(parse_float(raw_value, C.DEFAULT_REWARD_BONUS_POINTS), 2)))
 
 
-def reward_bonus_for_slot(session, slot: int):
-    if not reward_treatment_enabled(session):
-        return cu(0)
-    if slot not in rewarded_slots_for_session(session):
-        return cu(0)
-    return reward_bonus_points(session)
-
-
 def reward_bonus_for_player_slot(player: Player, slot: int):
     if not reward_treatment_enabled(player.session):
         return cu(0)
@@ -908,10 +885,6 @@ def coarse_toll_time_window_spec(session):
     return session.config.get('coarse_toll_time_window_spec', '')
 
 
-def coarse_toll_slots_for_session(session):
-    return parse_slot_spec(coarse_toll_slot_spec(session), 'coarse_toll_slot_spec')
-
-
 def coarse_toll_points(session):
     raw_value = session.config.get('coarse_toll_points', C.DEFAULT_COARSE_TOLL_POINTS)
     return cu(max(0, round(parse_float(raw_value, C.DEFAULT_COARSE_TOLL_POINTS), 2)))
@@ -1047,6 +1020,7 @@ def build_auto_toll_result(candidate, players_count: int, capacity: int, schedul
         enabled=True,
         source=COARSE_TOLL_SOURCE_AUTO,
         calibration_mode=getattr(candidate, 'calibration_mode', COARSE_TOLL_AUTO_MODE_EXACT),
+        calibration_source=getattr(candidate, 'calibration_source', COARSE_TOLL_CALIBRATION_SOURCE_COMPUTED),
         calibration_players=players_count,
         capacity=capacity,
         slot_spec=candidate.window_spec,
@@ -1058,6 +1032,155 @@ def build_auto_toll_result(candidate, players_count: int, capacity: int, schedul
         equilibrium_distribution=auto_toll_distribution_summary(candidate, valid_slots, schedule),
         equilibrium_costs=auto_toll_cost_summary(candidate, schedule),
     )
+
+
+def numeric_values_equal(left, right):
+    try:
+        return abs(float(left) - float(right)) < 1e-9
+    except (TypeError, ValueError):
+        return False
+
+
+def load_coarse_toll_calibration_cache():
+    global COARSE_TOLL_CALIBRATION_CACHE
+    if COARSE_TOLL_CALIBRATION_CACHE is not None:
+        return COARSE_TOLL_CALIBRATION_CACHE
+
+    cache_path = Path(__file__).with_name(COARSE_TOLL_CALIBRATION_CACHE_FILE)
+    try:
+        with cache_path.open('r', encoding='utf-8') as cache_file:
+            cache = json.load(cache_file)
+    except (OSError, json.JSONDecodeError):
+        cache = {}
+
+    COARSE_TOLL_CALIBRATION_CACHE = cache if isinstance(cache, dict) else {}
+    return COARSE_TOLL_CALIBRATION_CACHE
+
+
+def cached_toll_assumptions_match(
+    cache,
+    *,
+    capacity: int,
+    min_toll,
+    max_toll,
+    toll_step,
+    calibration_mode: str,
+    schedule,
+):
+    if calibration_mode not in {COARSE_TOLL_AUTO_MODE_AUTO, COARSE_TOLL_AUTO_MODE_EXACT}:
+        return False
+
+    assumptions = cache.get('calibration_assumptions', {})
+    if not isinstance(assumptions, dict):
+        return False
+
+    return (
+        parse_int(assumptions.get('capacity'), -1) == int(capacity)
+        and parse_int(assumptions.get('choice_slots'), -1) == len(departure_slots_from_schedule(schedule))
+        and numeric_values_equal(assumptions.get('choice_step_minutes'), departure_choice_step_minutes(schedule))
+        and numeric_values_equal(assumptions.get('min_toll'), min_toll)
+        and numeric_values_equal(assumptions.get('max_toll'), max_toll)
+        and numeric_values_equal(assumptions.get('toll_step'), toll_step)
+        and assumptions.get('first_departure_time') == schedule.get('first_departure_time')
+        and assumptions.get('last_departure_time') == schedule.get('last_departure_time')
+    )
+
+
+def cached_toll_record_for_group(players_count: int, capacity: int):
+    cache = load_coarse_toll_calibration_cache()
+    for record in cache.get('records', []):
+        if not isinstance(record, dict):
+            continue
+        if (
+            parse_int(record.get('players'), -1) == int(players_count)
+            and parse_int(record.get('capacity'), -1) == int(capacity)
+        ):
+            return cache, record
+    return cache, None
+
+
+def cached_toll_candidate_from_record(record, players_count: int, valid_slots: tuple[int, ...]):
+    from .toll_calibration import EquilibriumCandidate
+
+    tolled_slots = parse_slot_spec(
+        record.get('coarse_toll_slot_spec', ''),
+        'coarse_toll_calibration_cache_slot_spec',
+        valid_slots,
+    )
+    if not tolled_slots:
+        return None
+
+    window_start = min(tolled_slots)
+    window_end = max(tolled_slots)
+    if set(range(window_start, window_end + 1)) != tolled_slots:
+        return None
+
+    slot_to_index = {slot: index for index, slot in enumerate(valid_slots)}
+    distribution = [0] * len(valid_slots)
+    for item in record.get('equilibrium_distribution', []):
+        slot = parse_int(item.get('slot'), 0)
+        count = parse_int(item.get('count'), 0)
+        if slot not in slot_to_index or count < 0:
+            return None
+        distribution[slot_to_index[slot]] = count
+
+    if sum(distribution) != players_count:
+        return None
+
+    selected_costs = []
+    for item in record.get('selected_costs', []):
+        slot = parse_int(item.get('slot'), 0)
+        if slot not in slot_to_index:
+            return None
+        try:
+            expected_cost = float(item.get('expected_cost'))
+        except (TypeError, ValueError):
+            return None
+        selected_costs.append((slot, expected_cost))
+
+    if not selected_costs:
+        return None
+
+    candidate = EquilibriumCandidate(
+        window_start=window_start,
+        window_end=window_end,
+        toll=float(record.get('coarse_toll_points', 0)),
+        cost_gap=float(record.get('cost_gap', 0)),
+        nash_count=parse_int(record.get('nash_count'), 0),
+        distribution=tuple(distribution),
+        selected_costs=tuple(selected_costs),
+        calibration_mode=record.get('calibration_mode', COARSE_TOLL_AUTO_MODE_EXACT),
+        deviation_gap=float(record.get('deviation_gap', 0)),
+    )
+    object.__setattr__(candidate, 'calibration_source', COARSE_TOLL_CALIBRATION_SOURCE_CACHE)
+    return candidate
+
+
+def cached_auto_toll_candidate(
+    *,
+    players_count: int,
+    capacity: int,
+    min_toll,
+    max_toll,
+    toll_step,
+    calibration_mode: str,
+    schedule,
+    valid_slots: tuple[int, ...],
+):
+    cache, record = cached_toll_record_for_group(players_count, capacity)
+    if record is None:
+        return None
+    if not cached_toll_assumptions_match(
+        cache,
+        capacity=capacity,
+        min_toll=min_toll,
+        max_toll=max_toll,
+        toll_step=toll_step,
+        calibration_mode=calibration_mode,
+        schedule=schedule,
+    ):
+        return None
+    return cached_toll_candidate_from_record(record, players_count, valid_slots)
 
 
 def apply_departure_schedules(session, matrix):
@@ -1139,6 +1262,9 @@ def apply_auto_coarse_toll_calibration(session, matrix):
             players_count,
             capacity,
             calibration_mode,
+            min_toll,
+            max_toll,
+            toll_step,
             approx_refine_pool_size,
             approx_refine_iterations,
             tuple(valid_slots),
@@ -1147,26 +1273,45 @@ def apply_auto_coarse_toll_calibration(session, matrix):
         )
 
         if cache_key not in candidate_cache:
-            try:
-                candidate_cache[cache_key] = calibrate_best_candidate(
-                    players=players_count,
-                    capacity=capacity,
-                    min_toll=min_toll,
-                    max_toll=max_toll,
-                    toll_step=toll_step,
-                    valid_slots=valid_slots,
-                    first_departure_minute=schedule.get('first_departure_minute'),
-                    slot_size_minutes=schedule.get('slot_size_minutes', C.SLOT_SIZE_MINUTES),
-                    calibration_mode=calibration_mode,
-                    approx_refine_pool_size=approx_refine_pool_size,
-                    approx_refine_iterations=approx_refine_iterations,
-                )
-            except CalibrationError as exc:
-                raise ValueError(
-                    f'粗收费自动校准失败：第 {group_index} 组人数={players_count}, '
-                    f'capacity={capacity}, 时点数={len(valid_slots)}, '
-                    f'模式={calibration_mode}, 搜索范围={min_toll}-{max_toll}, 步长={toll_step}。{exc}'
-                ) from exc
+            cached_candidate = cached_auto_toll_candidate(
+                players_count=players_count,
+                capacity=capacity,
+                min_toll=min_toll,
+                max_toll=max_toll,
+                toll_step=toll_step,
+                calibration_mode=calibration_mode,
+                schedule=schedule,
+                valid_slots=valid_slots,
+            )
+            if cached_candidate is not None:
+                candidate_cache[cache_key] = cached_candidate
+            else:
+                try:
+                    candidate = calibrate_best_candidate(
+                        players=players_count,
+                        capacity=capacity,
+                        min_toll=min_toll,
+                        max_toll=max_toll,
+                        toll_step=toll_step,
+                        valid_slots=valid_slots,
+                        first_departure_minute=schedule.get('first_departure_minute'),
+                        slot_size_minutes=schedule.get('slot_size_minutes', C.SLOT_SIZE_MINUTES),
+                        calibration_mode=calibration_mode,
+                        approx_refine_pool_size=approx_refine_pool_size,
+                        approx_refine_iterations=approx_refine_iterations,
+                    )
+                    object.__setattr__(
+                        candidate,
+                        'calibration_source',
+                        COARSE_TOLL_CALIBRATION_SOURCE_COMPUTED,
+                    )
+                    candidate_cache[cache_key] = candidate
+                except CalibrationError as exc:
+                    raise ValueError(
+                        f'粗收费自动校准失败：第 {group_index} 组人数={players_count}, '
+                        f'capacity={capacity}, 时点数={len(valid_slots)}, '
+                        f'模式={calibration_mode}, 搜索范围={min_toll}-{max_toll}, 步长={toll_step}。{exc}'
+                    ) from exc
 
         result = build_auto_toll_result(candidate_cache[cache_key], players_count, capacity, schedule)
         for player in group_players:
@@ -1353,30 +1498,31 @@ def set_results(group: Group):
             set_player_departure_choice(player, departure_minute)
         players_by_departure_minute.setdefault(player_departure_minute(player), []).append(player)
 
-    for same_time_players in players_by_departure_minute.values():
-        random.shuffle(same_time_players)
-
     next_available_bottleneck_minute = first_departure_minute
     slot_service_interval = service_interval_minutes(group.session)
 
     for departure_minute in sorted(players_by_departure_minute):
         same_time_players = players_by_departure_minute[departure_minute]
         slot_load = len(same_time_players)
+        first_service_start_minute = max(departure_minute, next_available_bottleneck_minute)
+        expected_service_start_minute = (
+            first_service_start_minute
+            + ((slot_load - 1) / 2) * slot_service_interval
+        )
+        queue_delay = max(0, expected_service_start_minute - departure_minute)
+        arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
+        early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
+        late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
+        generalized_cost = (
+            C.QUEUE_COST_PER_MINUTE * queue_delay
+            + C.EARLY_COST_PER_MINUTE * early_minutes
+            + C.LATE_COST_PER_MINUTE * late_minutes
+        )
 
         for player in same_time_players:
             slot = player_departure_slot(player)
-            service_start_minute = max(departure_minute, next_available_bottleneck_minute)
-            queue_delay = max(0, service_start_minute - departure_minute)
-            arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
-            early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
-            late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
             reward_bonus = reward_bonus_for_player_slot(player, slot)
             coarse_toll_charge = coarse_toll_for_player_slot(player, slot)
-            generalized_cost = (
-                C.QUEUE_COST_PER_MINUTE * queue_delay
-                + C.EARLY_COST_PER_MINUTE * early_minutes
-                + C.LATE_COST_PER_MINUTE * late_minutes
-            )
             points = max(
                 0,
                 round(
@@ -1400,7 +1546,7 @@ def set_results(group: Group):
             player.reward_bonus = reward_bonus
             player.payoff = cu(points)
 
-            next_available_bottleneck_minute = service_start_minute + slot_service_interval
+        next_available_bottleneck_minute = first_service_start_minute + slot_load * slot_service_interval
 
     for player in players:
         if group.round_number == C.NUM_ROUNDS:
@@ -1421,6 +1567,7 @@ def export_row_for_player(player: Player):
     auto_toll_result = participant_auto_coarse_toll_result(player)
     toll_source = coarse_toll_source_for_player(player)
     toll_auto_enabled = coarse_toll_auto_enabled(player.session)
+    toll_calibration_source = auto_toll_result.get('calibration_source', '')
     toll_calibration_mode = auto_toll_result.get('calibration_mode', '')
     toll_calibration_players = auto_toll_result.get('calibration_players', '')
     toll_calibration_cost_gap = auto_toll_result.get('cost_gap', '')
@@ -1484,6 +1631,7 @@ def export_row_for_player(player: Player):
         reward_bonus_points_value,
         toll_source,
         toll_auto_enabled,
+        toll_calibration_source,
         toll_calibration_mode,
         toll_calibration_players,
         toll_calibration_cost_gap,
@@ -1668,6 +1816,18 @@ def result_slot_summaries(player: Player, current_slot: int):
     max_count = max([item['count'] for item in summaries] or [0])
     for item in summaries:
         item['bar_height_pct'] = bounded_percent(item['count'], max_count) if max_count else 0
+        if item['count'] <= 0 or max_count <= 0:
+            item['bar_level'] = 'zero'
+            continue
+        ratio = item['count'] / max_count
+        if ratio <= 0.33:
+            item['bar_level'] = 'low'
+        elif ratio <= 0.66:
+            item['bar_level'] = 'medium'
+        elif ratio < 1:
+            item['bar_level'] = 'high'
+        else:
+            item['bar_level'] = 'peak'
     return summaries
 
 
@@ -1819,11 +1979,8 @@ class Decision(Page):
             auto_advance_seconds=Decision.get_timeout_seconds(player),
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
-            reward_description=reward_description_for_player(player),
             coarse_toll_description=coarse_toll_description_for_player(player),
             slot_preview=preview,
-            departure_minute_min=minute_value_display(min_minute),
-            departure_minute_max=minute_value_display(max_minute),
             departure_time_min_label=minute_to_clock(min_minute),
             departure_time_max_label=minute_to_clock(max_minute),
             departure_time_step_minutes=minute_value_display(departure_choice_step_minutes(schedule)),
@@ -1901,6 +2058,7 @@ class Results(Page):
         queue_delay = safe_model_field(player, 'queue_delay_minutes', 0)
         early_minutes = safe_model_field(player, 'schedule_early_minutes', 0)
         late_minutes = safe_model_field(player, 'schedule_late_minutes', 0)
+        travel_time = safe_model_field(player, 'travel_time_minutes', C.FREE_FLOW_TRAVEL_MINUTES + queue_delay)
         queue_cost_points = round(C.QUEUE_COST_PER_MINUTE * queue_delay, 2)
         early_cost_points = round(C.EARLY_COST_PER_MINUTE * early_minutes, 2)
         late_cost_points = round(C.LATE_COST_PER_MINUTE * late_minutes, 2)
@@ -1913,6 +2071,8 @@ class Results(Page):
         late_cost_pct = bounded_percent(late_cost_points, total_choice_cost_points)
         toll_cost_pct = bounded_percent(toll_charge_points, total_choice_cost_points)
         cost_bar_min_width_px = 18 if total_choice_cost_points > 0 else 0
+        free_flow_time_pct = bounded_percent(C.FREE_FLOW_TRAVEL_MINUTES, travel_time)
+        queue_time_pct = bounded_percent(queue_delay, travel_time)
         slot_summaries = result_slot_summaries(player, current_slot)
         cost_history = result_cost_history(player)
 
@@ -1920,9 +2080,13 @@ class Results(Page):
             departure_time_label=safe_model_field(player, 'departure_time_label', ''),
             arrival_time_label=safe_model_field(player, 'arrival_time_label', ''),
             queue_delay_minutes=minute_value_display(queue_delay),
-            travel_time_minutes=minute_value_display(safe_model_field(player, 'travel_time_minutes', 0)),
+            travel_time_minutes=minute_value_display(travel_time),
             schedule_early_minutes=minute_value_display(early_minutes),
             schedule_late_minutes=minute_value_display(late_minutes),
+            free_flow_travel_minutes=minute_value_display(C.FREE_FLOW_TRAVEL_MINUTES),
+            free_flow_time_pct=free_flow_time_pct,
+            queue_time_pct=queue_time_pct,
+            has_queue_delay=queue_delay > 0,
             slot_load=safe_model_field(player, 'slot_load', 0),
             current_slot=current_slot,
             current_slot_time=minute_to_clock(departure_minute_for_slot(current_slot, schedule)),

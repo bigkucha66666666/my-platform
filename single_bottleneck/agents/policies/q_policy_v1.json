@@ -1,0 +1,5116 @@
+{
+  "best_action_by_state": {
+    "round=1|own=11|peak=0|payoff=140": 11,
+    "round=2|own=10|peak=10|payoff=130": 16,
+    "round=2|own=10|peak=11|payoff=130": 11,
+    "round=2|own=10|peak=13|payoff=130": 3,
+    "round=2|own=11|peak=10|payoff=110": 2,
+    "round=2|own=11|peak=10|payoff=120": 17,
+    "round=2|own=11|peak=11|payoff=110": 2,
+    "round=2|own=11|peak=11|payoff=120": 17,
+    "round=2|own=11|peak=11|payoff=130": 18,
+    "round=2|own=11|peak=12|payoff=130": 4,
+    "round=2|own=11|peak=12|payoff=140": 7,
+    "round=2|own=11|peak=13|payoff=130": 7,
+    "round=2|own=11|peak=13|payoff=140": 19,
+    "round=2|own=11|peak=9|payoff=110": 3,
+    "round=2|own=11|peak=9|payoff=120": 12,
+    "round=2|own=11|peak=9|payoff=130": 10,
+    "round=2|own=12|peak=10|payoff=110": 4,
+    "round=2|own=12|peak=12|payoff=120": 10,
+    "round=2|own=13|peak=11|payoff=100": 20,
+    "round=2|own=13|peak=13|payoff=110": 8,
+    "round=2|own=15|peak=13|payoff=110": 19,
+    "round=2|own=16|peak=11|payoff=110": 10,
+    "round=2|own=16|peak=13|payoff=110": 16,
+    "round=2|own=17|peak=10|payoff=120": 9,
+    "round=2|own=17|peak=12|payoff=100": 9,
+    "round=2|own=17|peak=12|payoff=110": 3,
+    "round=2|own=18|peak=13|payoff=110": 3,
+    "round=2|own=19|peak=11|payoff=110": 2,
+    "round=2|own=19|peak=12|payoff=110": 16,
+    "round=2|own=19|peak=9|payoff=110": 11,
+    "round=2|own=1|peak=11|payoff=130": 2,
+    "round=2|own=1|peak=12|payoff=130": 9,
+    "round=2|own=1|peak=13|payoff=130": 7,
+    "round=2|own=1|peak=9|payoff=130": 17,
+    "round=2|own=20|peak=10|payoff=110": 6,
+    "round=2|own=20|peak=11|payoff=110": 16,
+    "round=2|own=20|peak=9|payoff=110": 6,
+    "round=2|own=21|peak=11|payoff=110": 8,
+    "round=2|own=21|peak=12|payoff=110": 5,
+    "round=2|own=21|peak=9|payoff=110": 2,
+    "round=2|own=2|peak=13|payoff=130": 6,
+    "round=2|own=2|peak=2|payoff=130": 17,
+    "round=2|own=3|peak=11|payoff=130": 10,
+    "round=2|own=3|peak=3|payoff=130": 17,
+    "round=2|own=3|peak=9|payoff=130": 16,
+    "round=2|own=4|peak=13|payoff=130": 19,
+    "round=2|own=4|peak=4|payoff=130": 14,
+    "round=2|own=5|peak=5|payoff=130": 10,
+    "round=2|own=6|peak=10|payoff=130": 6,
+    "round=2|own=6|peak=11|payoff=130": 3,
+    "round=2|own=6|peak=12|payoff=130": 12,
+    "round=2|own=7|peak=10|payoff=130": 19,
+    "round=2|own=7|peak=9|payoff=130": 18,
+    "round=2|own=8|peak=10|payoff=130": 1,
+    "round=2|own=8|peak=13|payoff=130": 17,
+    "round=2|own=9|peak=9|payoff=130": 13,
+    "round=3|own=10|peak=10|payoff=120": 10,
+    "round=3|own=10|peak=10|payoff=130": 20,
+    "round=3|own=10|peak=11|payoff=130": 4,
+    "round=3|own=10|peak=13|payoff=130": 1,
+    "round=3|own=10|peak=3|payoff=130": 1,
+    "round=3|own=10|peak=7|payoff=120": 17,
+    "round=3|own=10|peak=7|payoff=130": 19,
+    "round=3|own=10|peak=8|payoff=130": 13,
+    "round=3|own=10|peak=9|payoff=120": 14,
+    "round=3|own=10|peak=9|payoff=130": 16,
+    "round=3|own=11|peak=10|payoff=130": 7,
+    "round=3|own=11|peak=11|payoff=130": 2,
+    "round=3|own=11|peak=12|payoff=130": 16,
+    "round=3|own=12|peak=10|payoff=110": 16,
+    "round=3|own=12|peak=10|payoff=120": 15,
+    "round=3|own=12|peak=11|payoff=110": 11,
+    "round=3|own=12|peak=12|payoff=110": 9,
+    "round=3|own=12|peak=12|payoff=120": 5,
+    "round=3|own=12|peak=12|payoff=130": 4,
+    "round=3|own=12|peak=13|payoff=120": 11,
+    "round=3|own=12|peak=7|payoff=120": 20,
+    "round=3|own=12|peak=9|payoff=110": 15,
+    "round=3|own=12|peak=9|payoff=120": 19,
+    "round=3|own=13|peak=11|payoff=100": 4,
+    "round=3|own=13|peak=11|payoff=110": 4,
+    "round=3|own=13|peak=12|payoff=100": 20,
+    "round=3|own=13|peak=13|payoff=110": 20,
+    "round=3|own=13|peak=9|payoff=110": 3,
+    "round=3|own=14|peak=11|payoff=110": 4,
+    "round=3|own=14|peak=13|payoff=110": 11,
+    "round=3|own=14|peak=9|payoff=110": 3,
+    "round=3|own=15|peak=10|payoff=110": 3,
+    "round=3|own=15|peak=9|payoff=110": 7,
+    "round=3|own=16|peak=10|payoff=110": 13,
+    "round=3|own=16|peak=11|payoff=110": 2,
+    "round=3|own=16|peak=11|payoff=120": 17,
+    "round=3|own=16|peak=12|payoff=120": 5,
+    "round=3|own=16|peak=9|payoff=110": 12,
+    "round=3|own=16|peak=9|payoff=120": 17,
+    "round=3|own=17|peak=10|payoff=110": 2,
+    "round=3|own=17|peak=10|payoff=120": 13,
+    "round=3|own=17|peak=11|payoff=110": 1,
+    "round=3|own=17|peak=11|payoff=120": 12,
+    "round=3|own=17|peak=12|payoff=110": 5,
+    "round=3|own=17|peak=12|payoff=120": 8,
+    "round=3|own=17|peak=13|payoff=110": 20,
+    "round=3|own=17|peak=13|payoff=120": 3,
+    "round=3|own=17|peak=2|payoff=120": 10,
+    "round=3|own=17|peak=3|payoff=120": 15,
+    "round=3|own=17|peak=8|payoff=120": 1,
+    "round=3|own=17|peak=9|payoff=120": 19,
+    "round=3|own=18|peak=10|payoff=110": 10,
+    "round=3|own=18|peak=11|payoff=110": 18,
+    "round=3|own=18|peak=12|payoff=100": 7,
+    "round=3|own=18|peak=12|payoff=110": 15,
+    "round=3|own=18|peak=13|payoff=110": 4,
+    "round=3|own=18|peak=7|payoff=110": 19,
+    "round=3|own=18|peak=9|payoff=110": 20,
+    "round=3|own=19|peak=10|payoff=110": 2,
+    "round=3|own=19|peak=11|payoff=110": 12,
+    "round=3|own=19|peak=12|payoff=110": 6,
+    "round=3|own=19|peak=13|payoff=110": 17,
+    "round=3|own=19|peak=14|payoff=110": 10,
+    "round=3|own=19|peak=9|payoff=110": 16,
+    "round=3|own=1|peak=13|payoff=130": 21,
+    "round=3|own=1|peak=1|payoff=130": 13,
+    "round=3|own=1|peak=9|payoff=130": 9,
+    "round=3|own=20|peak=11|payoff=110": 7,
+    "round=3|own=20|peak=9|payoff=110": 7,
+    "round=3|own=21|peak=11|payoff=110": 2,
+    "round=3|own=21|peak=12|payoff=110": 17,
+    "round=3|own=21|peak=13|payoff=110": 21,
+    "round=3|own=21|peak=9|payoff=110": 3,
+    "round=3|own=2|peak=10|payoff=130": 20,
+    "round=3|own=2|peak=11|payoff=130": 9,
+    "round=3|own=2|peak=13|payoff=130": 7,
+    "round=3|own=2|peak=2|payoff=130": 4,
+    "round=3|own=2|peak=9|payoff=130": 4,
+    "round=3|own=3|peak=10|payoff=130": 8,
+    "round=3|own=3|peak=11|payoff=130": 18,
+    "round=3|own=3|peak=13|payoff=130": 9,
+    "round=3|own=3|peak=3|payoff=130": 3,
+    "round=3|own=3|peak=8|payoff=130": 10,
+    "round=3|own=3|peak=9|payoff=130": 18,
+    "round=3|own=4|peak=11|payoff=130": 12,
+    "round=3|own=4|peak=12|payoff=130": 12,
+    "round=3|own=4|peak=4|payoff=130": 13,
+    "round=3|own=4|peak=9|payoff=130": 16,
+    "round=3|own=5|peak=10|payoff=130": 9,
+    "round=3|own=5|peak=12|payoff=130": 19,
+    "round=3|own=5|peak=5|payoff=130": 16,
+    "round=3|own=6|peak=10|payoff=130": 20,
+    "round=3|own=6|peak=11|payoff=130": 8,
+    "round=3|own=6|peak=12|payoff=130": 4,
+    "round=3|own=6|peak=6|payoff=130": 2,
+    "round=3|own=6|peak=9|payoff=130": 3,
+    "round=3|own=7|peak=10|payoff=130": 21,
+    "round=3|own=7|peak=11|payoff=130": 8,
+    "round=3|own=7|peak=12|payoff=130": 19,
+    "round=3|own=7|peak=13|payoff=130": 19,
+    "round=3|own=7|peak=15|payoff=130": 21,
+    "round=3|own=7|peak=7|payoff=130": 1,
+    "round=3|own=7|peak=9|payoff=130": 8,
+    "round=3|own=8|peak=11|payoff=130": 18,
+    "round=3|own=8|peak=12|payoff=130": 13,
+    "round=3|own=8|peak=13|payoff=130": 3,
+    "round=3|own=8|peak=8|payoff=130": 16,
+    "round=3|own=9|peak=9|payoff=130": 5,
+    "round=4|own=10|peak=10|payoff=120": 20,
+    "round=4|own=10|peak=10|payoff=130": 14,
+    "round=4|own=10|peak=11|payoff=130": 8,
+    "round=4|own=10|peak=12|payoff=130": 12,
+    "round=4|own=10|peak=13|payoff=130": 3,
+    "round=4|own=10|peak=8|payoff=130": 10,
+    "round=4|own=10|peak=9|payoff=110": 18,
+    "round=4|own=10|peak=9|payoff=120": 9,
+    "round=4|own=10|peak=9|payoff=130": 9,
+    "round=4|own=11|peak=10|payoff=110": 6,
+    "round=4|own=11|peak=10|payoff=120": 21,
+    "round=4|own=11|peak=11|payoff=120": 10,
+    "round=4|own=11|peak=11|payoff=130": 2,
+    "round=4|own=11|peak=8|payoff=120": 21,
+    "round=4|own=11|peak=9|payoff=120": 6,
+    "round=4|own=11|peak=9|payoff=130": 6,
+    "round=4|own=12|peak=10|payoff=110": 20,
+    "round=4|own=12|peak=10|payoff=120": 17,
+    "round=4|own=12|peak=11|payoff=100": 20,
+    "round=4|own=12|peak=11|payoff=110": 13,
+    "round=4|own=12|peak=12|payoff=110": 11,
+    "round=4|own=12|peak=12|payoff=120": 19,
+    "round=4|own=12|peak=13|payoff=130": 16,
+    "round=4|own=12|peak=8|payoff=110": 21,
+    "round=4|own=12|peak=9|payoff=110": 13,
+    "round=4|own=12|peak=9|payoff=120": 15,
+    "round=4|own=13|peak=10|payoff=100": 20,
+    "round=4|own=13|peak=10|payoff=110": 16,
+    "round=4|own=13|peak=11|payoff=100": 3,
+    "round=4|own=13|peak=11|payoff=110": 9,
+    "round=4|own=13|peak=12|payoff=110": 17,
+    "round=4|own=13|peak=13|payoff=110": 12,
+    "round=4|own=13|peak=13|payoff=120": 16,
+    "round=4|own=13|peak=1|payoff=120": 8,
+    "round=4|own=13|peak=8|payoff=110": 16,
+    "round=4|own=13|peak=9|payoff=110": 9,
+    "round=4|own=14|peak=10|payoff=110": 1,
+    "round=4|own=14|peak=11|payoff=110": 15,
+    "round=4|own=14|peak=8|payoff=120": 19,
+    "round=4|own=14|peak=9|payoff=110": 20,
+    "round=4|own=15|peak=10|payoff=110": 9,
+    "round=4|own=15|peak=10|payoff=120": 8,
+    "round=4|own=15|peak=11|payoff=100": 5,
+    "round=4|own=15|peak=11|payoff=110": 18,
+    "round=4|own=15|peak=11|payoff=120": 1,
+    "round=4|own=15|peak=13|payoff=110": 9,
+    "round=4|own=15|peak=7|payoff=120": 8,
+    "round=4|own=15|peak=9|payoff=110": 5,
+    "round=4|own=15|peak=9|payoff=120": 9,
+    "round=4|own=16|peak=10|payoff=110": 18,
+    "round=4|own=16|peak=10|payoff=120": 14,
+    "round=4|own=16|peak=11|payoff=110": 11,
+    "round=4|own=16|peak=11|payoff=120": 17,
+    "round=4|own=16|peak=12|payoff=110": 7,
+    "round=4|own=16|peak=13|payoff=110": 18,
+    "round=4|own=16|peak=8|payoff=120": 9,
+    "round=4|own=16|peak=9|payoff=120": 19,
+    "round=4|own=17|peak=10|payoff=110": 9,
+    "round=4|own=17|peak=10|payoff=120": 7,
+    "round=4|own=17|peak=11|payoff=110": 13,
+    "round=4|own=17|peak=12|payoff=110": 2,
+    "round=4|own=17|peak=13|payoff=100": 17,
+    "round=4|own=17|peak=13|payoff=120": 3,
+    "round=4|own=17|peak=9|payoff=120": 19,
+    "round=4|own=18|peak=10|payoff=110": 19,
+    "round=4|own=18|peak=11|payoff=110": 2,
+    "round=4|own=18|peak=12|payoff=110": 17,
+    "round=4|own=18|peak=13|payoff=100": 15,
+    "round=4|own=18|peak=13|payoff=110": 19,
+    "round=4|own=18|peak=7|payoff=110": 21,
+    "round=4|own=18|peak=9|payoff=110": 8,
+    "round=4|own=19|peak=10|payoff=110": 3,
+    "round=4|own=19|peak=11|payoff=110": 12,
+    "round=4|own=19|peak=12|payoff=110": 11,
+    "round=4|own=19|peak=13|payoff=110": 6,
+    "round=4|own=19|peak=15|payoff=110": 20,
+    "round=4|own=19|peak=7|payoff=110": 17,
+    "round=4|own=19|peak=8|payoff=110": 10,
+    "round=4|own=19|peak=9|payoff=110": 7,
+    "round=4|own=1|peak=10|payoff=130": 2,
+    "round=4|own=1|peak=11|payoff=130": 13,
+    "round=4|own=1|peak=12|payoff=130": 13,
+    "round=4|own=1|peak=13|payoff=130": 14,
+    "round=4|own=1|peak=1|payoff=130": 8,
+    "round=4|own=1|peak=6|payoff=130": 9,
+    "round=4|own=1|peak=9|payoff=130": 6,
+    "round=4|own=20|peak=10|payoff=110": 16,
+    "round=4|own=20|peak=11|payoff=110": 9,
+    "round=4|own=20|peak=12|payoff=110": 3,
+    "round=4|own=20|peak=13|payoff=110": 16,
+    "round=4|own=20|peak=15|payoff=110": 7,
+    "round=4|own=20|peak=7|payoff=110": 7,
+    "round=4|own=20|peak=8|payoff=110": 13,
+    "round=4|own=20|peak=9|payoff=110": 20,
+    "round=4|own=21|peak=10|payoff=110": 20,
+    "round=4|own=21|peak=11|payoff=110": 6,
+    "round=4|own=21|peak=13|payoff=110": 11,
+    "round=4|own=2|peak=10|payoff=130": 20,
+    "round=4|own=2|peak=11|payoff=130": 18,
+    "round=4|own=2|peak=12|payoff=130": 17,
+    "round=4|own=2|peak=13|payoff=130": 8,
+    "round=4|own=2|peak=2|payoff=130": 20,
+    "round=4|own=2|peak=9|payoff=130": 20,
+    "round=4|own=3|peak=10|payoff=130": 10,
+    "round=4|own=3|peak=11|payoff=130": 11,
+    "round=4|own=3|peak=12|payoff=130": 19,
+    "round=4|own=3|peak=2|payoff=130": 4,
+    "round=4|own=3|peak=3|payoff=130": 20,
+    "round=4|own=3|peak=7|payoff=130": 1,
+    "round=4|own=3|peak=9|payoff=130": 1,
+    "round=4|own=4|peak=10|payoff=130": 15,
+    "round=4|own=4|peak=11|payoff=130": 14,
+    "round=4|own=4|peak=12|payoff=130": 9,
+    "round=4|own=4|peak=13|payoff=130": 1,
+    "round=4|own=4|peak=1|payoff=130": 19,
+    "round=4|own=4|peak=2|payoff=130": 7,
+    "round=4|own=4|peak=4|payoff=130": 3,
+    "round=4|own=4|peak=7|payoff=130": 10,
+    "round=4|own=4|peak=9|payoff=130": 18,
+    "round=4|own=5|peak=10|payoff=130": 6,
+    "round=4|own=5|peak=11|payoff=130": 10,
+    "round=4|own=5|peak=12|payoff=130": 20,
+    "round=4|own=5|peak=13|payoff=130": 20,
+    "round=4|own=5|peak=5|payoff=130": 10,
+    "round=4|own=5|peak=9|payoff=130": 20,
+    "round=4|own=6|peak=13|payoff=130": 17,
+    "round=4|own=6|peak=9|payoff=130": 10,
+    "round=4|own=7|peak=11|payoff=130": 7,
+    "round=4|own=7|peak=12|payoff=130": 10,
+    "round=4|own=7|peak=13|payoff=130": 12,
+    "round=4|own=7|peak=7|payoff=130": 10,
+    "round=4|own=7|peak=9|payoff=130": 8,
+    "round=4|own=8|peak=10|payoff=130": 8,
+    "round=4|own=8|peak=11|payoff=130": 1,
+    "round=4|own=8|peak=12|payoff=130": 17,
+    "round=4|own=8|peak=8|payoff=130": 21,
+    "round=4|own=8|peak=9|payoff=130": 13,
+    "round=4|own=9|peak=10|payoff=130": 17,
+    "round=4|own=9|peak=11|payoff=130": 21,
+    "round=4|own=9|peak=13|payoff=130": 16,
+    "round=4|own=9|peak=9|payoff=130": 4,
+    "round=5|own=10|peak=10|payoff=120": 4,
+    "round=5|own=10|peak=10|payoff=130": 18,
+    "round=5|own=10|peak=11|payoff=130": 10,
+    "round=5|own=10|peak=12|payoff=130": 9,
+    "round=5|own=10|peak=13|payoff=130": 2,
+    "round=5|own=10|peak=5|payoff=120": 9,
+    "round=5|own=10|peak=6|payoff=120": 15,
+    "round=5|own=10|peak=6|payoff=130": 5,
+    "round=5|own=10|peak=7|payoff=120": 9,
+    "round=5|own=10|peak=9|payoff=110": 15,
+    "round=5|own=10|peak=9|payoff=120": 9,
+    "round=5|own=11|peak=10|payoff=110": 10,
+    "round=5|own=11|peak=10|payoff=120": 4,
+    "round=5|own=11|peak=11|payoff=120": 16,
+    "round=5|own=11|peak=11|payoff=130": 18,
+    "round=5|own=11|peak=12|payoff=130": 19,
+    "round=5|own=11|peak=12|payoff=140": 4,
+    "round=5|own=11|peak=9|payoff=110": 13,
+    "round=5|own=12|peak=10|payoff=110": 13,
+    "round=5|own=12|peak=10|payoff=120": 13,
+    "round=5|own=12|peak=11|payoff=100": 20,
+    "round=5|own=12|peak=11|payoff=110": 8,
+    "round=5|own=12|peak=12|payoff=110": 2,
+    "round=5|own=12|peak=12|payoff=120": 2,
+    "round=5|own=12|peak=12|payoff=130": 20,
+    "round=5|own=12|peak=13|payoff=130": 19,
+    "round=5|own=12|peak=9|payoff=110": 7,
+    "round=5|own=12|peak=9|payoff=120": 6,
+    "round=5|own=13|peak=10|payoff=100": 15,
+    "round=5|own=13|peak=10|payoff=110": 14,
+    "round=5|own=13|peak=11|payoff=100": 8,
+    "round=5|own=13|peak=11|payoff=110": 9,
+    "round=5|own=13|peak=12|payoff=100": 17,
+    "round=5|own=13|peak=12|payoff=110": 20,
+    "round=5|own=13|peak=13|payoff=110": 12,
+    "round=5|own=13|peak=13|payoff=120": 2,
+    "round=5|own=13|peak=6|payoff=120": 5,
+    "round=5|own=13|peak=7|payoff=120": 6,
+    "round=5|own=13|peak=9|payoff=110": 9,
+    "round=5|own=13|peak=9|payoff=120": 11,
+    "round=5|own=14|peak=10|payoff=110": 2,
+    "round=5|own=14|peak=11|payoff=100": 8,
+    "round=5|own=14|peak=11|payoff=110": 18,
+    "round=5|own=14|peak=12|payoff=110": 7,
+    "round=5|own=14|peak=13|payoff=100": 18,
+    "round=5|own=14|peak=9|payoff=110": 11,
+    "round=5|own=15|peak=10|payoff=110": 12,
+    "round=5|own=15|peak=11|payoff=100": 7,
+    "round=5|own=15|peak=11|payoff=110": 20,
+    "round=5|own=15|peak=11|payoff=120": 19,
+    "round=5|own=15|peak=13|payoff=100": 2,
+    "round=5|own=15|peak=7|payoff=120": 15,
+    "round=5|own=15|peak=8|payoff=120": 18,
+    "round=5|own=15|peak=9|payoff=110": 1,
+    "round=5|own=15|peak=9|payoff=120": 7,
+    "round=5|own=16|peak=10|payoff=110": 18,
+    "round=5|own=16|peak=10|payoff=120": 6,
+    "round=5|own=16|peak=11|payoff=110": 19,
+    "round=5|own=16|peak=11|payoff=120": 8,
+    "round=5|own=16|peak=12|payoff=100": 5,
+    "round=5|own=16|peak=12|payoff=120": 17,
+    "round=5|own=16|peak=14|payoff=110": 10,
+    "round=5|own=16|peak=8|payoff=120": 2,
+    "round=5|own=16|peak=9|payoff=120": 11,
+    "round=5|own=17|peak=10|payoff=110": 7,
+    "round=5|own=17|peak=10|payoff=120": 6,
+    "round=5|own=17|peak=11|payoff=110": 18,
+    "round=5|own=17|peak=11|payoff=120": 12,
+    "round=5|own=17|peak=12|payoff=110": 3,
+    "round=5|own=17|peak=13|payoff=110": 12,
+    "round=5|own=17|peak=5|payoff=120": 17,
+    "round=5|own=17|peak=7|payoff=120": 8,
+    "round=5|own=17|peak=8|payoff=120": 10,
+    "round=5|own=17|peak=9|payoff=120": 12,
+    "round=5|own=18|peak=10|payoff=110": 5,
+    "round=5|own=18|peak=11|payoff=110": 4,
+    "round=5|own=18|peak=12|payoff=110": 13,
+    "round=5|own=18|peak=13|payoff=110": 1,
+    "round=5|own=18|peak=9|payoff=110": 15,
+    "round=5|own=19|peak=10|payoff=110": 16,
+    "round=5|own=19|peak=11|payoff=110": 5,
+    "round=5|own=19|peak=12|payoff=110": 19,
+    "round=5|own=19|peak=13|payoff=110": 7,
+    "round=5|own=19|peak=15|payoff=100": 8,
+    "round=5|own=19|peak=2|payoff=110": 11,
+    "round=5|own=19|peak=9|payoff=110": 3,
+    "round=5|own=1|peak=10|payoff=130": 21,
+    "round=5|own=1|peak=11|payoff=130": 12,
+    "round=5|own=1|peak=12|payoff=130": 9,
+    "round=5|own=1|peak=13|payoff=130": 7,
+    "round=5|own=1|peak=1|payoff=130": 16,
+    "round=5|own=1|peak=9|payoff=130": 4,
+    "round=5|own=20|peak=10|payoff=110": 1,
+    "round=5|own=20|peak=11|payoff=110": 3,
+    "round=5|own=20|peak=12|payoff=110": 14,
+    "round=5|own=20|peak=13|payoff=110": 10,
+    "round=5|own=20|peak=1|payoff=110": 4,
+    "round=5|own=20|peak=2|payoff=110": 18,
+    "round=5|own=20|peak=3|payoff=110": 10,
+    "round=5|own=20|peak=7|payoff=110": 2,
+    "round=5|own=20|peak=8|payoff=110": 13,
+    "round=5|own=20|peak=9|payoff=110": 3,
+    "round=5|own=21|peak=10|payoff=110": 8,
+    "round=5|own=21|peak=11|payoff=110": 4,
+    "round=5|own=21|peak=12|payoff=110": 4,
+    "round=5|own=21|peak=13|payoff=110": 12,
+    "round=5|own=21|peak=5|payoff=110": 3,
+    "round=5|own=21|peak=6|payoff=110": 11,
+    "round=5|own=21|peak=7|payoff=110": 2,
+    "round=5|own=21|peak=8|payoff=110": 13,
+    "round=5|own=21|peak=9|payoff=110": 12,
+    "round=5|own=2|peak=11|payoff=130": 8,
+    "round=5|own=2|peak=12|payoff=130": 18,
+    "round=5|own=2|peak=13|payoff=130": 21,
+    "round=5|own=2|peak=2|payoff=130": 20,
+    "round=5|own=2|peak=9|payoff=130": 15,
+    "round=5|own=3|peak=10|payoff=130": 19,
+    "round=5|own=3|peak=11|payoff=130": 3,
+    "round=5|own=3|peak=3|payoff=130": 5,
+    "round=5|own=3|peak=9|payoff=130": 3,
+    "round=5|own=4|peak=10|payoff=130": 9,
+    "round=5|own=4|peak=11|payoff=130": 6,
+    "round=5|own=4|peak=12|payoff=130": 1,
+    "round=5|own=4|peak=4|payoff=130": 4,
+    "round=5|own=4|peak=9|payoff=130": 2,
+    "round=5|own=5|peak=10|payoff=130": 16,
+    "round=5|own=5|peak=11|payoff=130": 11,
+    "round=5|own=5|peak=12|payoff=130": 5,
+    "round=5|own=5|peak=9|payoff=130": 11,
+    "round=5|own=6|peak=10|payoff=130": 7,
+    "round=5|own=6|peak=11|payoff=130": 20,
+    "round=5|own=6|peak=12|payoff=130": 8,
+    "round=5|own=6|peak=13|payoff=130": 13,
+    "round=5|own=6|peak=3|payoff=130": 19,
+    "round=5|own=6|peak=6|payoff=130": 15,
+    "round=5|own=6|peak=9|payoff=130": 8,
+    "round=5|own=7|peak=10|payoff=130": 7,
+    "round=5|own=7|peak=11|payoff=130": 18,
+    "round=5|own=7|peak=5|payoff=130": 20,
+    "round=5|own=7|peak=7|payoff=130": 14,
+    "round=5|own=7|peak=8|payoff=130": 12,
+    "round=5|own=8|peak=10|payoff=130": 15,
+    "round=5|own=8|peak=11|payoff=130": 9,
+    "round=5|own=8|peak=12|payoff=130": 7,
+    "round=5|own=8|peak=13|payoff=130": 8,
+    "round=5|own=8|peak=1|payoff=130": 19,
+    "round=5|own=8|peak=7|payoff=130": 6,
+    "round=5|own=8|peak=8|payoff=130": 18,
+    "round=5|own=8|peak=9|payoff=130": 11,
+    "round=5|own=9|peak=10|payoff=130": 12,
+    "round=5|own=9|peak=11|payoff=130": 18,
+    "round=5|own=9|peak=12|payoff=130": 17,
+    "round=5|own=9|peak=13|payoff=130": 10,
+    "round=5|own=9|peak=6|payoff=130": 21,
+    "round=5|own=9|peak=8|payoff=130": 7,
+    "round=5|own=9|peak=9|payoff=130": 11,
+    "round=6|own=10|peak=10|payoff=120": 16,
+    "round=6|own=10|peak=10|payoff=130": 20,
+    "round=6|own=10|peak=11|payoff=130": 20,
+    "round=6|own=10|peak=12|payoff=130": 16,
+    "round=6|own=10|peak=13|payoff=130": 8,
+    "round=6|own=10|peak=9|payoff=120": 10,
+    "round=6|own=11|peak=10|payoff=110": 2,
+    "round=6|own=11|peak=10|payoff=120": 15,
+    "round=6|own=11|peak=11|payoff=110": 18,
+    "round=6|own=11|peak=11|payoff=120": 17,
+    "round=6|own=11|peak=11|payoff=130": 8,
+    "round=6|own=11|peak=13|payoff=130": 9,
+    "round=6|own=11|peak=2|payoff=130": 9,
+    "round=6|own=11|peak=7|payoff=130": 19,
+    "round=6|own=11|peak=9|payoff=110": 17,
+    "round=6|own=11|peak=9|payoff=120": 12,
+    "round=6|own=12|peak=10|payoff=110": 1,
+    "round=6|own=12|peak=10|payoff=120": 20,
+    "round=6|own=12|peak=11|payoff=100": 13,
+    "round=6|own=12|peak=11|payoff=110": 9,
+    "round=6|own=12|peak=11|payoff=120": 3,
+    "round=6|own=12|peak=12|payoff=110": 21,
+    "round=6|own=12|peak=12|payoff=120": 18,
+    "round=6|own=12|peak=8|payoff=120": 4,
+    "round=6|own=12|peak=9|payoff=110": 6,
+    "round=6|own=12|peak=9|payoff=120": 14,
+    "round=6|own=12|peak=9|payoff=130": 15,
+    "round=6|own=13|peak=10|payoff=110": 6,
+    "round=6|own=13|peak=11|payoff=100": 2,
+    "round=6|own=13|peak=11|payoff=110": 8,
+    "round=6|own=13|peak=12|payoff=100": 8,
+    "round=6|own=13|peak=13|payoff=110": 5,
+    "round=6|own=13|peak=13|payoff=120": 7,
+    "round=6|own=13|peak=6|payoff=120": 17,
+    "round=6|own=13|peak=9|payoff=110": 15,
+    "round=6|own=14|peak=10|payoff=110": 2,
+    "round=6|own=14|peak=11|payoff=100": 20,
+    "round=6|own=14|peak=11|payoff=110": 21,
+    "round=6|own=14|peak=11|payoff=120": 1,
+    "round=6|own=14|peak=12|payoff=100": 8,
+    "round=6|own=14|peak=12|payoff=110": 8,
+    "round=6|own=14|peak=13|payoff=110": 20,
+    "round=6|own=14|peak=6|payoff=130": 21,
+    "round=6|own=14|peak=7|payoff=120": 6,
+    "round=6|own=14|peak=8|payoff=120": 12,
+    "round=6|own=14|peak=9|payoff=110": 12,
+    "round=6|own=14|peak=9|payoff=120": 20,
+    "round=6|own=15|peak=11|payoff=100": 5,
+    "round=6|own=15|peak=11|payoff=110": 14,
+    "round=6|own=15|peak=11|payoff=120": 8,
+    "round=6|own=15|peak=12|payoff=100": 3,
+    "round=6|own=15|peak=12|payoff=120": 12,
+    "round=6|own=15|peak=13|payoff=110": 11,
+    "round=6|own=15|peak=6|payoff=120": 14,
+    "round=6|own=15|peak=7|payoff=120": 7,
+    "round=6|own=15|peak=9|payoff=110": 2,
+    "round=6|own=16|peak=11|payoff=120": 21,
+    "round=6|own=16|peak=12|payoff=100": 14,
+    "round=6|own=16|peak=13|payoff=120": 15,
+    "round=6|own=16|peak=1|payoff=120": 3,
+    "round=6|own=16|peak=9|payoff=120": 6,
+    "round=6|own=17|peak=11|payoff=110": 1,
+    "round=6|own=17|peak=12|payoff=110": 21,
+    "round=6|own=17|peak=13|payoff=110": 6,
+    "round=6|own=17|peak=4|payoff=120": 12,
+    "round=6|own=17|peak=5|payoff=120": 21,
+    "round=6|own=17|peak=9|payoff=120": 13,
+    "round=6|own=18|peak=10|payoff=110": 9,
+    "round=6|own=18|peak=11|payoff=110": 16,
+    "round=6|own=18|peak=12|payoff=110": 3,
+    "round=6|own=18|peak=13|payoff=110": 15,
+    "round=6|own=18|peak=1|payoff=110": 19,
+    "round=6|own=18|peak=3|payoff=110": 17,
+    "round=6|own=18|peak=6|payoff=110": 4,
+    "round=6|own=18|peak=9|payoff=110": 19,
+    "round=6|own=19|peak=10|payoff=110": 3,
+    "round=6|own=19|peak=11|payoff=110": 1,
+    "round=6|own=19|peak=12|payoff=110": 19,
+    "round=6|own=19|peak=13|payoff=110": 18,
+    "round=6|own=19|peak=1|payoff=110": 11,
+    "round=6|own=19|peak=2|payoff=110": 15,
+    "round=6|own=19|peak=7|payoff=110": 16,
+    "round=6|own=19|peak=8|payoff=110": 2,
+    "round=6|own=19|peak=9|payoff=110": 5,
+    "round=6|own=1|peak=10|payoff=130": 11,
+    "round=6|own=1|peak=11|payoff=130": 8,
+    "round=6|own=1|peak=12|payoff=130": 5,
+    "round=6|own=1|peak=13|payoff=130": 14,
+    "round=6|own=1|peak=14|payoff=130": 17,
+    "round=6|own=1|peak=1|payoff=130": 18,
+    "round=6|own=1|peak=9|payoff=130": 12,
+    "round=6|own=20|peak=11|payoff=110": 17,
+    "round=6|own=20|peak=12|payoff=110": 18,
+    "round=6|own=20|peak=13|payoff=110": 17,
+    "round=6|own=20|peak=1|payoff=110": 13,
+    "round=6|own=20|peak=5|payoff=110": 8,
+    "round=6|own=20|peak=8|payoff=110": 10,
+    "round=6|own=20|peak=9|payoff=110": 8,
+    "round=6|own=21|peak=10|payoff=110": 12,
+    "round=6|own=21|peak=11|payoff=110": 5,
+    "round=6|own=21|peak=13|payoff=110": 9,
+    "round=6|own=21|peak=1|payoff=110": 5,
+    "round=6|own=21|peak=2|payoff=110": 14,
+    "round=6|own=21|peak=8|payoff=110": 13,
+    "round=6|own=21|peak=9|payoff=110": 6,
+    "round=6|own=2|peak=10|payoff=130": 6,
+    "round=6|own=2|peak=11|payoff=130": 9,
+    "round=6|own=2|peak=12|payoff=130": 15,
+    "round=6|own=2|peak=13|payoff=130": 14,
+    "round=6|own=2|peak=2|payoff=130": 20,
+    "round=6|own=2|peak=8|payoff=130": 3,
+    "round=6|own=2|peak=9|payoff=130": 4,
+    "round=6|own=3|peak=10|payoff=130": 13,
+    "round=6|own=3|peak=11|payoff=130": 17,
+    "round=6|own=3|peak=12|payoff=130": 8,
+    "round=6|own=3|peak=13|payoff=130": 3,
+    "round=6|own=3|peak=3|payoff=130": 10,
+    "round=6|own=3|peak=7|payoff=130": 16,
+    "round=6|own=3|peak=8|payoff=130": 10,
+    "round=6|own=3|peak=9|payoff=130": 1,
+    "round=6|own=4|peak=10|payoff=130": 10,
+    "round=6|own=4|peak=11|payoff=130": 4,
+    "round=6|own=4|peak=12|payoff=130": 19,
+    "round=6|own=4|peak=1|payoff=130": 19,
+    "round=6|own=4|peak=4|payoff=130": 13,
+    "round=6|own=4|peak=5|payoff=130": 19,
+    "round=6|own=4|peak=9|payoff=130": 3,
+    "round=6|own=5|peak=10|payoff=130": 13,
+    "round=6|own=5|peak=11|payoff=130": 15,
+    "round=6|own=5|peak=12|payoff=130": 9,
+    "round=6|own=5|peak=1|payoff=130": 21,
+    "round=6|own=5|peak=2|payoff=130": 16,
+    "round=6|own=5|peak=4|payoff=130": 11,
+    "round=6|own=5|peak=5|payoff=130": 4,
+    "round=6|own=5|peak=6|payoff=130": 7,
+    "round=6|own=5|peak=9|payoff=130": 2,
+    "round=6|own=6|peak=10|payoff=130": 12,
+    "round=6|own=6|peak=11|payoff=130": 7,
+    "round=6|own=6|peak=6|payoff=130": 17,
+    "round=6|own=6|peak=9|payoff=130": 11,
+    "round=6|own=7|peak=10|payoff=130": 8,
+    "round=6|own=7|peak=11|payoff=130": 4,
+    "round=6|own=7|peak=12|payoff=130": 3,
+    "round=6|own=7|peak=14|payoff=130": 12,
+    "round=6|own=7|peak=7|payoff=130": 17,
+    "round=6|own=7|peak=8|payoff=130": 17,
+    "round=6|own=7|peak=9|payoff=130": 17,
+    "round=6|own=8|peak=10|payoff=130": 4,
+    "round=6|own=8|peak=11|payoff=130": 3,
+    "round=6|own=8|peak=12|payoff=130": 19,
+    "round=6|own=8|peak=13|payoff=130": 5,
+    "round=6|own=8|peak=7|payoff=120": 21,
+    "round=6|own=8|peak=7|payoff=130": 7,
+    "round=6|own=8|peak=8|payoff=130": 2,
+    "round=6|own=8|peak=9|payoff=130": 12,
+    "round=6|own=9|peak=10|payoff=130": 4,
+    "round=6|own=9|peak=11|payoff=130": 21,
+    "round=6|own=9|peak=12|payoff=130": 5,
+    "round=6|own=9|peak=13|payoff=130": 20,
+    "round=6|own=9|peak=1|payoff=130": 6,
+    "round=6|own=9|peak=7|payoff=130": 19,
+    "round=6|own=9|peak=8|payoff=130": 21,
+    "round=6|own=9|peak=9|payoff=130": 10,
+    "round=7|own=10|peak=10|payoff=120": 6,
+    "round=7|own=10|peak=10|payoff=130": 20,
+    "round=7|own=10|peak=11|payoff=130": 15,
+    "round=7|own=10|peak=1|payoff=130": 7,
+    "round=7|own=10|peak=5|payoff=130": 5,
+    "round=7|own=10|peak=6|payoff=130": 19,
+    "round=7|own=10|peak=7|payoff=120": 9,
+    "round=7|own=10|peak=9|payoff=110": 1,
+    "round=7|own=10|peak=9|payoff=120": 20,
+    "round=7|own=11|peak=10|payoff=110": 6,
+    "round=7|own=11|peak=11|payoff=120": 2,
+    "round=7|own=11|peak=11|payoff=130": 16,
+    "round=7|own=11|peak=6|payoff=130": 17,
+    "round=7|own=12|peak=10|payoff=110": 9,
+    "round=7|own=12|peak=10|payoff=120": 1,
+    "round=7|own=12|peak=11|payoff=110": 4,
+    "round=7|own=12|peak=11|payoff=120": 15,
+    "round=7|own=12|peak=12|payoff=110": 2,
+    "round=7|own=12|peak=12|payoff=120": 7,
+    "round=7|own=12|peak=13|payoff=130": 9,
+    "round=7|own=12|peak=7|payoff=120": 11,
+    "round=7|own=12|peak=7|payoff=130": 20,
+    "round=7|own=12|peak=9|payoff=110": 5,
+    "round=7|own=12|peak=9|payoff=120": 10,
+    "round=7|own=13|peak=10|payoff=100": 16,
+    "round=7|own=13|peak=10|payoff=110": 17,
+    "round=7|own=13|peak=11|payoff=100": 20,
+    "round=7|own=13|peak=11|payoff=110": 18,
+    "round=7|own=13|peak=12|payoff=100": 10,
+    "round=7|own=13|peak=12|payoff=110": 19,
+    "round=7|own=13|peak=13|payoff=110": 2,
+    "round=7|own=13|peak=1|payoff=130": 10,
+    "round=7|own=13|peak=9|payoff=110": 19,
+    "round=7|own=14|peak=10|payoff=110": 3,
+    "round=7|own=14|peak=10|payoff=120": 6,
+    "round=7|own=14|peak=11|payoff=100": 9,
+    "round=7|own=14|peak=11|payoff=110": 17,
+    "round=7|own=14|peak=11|payoff=120": 9,
+    "round=7|own=14|peak=12|payoff=100": 21,
+    "round=7|own=14|peak=13|payoff=110": 3,
+    "round=7|own=14|peak=14|payoff=120": 14,
+    "round=7|own=14|peak=9|payoff=110": 12,
+    "round=7|own=15|peak=10|payoff=110": 12,
+    "round=7|own=15|peak=10|payoff=120": 18,
+    "round=7|own=15|peak=11|payoff=100": 19,
+    "round=7|own=15|peak=11|payoff=110": 16,
+    "round=7|own=15|peak=12|payoff=100": 17,
+    "round=7|own=15|peak=12|payoff=110": 14,
+    "round=7|own=15|peak=13|payoff=100": 9,
+    "round=7|own=15|peak=13|payoff=110": 12,
+    "round=7|own=15|peak=15|payoff=110": 15,
+    "round=7|own=15|peak=15|payoff=120": 5,
+    "round=7|own=15|peak=1|payoff=120": 3,
+    "round=7|own=15|peak=8|payoff=110": 9,
+    "round=7|own=15|peak=9|payoff=110": 4,
+    "round=7|own=16|peak=10|payoff=110": 17,
+    "round=7|own=16|peak=11|payoff=110": 7,
+    "round=7|own=16|peak=11|payoff=120": 11,
+    "round=7|own=16|peak=12|payoff=100": 19,
+    "round=7|own=16|peak=12|payoff=110": 19,
+    "round=7|own=16|peak=12|payoff=120": 7,
+    "round=7|own=16|peak=13|payoff=110": 2,
+    "round=7|own=16|peak=13|payoff=120": 20,
+    "round=7|own=16|peak=1|payoff=120": 15,
+    "round=7|own=16|peak=7|payoff=120": 1,
+    "round=7|own=16|peak=9|payoff=120": 9,
+    "round=7|own=17|peak=10|payoff=110": 14,
+    "round=7|own=17|peak=10|payoff=120": 21,
+    "round=7|own=17|peak=11|payoff=110": 4,
+    "round=7|own=17|peak=11|payoff=120": 3,
+    "round=7|own=17|peak=12|payoff=110": 7,
+    "round=7|own=17|peak=12|payoff=120": 21,
+    "round=7|own=17|peak=13|payoff=110": 14,
+    "round=7|own=17|peak=13|payoff=120": 4,
+    "round=7|own=17|peak=5|payoff=120": 19,
+    "round=7|own=17|peak=6|payoff=120": 6,
+    "round=7|own=17|peak=7|payoff=120": 4,
+    "round=7|own=17|peak=8|payoff=120": 14,
+    "round=7|own=17|peak=9|payoff=120": 6,
+    "round=7|own=18|peak=10|payoff=110": 7,
+    "round=7|own=18|peak=11|payoff=110": 18,
+    "round=7|own=18|peak=12|payoff=110": 5,
+    "round=7|own=18|peak=1|payoff=110": 10,
+    "round=7|own=18|peak=9|payoff=110": 5,
+    "round=7|own=19|peak=10|payoff=110": 8,
+    "round=7|own=19|peak=11|payoff=110": 6,
+    "round=7|own=19|peak=12|payoff=110": 16,
+    "round=7|own=19|peak=13|payoff=110": 4,
+    "round=7|own=19|peak=1|payoff=110": 18,
+    "round=7|own=19|peak=5|payoff=110": 9,
+    "round=7|own=19|peak=6|payoff=110": 10,
+    "round=7|own=19|peak=7|payoff=110": 16,
+    "round=7|own=19|peak=9|payoff=110": 20,
+    "round=7|own=1|peak=10|payoff=130": 10,
+    "round=7|own=1|peak=11|payoff=130": 18,
+    "round=7|own=1|peak=13|payoff=130": 6,
+    "round=7|own=1|peak=1|payoff=130": 7,
+    "round=7|own=1|peak=9|payoff=130": 8,
+    "round=7|own=20|peak=10|payoff=110": 17,
+    "round=7|own=20|peak=11|payoff=110": 12,
+    "round=7|own=20|peak=12|payoff=110": 11,
+    "round=7|own=20|peak=13|payoff=100": 4,
+    "round=7|own=20|peak=13|payoff=110": 4,
+    "round=7|own=20|peak=2|payoff=110": 16,
+    "round=7|own=20|peak=3|payoff=110": 12,
+    "round=7|own=20|peak=8|payoff=110": 15,
+    "round=7|own=20|peak=9|payoff=110": 17,
+    "round=7|own=21|peak=10|payoff=110": 18,
+    "round=7|own=21|peak=11|payoff=110": 9,
+    "round=7|own=21|peak=13|payoff=110": 5,
+    "round=7|own=21|peak=5|payoff=110": 10,
+    "round=7|own=21|peak=6|payoff=110": 5,
+    "round=7|own=21|peak=7|payoff=110": 11,
+    "round=7|own=21|peak=9|payoff=110": 10,
+    "round=7|own=2|peak=10|payoff=130": 1,
+    "round=7|own=2|peak=11|payoff=130": 14,
+    "round=7|own=2|peak=13|payoff=130": 6,
+    "round=7|own=2|peak=2|payoff=130": 12,
+    "round=7|own=2|peak=8|payoff=130": 21,
+    "round=7|own=2|peak=9|payoff=130": 17,
+    "round=7|own=3|peak=10|payoff=130": 7,
+    "round=7|own=3|peak=11|payoff=130": 18,
+    "round=7|own=3|peak=12|payoff=130": 3,
+    "round=7|own=3|peak=13|payoff=130": 2,
+    "round=7|own=3|peak=3|payoff=130": 11,
+    "round=7|own=3|peak=9|payoff=130": 13,
+    "round=7|own=4|peak=10|payoff=130": 14,
+    "round=7|own=4|peak=11|payoff=130": 15,
+    "round=7|own=4|peak=12|payoff=130": 6,
+    "round=7|own=4|peak=13|payoff=130": 7,
+    "round=7|own=4|peak=4|payoff=130": 17,
+    "round=7|own=4|peak=9|payoff=130": 10,
+    "round=7|own=5|peak=10|payoff=130": 13,
+    "round=7|own=5|peak=11|payoff=130": 16,
+    "round=7|own=5|peak=12|payoff=130": 8,
+    "round=7|own=5|peak=1|payoff=130": 2,
+    "round=7|own=5|peak=5|payoff=130": 17,
+    "round=7|own=5|peak=9|payoff=130": 2,
+    "round=7|own=6|peak=10|payoff=130": 20,
+    "round=7|own=6|peak=11|payoff=130": 13,
+    "round=7|own=6|peak=12|payoff=130": 17,
+    "round=7|own=6|peak=6|payoff=130": 3,
+    "round=7|own=6|peak=7|payoff=130": 4,
+    "round=7|own=6|peak=8|payoff=130": 7,
+    "round=7|own=6|peak=9|payoff=130": 2,
+    "round=7|own=7|peak=10|payoff=130": 18,
+    "round=7|own=7|peak=11|payoff=130": 12,
+    "round=7|own=7|peak=12|payoff=130": 18,
+    "round=7|own=7|peak=13|payoff=130": 7,
+    "round=7|own=7|peak=6|payoff=130": 3,
+    "round=7|own=7|peak=7|payoff=130": 15,
+    "round=7|own=8|peak=10|payoff=130": 21,
+    "round=7|own=8|peak=11|payoff=130": 11,
+    "round=7|own=8|peak=12|payoff=130": 5,
+    "round=7|own=8|peak=13|payoff=130": 1,
+    "round=7|own=8|peak=3|payoff=130": 7,
+    "round=7|own=8|peak=8|payoff=130": 18,
+    "round=7|own=9|peak=10|payoff=130": 20,
+    "round=7|own=9|peak=11|payoff=130": 18,
+    "round=7|own=9|peak=12|payoff=130": 3,
+    "round=7|own=9|peak=8|payoff=130": 10,
+    "round=7|own=9|peak=9|payoff=130": 13,
+    "round=8|own=10|peak=10|payoff=120": 3,
+    "round=8|own=10|peak=10|payoff=130": 17,
+    "round=8|own=10|peak=11|payoff=130": 7,
+    "round=8|own=10|peak=12|payoff=130": 8,
+    "round=8|own=10|peak=13|payoff=130": 12,
+    "round=8|own=10|peak=14|payoff=130": 7,
+    "round=8|own=10|peak=1|payoff=130": 2,
+    "round=8|own=10|peak=4|payoff=130": 11,
+    "round=8|own=10|peak=8|payoff=130": 7,
+    "round=8|own=10|peak=9|payoff=120": 10,
+    "round=8|own=11|peak=10|payoff=120": 7,
+    "round=8|own=11|peak=11|payoff=110": 14,
+    "round=8|own=11|peak=11|payoff=120": 18,
+    "round=8|own=11|peak=11|payoff=130": 12,
+    "round=8|own=11|peak=12|payoff=130": 15,
+    "round=8|own=11|peak=12|payoff=140": 20,
+    "round=8|own=11|peak=13|payoff=130": 3,
+    "round=8|own=11|peak=3|payoff=140": 3,
+    "round=8|own=11|peak=9|payoff=110": 13,
+    "round=8|own=11|peak=9|payoff=120": 18,
+    "round=8|own=11|peak=9|payoff=130": 14,
+    "round=8|own=12|peak=10|payoff=110": 7,
+    "round=8|own=12|peak=10|payoff=120": 19,
+    "round=8|own=12|peak=11|payoff=100": 10,
+    "round=8|own=12|peak=11|payoff=110": 8,
+    "round=8|own=12|peak=12|payoff=110": 13,
+    "round=8|own=12|peak=12|payoff=120": 7,
+    "round=8|own=12|peak=12|payoff=130": 10,
+    "round=8|own=12|peak=2|payoff=120": 7,
+    "round=8|own=12|peak=2|payoff=130": 1,
+    "round=8|own=12|peak=7|payoff=130": 18,
+    "round=8|own=12|peak=8|payoff=120": 15,
+    "round=8|own=12|peak=9|payoff=110": 8,
+    "round=8|own=12|peak=9|payoff=120": 14,
+    "round=8|own=13|peak=10|payoff=100": 5,
+    "round=8|own=13|peak=10|payoff=110": 20,
+    "round=8|own=13|peak=11|payoff=100": 13,
+    "round=8|own=13|peak=11|payoff=110": 7,
+    "round=8|own=13|peak=11|payoff=120": 18,
+    "round=8|own=13|peak=12|payoff=100": 12,
+    "round=8|own=13|peak=12|payoff=110": 1,
+    "round=8|own=13|peak=13|payoff=110": 15,
+    "round=8|own=13|peak=13|payoff=120": 13,
+    "round=8|own=13|peak=8|payoff=110": 6,
+    "round=8|own=13|peak=9|payoff=110": 1,
+    "round=8|own=13|peak=9|payoff=120": 2,
+    "round=8|own=14|peak=10|payoff=110": 6,
+    "round=8|own=14|peak=11|payoff=100": 15,
+    "round=8|own=14|peak=11|payoff=110": 3,
+    "round=8|own=14|peak=12|payoff=110": 18,
+    "round=8|own=14|peak=13|payoff=110": 13,
+    "round=8|own=14|peak=14|payoff=120": 16,
+    "round=8|own=14|peak=9|payoff=110": 6,
+    "round=8|own=14|peak=9|payoff=120": 9,
+    "round=8|own=15|peak=10|payoff=110": 18,
+    "round=8|own=15|peak=11|payoff=110": 5,
+    "round=8|own=15|peak=11|payoff=120": 3,
+    "round=8|own=15|peak=12|payoff=110": 1,
+    "round=8|own=15|peak=13|payoff=110": 16,
+    "round=8|own=15|peak=7|payoff=120": 5,
+    "round=8|own=15|peak=9|payoff=110": 9,
+    "round=8|own=15|peak=9|payoff=120": 6,
+    "round=8|own=16|peak=10|payoff=110": 14,
+    "round=8|own=16|peak=10|payoff=120": 14,
+    "round=8|own=16|peak=11|payoff=110": 8,
+    "round=8|own=16|peak=11|payoff=120": 21,
+    "round=8|own=16|peak=12|payoff=100": 3,
+    "round=8|own=16|peak=12|payoff=110": 5,
+    "round=8|own=16|peak=12|payoff=120": 13,
+    "round=8|own=16|peak=13|payoff=110": 4,
+    "round=8|own=16|peak=13|payoff=120": 3,
+    "round=8|own=16|peak=5|payoff=120": 11,
+    "round=8|own=16|peak=8|payoff=120": 9,
+    "round=8|own=17|peak=10|payoff=110": 12,
+    "round=8|own=17|peak=10|payoff=120": 14,
+    "round=8|own=17|peak=11|payoff=110": 12,
+    "round=8|own=17|peak=11|payoff=120": 3,
+    "round=8|own=17|peak=13|payoff=110": 19,
+    "round=8|own=17|peak=3|payoff=120": 12,
+    "round=8|own=17|peak=4|payoff=120": 7,
+    "round=8|own=17|peak=5|payoff=120": 6,
+    "round=8|own=17|peak=7|payoff=120": 3,
+    "round=8|own=17|peak=8|payoff=120": 18,
+    "round=8|own=17|peak=9|payoff=120": 3,
+    "round=8|own=18|peak=10|payoff=110": 19,
+    "round=8|own=18|peak=11|payoff=110": 14,
+    "round=8|own=18|peak=12|payoff=100": 14,
+    "round=8|own=18|peak=12|payoff=110": 15,
+    "round=8|own=18|peak=13|payoff=110": 18,
+    "round=8|own=18|peak=3|payoff=110": 11,
+    "round=8|own=18|peak=4|payoff=110": 12,
+    "round=8|own=18|peak=7|payoff=110": 6,
+    "round=8|own=18|peak=8|payoff=110": 8,
+    "round=8|own=18|peak=9|payoff=110": 17,
+    "round=8|own=19|peak=10|payoff=110": 21,
+    "round=8|own=19|peak=11|payoff=110": 17,
+    "round=8|own=19|peak=12|payoff=110": 9,
+    "round=8|own=19|peak=5|payoff=110": 17,
+    "round=8|own=19|peak=7|payoff=110": 4,
+    "round=8|own=19|peak=9|payoff=110": 2,
+    "round=8|own=1|peak=10|payoff=130": 2,
+    "round=8|own=1|peak=11|payoff=130": 4,
+    "round=8|own=1|peak=13|payoff=130": 13,
+    "round=8|own=1|peak=1|payoff=130": 20,
+    "round=8|own=20|peak=10|payoff=110": 16,
+    "round=8|own=20|peak=11|payoff=110": 8,
+    "round=8|own=20|peak=12|payoff=110": 6,
+    "round=8|own=20|peak=13|payoff=110": 14,
+    "round=8|own=20|peak=6|payoff=110": 19,
+    "round=8|own=20|peak=8|payoff=110": 3,
+    "round=8|own=20|peak=9|payoff=110": 6,
+    "round=8|own=21|peak=10|payoff=110": 11,
+    "round=8|own=21|peak=11|payoff=110": 8,
+    "round=8|own=21|peak=12|payoff=110": 14,
+    "round=8|own=21|peak=5|payoff=110": 6,
+    "round=8|own=21|peak=9|payoff=110": 6,
+    "round=8|own=2|peak=10|payoff=130": 5,
+    "round=8|own=2|peak=11|payoff=130": 17,
+    "round=8|own=2|peak=12|payoff=130": 19,
+    "round=8|own=2|peak=13|payoff=130": 11,
+    "round=8|own=2|peak=1|payoff=130": 18,
+    "round=8|own=2|peak=2|payoff=130": 6,
+    "round=8|own=2|peak=9|payoff=130": 14,
+    "round=8|own=3|peak=10|payoff=130": 12,
+    "round=8|own=3|peak=11|payoff=130": 15,
+    "round=8|own=3|peak=13|payoff=130": 20,
+    "round=8|own=3|peak=3|payoff=130": 8,
+    "round=8|own=3|peak=9|payoff=130": 11,
+    "round=8|own=4|peak=10|payoff=130": 1,
+    "round=8|own=4|peak=11|payoff=130": 8,
+    "round=8|own=4|peak=12|payoff=130": 5,
+    "round=8|own=4|peak=13|payoff=130": 13,
+    "round=8|own=4|peak=14|payoff=130": 3,
+    "round=8|own=4|peak=3|payoff=130": 8,
+    "round=8|own=4|peak=4|payoff=130": 20,
+    "round=8|own=4|peak=9|payoff=130": 14,
+    "round=8|own=5|peak=10|payoff=130": 21,
+    "round=8|own=5|peak=11|payoff=130": 8,
+    "round=8|own=5|peak=12|payoff=130": 3,
+    "round=8|own=5|peak=5|payoff=130": 21,
+    "round=8|own=5|peak=9|payoff=130": 5,
+    "round=8|own=6|peak=11|payoff=130": 3,
+    "round=8|own=6|peak=12|payoff=130": 1,
+    "round=8|own=6|peak=13|payoff=130": 18,
+    "round=8|own=6|peak=4|payoff=130": 6,
+    "round=8|own=6|peak=6|payoff=130": 8,
+    "round=8|own=6|peak=7|payoff=130": 2,
+    "round=8|own=6|peak=9|payoff=130": 8,
+    "round=8|own=7|peak=10|payoff=130": 16,
+    "round=8|own=7|peak=11|payoff=130": 2,
+    "round=8|own=7|peak=13|payoff=130": 1,
+    "round=8|own=7|peak=1|payoff=130": 18,
+    "round=8|own=7|peak=2|payoff=130": 7,
+    "round=8|own=7|peak=7|payoff=130": 12,
+    "round=8|own=7|peak=9|payoff=130": 7,
+    "round=8|own=8|peak=10|payoff=130": 4,
+    "round=8|own=8|peak=12|payoff=130": 21,
+    "round=8|own=8|peak=13|payoff=130": 9,
+    "round=8|own=8|peak=14|payoff=130": 14,
+    "round=8|own=8|peak=8|payoff=130": 9,
+    "round=8|own=8|peak=9|payoff=130": 6,
+    "round=8|own=9|peak=10|payoff=130": 3,
+    "round=8|own=9|peak=11|payoff=130": 9,
+    "round=8|own=9|peak=13|payoff=130": 11,
+    "round=8|own=9|peak=7|payoff=130": 16,
+    "round=8|own=9|peak=9|payoff=130": 14,
+    "round=9|own=10|peak=10|payoff=120": 3,
+    "round=9|own=10|peak=10|payoff=130": 16,
+    "round=9|own=10|peak=11|payoff=130": 20,
+    "round=9|own=10|peak=12|payoff=130": 5,
+    "round=9|own=10|peak=13|payoff=130": 18,
+    "round=9|own=10|peak=4|payoff=130": 3,
+    "round=9|own=10|peak=6|payoff=130": 10,
+    "round=9|own=10|peak=7|payoff=130": 1,
+    "round=9|own=10|peak=8|payoff=130": 7,
+    "round=9|own=10|peak=9|payoff=110": 17,
+    "round=9|own=10|peak=9|payoff=120": 20,
+    "round=9|own=10|peak=9|payoff=130": 2,
+    "round=9|own=11|peak=10|payoff=110": 21,
+    "round=9|own=11|peak=10|payoff=120": 20,
+    "round=9|own=11|peak=11|payoff=120": 13,
+    "round=9|own=11|peak=11|payoff=130": 9,
+    "round=9|own=11|peak=12|payoff=130": 5,
+    "round=9|own=11|peak=12|payoff=140": 20,
+    "round=9|own=11|peak=13|payoff=130": 2,
+    "round=9|own=11|peak=1|payoff=140": 4,
+    "round=9|own=11|peak=9|payoff=110": 18,
+    "round=9|own=11|peak=9|payoff=120": 5,
+    "round=9|own=12|peak=10|payoff=110": 19,
+    "round=9|own=12|peak=10|payoff=120": 4,
+    "round=9|own=12|peak=11|payoff=110": 11,
+    "round=9|own=12|peak=11|payoff=120": 21,
+    "round=9|own=12|peak=12|payoff=110": 7,
+    "round=9|own=12|peak=12|payoff=120": 16,
+    "round=9|own=12|peak=12|payoff=130": 8,
+    "round=9|own=12|peak=13|payoff=120": 19,
+    "round=9|own=12|peak=13|payoff=130": 6,
+    "round=9|own=12|peak=3|payoff=130": 10,
+    "round=9|own=12|peak=5|payoff=120": 13,
+    "round=9|own=12|peak=5|payoff=130": 17,
+    "round=9|own=12|peak=7|payoff=120": 6,
+    "round=9|own=12|peak=8|payoff=130": 15,
+    "round=9|own=12|peak=9|payoff=110": 5,
+    "round=9|own=12|peak=9|payoff=120": 13,
+    "round=9|own=13|peak=10|payoff=100": 2,
+    "round=9|own=13|peak=10|payoff=110": 10,
+    "round=9|own=13|peak=11|payoff=100": 1,
+    "round=9|own=13|peak=11|payoff=110": 5,
+    "round=9|own=13|peak=11|payoff=120": 18,
+    "round=9|own=13|peak=12|payoff=100": 5,
+    "round=9|own=13|peak=12|payoff=110": 9,
+    "round=9|own=13|peak=13|payoff=110": 10,
+    "round=9|own=13|peak=13|payoff=120": 17,
+    "round=9|own=13|peak=13|payoff=130": 5,
+    "round=9|own=13|peak=14|payoff=120": 3,
+    "round=9|own=13|peak=3|payoff=120": 15,
+    "round=9|own=13|peak=4|payoff=130": 11,
+    "round=9|own=13|peak=5|payoff=120": 9,
+    "round=9|own=13|peak=7|payoff=120": 6,
+    "round=9|own=13|peak=9|payoff=110": 16,
+    "round=9|own=13|peak=9|payoff=120": 9,
+    "round=9|own=14|peak=10|payoff=110": 19,
+    "round=9|own=14|peak=10|payoff=120": 6,
+    "round=9|own=14|peak=11|payoff=100": 11,
+    "round=9|own=14|peak=11|payoff=110": 7,
+    "round=9|own=14|peak=11|payoff=120": 12,
+    "round=9|own=14|peak=12|payoff=110": 11,
+    "round=9|own=14|peak=13|payoff=100": 20,
+    "round=9|own=14|peak=13|payoff=110": 20,
+    "round=9|own=14|peak=1|payoff=120": 10,
+    "round=9|own=14|peak=5|payoff=130": 3,
+    "round=9|own=14|peak=7|payoff=110": 13,
+    "round=9|own=14|peak=8|payoff=120": 10,
+    "round=9|own=14|peak=9|payoff=110": 7,
+    "round=9|own=14|peak=9|payoff=120": 14,
+    "round=9|own=15|peak=10|payoff=110": 9,
+    "round=9|own=15|peak=10|payoff=120": 11,
+    "round=9|own=15|peak=11|payoff=100": 3,
+    "round=9|own=15|peak=11|payoff=110": 7,
+    "round=9|own=15|peak=12|payoff=110": 11,
+    "round=9|own=15|peak=13|payoff=100": 10,
+    "round=9|own=15|peak=13|payoff=110": 13,
+    "round=9|own=15|peak=14|payoff=110": 13,
+    "round=9|own=15|peak=2|payoff=120": 20,
+    "round=9|own=15|peak=7|payoff=120": 3,
+    "round=9|own=15|peak=9|payoff=110": 13,
+    "round=9|own=16|peak=10|payoff=110": 17,
+    "round=9|own=16|peak=10|payoff=120": 16,
+    "round=9|own=16|peak=11|payoff=110": 20,
+    "round=9|own=16|peak=11|payoff=120": 4,
+    "round=9|own=16|peak=12|payoff=100": 4,
+    "round=9|own=16|peak=12|payoff=110": 5,
+    "round=9|own=16|peak=12|payoff=120": 4,
+    "round=9|own=16|peak=13|payoff=110": 11,
+    "round=9|own=16|peak=13|payoff=120": 9,
+    "round=9|own=16|peak=16|payoff=110": 13,
+    "round=9|own=16|peak=7|payoff=120": 11,
+    "round=9|own=16|peak=8|payoff=120": 2,
+    "round=9|own=16|peak=9|payoff=120": 3,
+    "round=9|own=17|peak=10|payoff=110": 20,
+    "round=9|own=17|peak=10|payoff=120": 8,
+    "round=9|own=17|peak=11|payoff=110": 16,
+    "round=9|own=17|peak=11|payoff=120": 13,
+    "round=9|own=17|peak=12|payoff=110": 14,
+    "round=9|own=17|peak=12|payoff=120": 12,
+    "round=9|own=17|peak=13|payoff=110": 19,
+    "round=9|own=17|peak=13|payoff=120": 15,
+    "round=9|own=17|peak=1|payoff=120": 3,
+    "round=9|own=17|peak=5|payoff=120": 4,
+    "round=9|own=17|peak=7|payoff=120": 5,
+    "round=9|own=17|peak=8|payoff=120": 7,
+    "round=9|own=17|peak=9|payoff=120": 11,
+    "round=9|own=18|peak=10|payoff=110": 12,
+    "round=9|own=18|peak=11|payoff=110": 21,
+    "round=9|own=18|peak=12|payoff=110": 13,
+    "round=9|own=18|peak=13|payoff=110": 12,
+    "round=9|own=18|peak=1|payoff=110": 18,
+    "round=9|own=18|peak=3|payoff=110": 3,
+    "round=9|own=18|peak=4|payoff=110": 8,
+    "round=9|own=18|peak=6|payoff=110": 7,
+    "round=9|own=18|peak=8|payoff=110": 13,
+    "round=9|own=18|peak=9|payoff=110": 21,
+    "round=9|own=19|peak=10|payoff=110": 11,
+    "round=9|own=19|peak=11|payoff=110": 2,
+    "round=9|own=19|peak=12|payoff=110": 16,
+    "round=9|own=19|peak=13|payoff=110": 16,
+    "round=9|own=19|peak=8|payoff=110": 9,
+    "round=9|own=19|peak=9|payoff=110": 5,
+    "round=9|own=1|peak=10|payoff=130": 20,
+    "round=9|own=1|peak=11|payoff=130": 6,
+    "round=9|own=1|peak=12|payoff=130": 21,
+    "round=9|own=1|peak=13|payoff=130": 15,
+    "round=9|own=1|peak=1|payoff=130": 20,
+    "round=9|own=1|peak=3|payoff=130": 12,
+    "round=9|own=1|peak=4|payoff=130": 11,
+    "round=9|own=1|peak=8|payoff=130": 15,
+    "round=9|own=1|peak=9|payoff=130": 21,
+    "round=9|own=20|peak=10|payoff=110": 5,
+    "round=9|own=20|peak=11|payoff=110": 19,
+    "round=9|own=20|peak=12|payoff=110": 6,
+    "round=9|own=20|peak=13|payoff=110": 6,
+    "round=9|own=20|peak=14|payoff=110": 19,
+    "round=9|own=20|peak=1|payoff=110": 8,
+    "round=9|own=20|peak=2|payoff=110": 18,
+    "round=9|own=20|peak=3|payoff=110": 15,
+    "round=9|own=20|peak=4|payoff=110": 13,
+    "round=9|own=20|peak=8|payoff=110": 2,
+    "round=9|own=20|peak=9|payoff=110": 10,
+    "round=9|own=21|peak=10|payoff=110": 10,
+    "round=9|own=21|peak=11|payoff=110": 13,
+    "round=9|own=21|peak=12|payoff=110": 5,
+    "round=9|own=21|peak=13|payoff=110": 14,
+    "round=9|own=21|peak=3|payoff=110": 2,
+    "round=9|own=21|peak=4|payoff=110": 4,
+    "round=9|own=21|peak=8|payoff=110": 4,
+    "round=9|own=21|peak=9|payoff=110": 1,
+    "round=9|own=2|peak=10|payoff=130": 1,
+    "round=9|own=2|peak=11|payoff=130": 2,
+    "round=9|own=2|peak=12|payoff=130": 12,
+    "round=9|own=2|peak=13|payoff=130": 8,
+    "round=9|own=2|peak=14|payoff=130": 5,
+    "round=9|own=2|peak=1|payoff=120": 7,
+    "round=9|own=2|peak=1|payoff=130": 9,
+    "round=9|own=2|peak=2|payoff=130": 3,
+    "round=9|own=2|peak=9|payoff=130": 15,
+    "round=9|own=3|peak=10|payoff=130": 8,
+    "round=9|own=3|peak=11|payoff=130": 16,
+    "round=9|own=3|peak=12|payoff=130": 20,
+    "round=9|own=3|peak=13|payoff=130": 12,
+    "round=9|own=3|peak=14|payoff=130": 14,
+    "round=9|own=3|peak=1|payoff=130": 14,
+    "round=9|own=3|peak=2|payoff=120": 2,
+    "round=9|own=3|peak=3|payoff=130": 12,
+    "round=9|own=3|peak=7|payoff=130": 17,
+    "round=9|own=3|peak=9|payoff=130": 20,
+    "round=9|own=4|peak=10|payoff=130": 21,
+    "round=9|own=4|peak=11|payoff=130": 2,
+    "round=9|own=4|peak=12|payoff=130": 19,
+    "round=9|own=4|peak=13|payoff=130": 17,
+    "round=9|own=4|peak=1|payoff=130": 6,
+    "round=9|own=4|peak=2|payoff=130": 11,
+    "round=9|own=4|peak=3|payoff=120": 11,
+    "round=9|own=4|peak=4|payoff=130": 18,
+    "round=9|own=4|peak=6|payoff=130": 11,
+    "round=9|own=4|peak=9|payoff=130": 6,
+    "round=9|own=5|peak=10|payoff=130": 16,
+    "round=9|own=5|peak=11|payoff=130": 6,
+    "round=9|own=5|peak=12|payoff=130": 8,
+    "round=9|own=5|peak=13|payoff=130": 8,
+    "round=9|own=5|peak=5|payoff=130": 13,
+    "round=9|own=5|peak=7|payoff=130": 1,
+    "round=9|own=5|peak=8|payoff=130": 9,
+    "round=9|own=5|peak=9|payoff=130": 12,
+    "round=9|own=6|peak=10|payoff=130": 9,
+    "round=9|own=6|peak=11|payoff=130": 7,
+    "round=9|own=6|peak=12|payoff=130": 4,
+    "round=9|own=6|peak=13|payoff=130": 15,
+    "round=9|own=6|peak=14|payoff=130": 2,
+    "round=9|own=6|peak=2|payoff=130": 8,
+    "round=9|own=6|peak=3|payoff=130": 3,
+    "round=9|own=6|peak=4|payoff=130": 1,
+    "round=9|own=6|peak=6|payoff=130": 10,
+    "round=9|own=6|peak=9|payoff=130": 13,
+    "round=9|own=7|peak=10|payoff=130": 11,
+    "round=9|own=7|peak=11|payoff=130": 19,
+    "round=9|own=7|peak=12|payoff=130": 20,
+    "round=9|own=7|peak=13|payoff=130": 6,
+    "round=9|own=7|peak=1|payoff=130": 14,
+    "round=9|own=7|peak=2|payoff=130": 2,
+    "round=9|own=7|peak=6|payoff=130": 19,
+    "round=9|own=7|peak=7|payoff=130": 13,
+    "round=9|own=7|peak=9|payoff=130": 6,
+    "round=9|own=8|peak=10|payoff=130": 5,
+    "round=9|own=8|peak=11|payoff=130": 10,
+    "round=9|own=8|peak=12|payoff=130": 7,
+    "round=9|own=8|peak=13|payoff=130": 19,
+    "round=9|own=8|peak=1|payoff=130": 4,
+    "round=9|own=8|peak=2|payoff=130": 9,
+    "round=9|own=8|peak=3|payoff=130": 11,
+    "round=9|own=8|peak=4|payoff=130": 12,
+    "round=9|own=8|peak=5|payoff=130": 14,
+    "round=9|own=8|peak=7|payoff=130": 16,
+    "round=9|own=8|peak=8|payoff=130": 1,
+    "round=9|own=8|peak=9|payoff=130": 9,
+    "round=9|own=9|peak=10|payoff=130": 7,
+    "round=9|own=9|peak=11|payoff=130": 1,
+    "round=9|own=9|peak=12|payoff=130": 11,
+    "round=9|own=9|peak=2|payoff=130": 17,
+    "round=9|own=9|peak=7|payoff=130": 7,
+    "round=9|own=9|peak=8|payoff=130": 18,
+    "round=9|own=9|peak=9|payoff=130": 16
+  },
+  "config": {
+    "discount_factor": 0.92,
+    "episodes": 500,
+    "epsilon": 0.25,
+    "epsilon_decay": 0.997,
+    "learning_rate": 0.18,
+    "min_epsilon": 0.04,
+    "rounds_per_episode": 10,
+    "seed": 20260519
+  },
+  "params": {
+    "background_count": 4,
+    "base_points": 140,
+    "capacity_per_window": 1,
+    "choice_step_minutes": 1,
+    "early_cost_per_minute": 1,
+    "first_departure_minute": 464,
+    "free_flow_travel_minutes": 6,
+    "late_cost_per_minute": 3,
+    "num_slots": 21,
+    "preferred_arrival_minute": 480,
+    "queue_cost_per_minute": 2,
+    "reward_by_slot": {},
+    "service_window_minutes": 2,
+    "toll_by_slot": {}
+  },
+  "policy_version": "q_learning_v1",
+  "q_table": {
+    "round=1|own=11|peak=0|payoff=140": {
+      "1": 105.917054,
+      "10": 61.474248,
+      "11": 335.297504,
+      "12": 39.0672,
+      "13": 36.2844,
+      "15": 21.24,
+      "16": 54.41544,
+      "17": 51.308784,
+      "18": 20.52,
+      "19": 66.981796,
+      "2": 97.411116,
+      "20": 77.737712,
+      "21": 63.615237,
+      "3": 59.219424,
+      "4": 43.5708,
+      "5": 73.381354,
+      "6": 77.18998,
+      "7": 44.5536,
+      "8": 44.8812,
+      "9": 48.428352
+    },
+    "round=2|own=10|peak=10|payoff=130": {
+      "16": 21.6
+    },
+    "round=2|own=10|peak=11|payoff=130": {
+      "11": 23.4
+    },
+    "round=2|own=10|peak=13|payoff=130": {
+      "3": 43.305113
+    },
+    "round=2|own=11|peak=10|payoff=110": {
+      "1": 23.4,
+      "10": 35.232739,
+      "2": 217.375359
+    },
+    "round=2|own=11|peak=10|payoff=120": {
+      "17": 250.182979,
+      "18": 37.146792,
+      "5": 24.12
+    },
+    "round=2|own=11|peak=11|payoff=110": {
+      "14": 24.844464,
+      "2": 111.465116
+    },
+    "round=2|own=11|peak=11|payoff=120": {
+      "1": 23.4,
+      "10": 80.56104,
+      "11": 24.3,
+      "12": 60.433838,
+      "13": 36.6084,
+      "14": 20.88,
+      "15": 45.160163,
+      "16": 20.7,
+      "17": 276.431671,
+      "20": 20.34,
+      "21": 36.036,
+      "6": 33.857916,
+      "7": 35.299911,
+      "8": 64.741464
+    },
+    "round=2|own=11|peak=11|payoff=130": {
+      "12": 21.06,
+      "14": 37.1016,
+      "15": 42.710688,
+      "17": 46.696418,
+      "18": 332.691367,
+      "2": 74.389175,
+      "20": 20.34,
+      "21": 19.8,
+      "3": 70.133723,
+      "5": 24.12,
+      "6": 24.3,
+      "8": 28.058112,
+      "9": 55.492407
+    },
+    "round=2|own=11|peak=12|payoff=130": {
+      "11": 50.432823,
+      "4": 132.879688
+    },
+    "round=2|own=11|peak=12|payoff=140": {
+      "12": 28.234309,
+      "6": 27.668304,
+      "7": 163.331975,
+      "8": 31.664928
+    },
+    "round=2|own=11|peak=13|payoff=130": {
+      "3": 27.664848,
+      "7": 167.838218
+    },
+    "round=2|own=11|peak=13|payoff=140": {
+      "19": 145.280269
+    },
+    "round=2|own=11|peak=9|payoff=110": {
+      "3": 151.269397
+    },
+    "round=2|own=11|peak=9|payoff=120": {
+      "10": 35.808896,
+      "12": 178.280612,
+      "13": 20.52,
+      "18": 21.42
+    },
+    "round=2|own=11|peak=9|payoff=130": {
+      "10": 161.498449,
+      "21": 19.8,
+      "7": 31.912327
+    },
+    "round=2|own=12|peak=10|payoff=110": {
+      "4": 23.94
+    },
+    "round=2|own=12|peak=12|payoff=120": {
+      "10": 25.02
+    },
+    "round=2|own=13|peak=11|payoff=100": {
+      "20": 25.065212
+    },
+    "round=2|own=13|peak=13|payoff=110": {
+      "8": 24.66
+    },
+    "round=2|own=15|peak=13|payoff=110": {
+      "19": 20.88
+    },
+    "round=2|own=16|peak=11|payoff=110": {
+      "10": 29.184025
+    },
+    "round=2|own=16|peak=13|payoff=110": {
+      "16": 49.567159
+    },
+    "round=2|own=17|peak=10|payoff=120": {
+      "9": 31.929575
+    },
+    "round=2|own=17|peak=12|payoff=100": {
+      "9": 28.654272
+    },
+    "round=2|own=17|peak=12|payoff=110": {
+      "3": 23.76
+    },
+    "round=2|own=18|peak=13|payoff=110": {
+      "3": 23.76
+    },
+    "round=2|own=19|peak=11|payoff=110": {
+      "2": 42.010557
+    },
+    "round=2|own=19|peak=12|payoff=110": {
+      "16": 45.579035
+    },
+    "round=2|own=19|peak=9|payoff=110": {
+      "11": 27.304848
+    },
+    "round=2|own=1|peak=11|payoff=130": {
+      "2": 71.457887,
+      "7": 24.48
+    },
+    "round=2|own=1|peak=12|payoff=130": {
+      "9": 38.893046
+    },
+    "round=2|own=1|peak=13|payoff=130": {
+      "7": 44.5536
+    },
+    "round=2|own=1|peak=9|payoff=130": {
+      "17": 52.851695
+    },
+    "round=2|own=20|peak=10|payoff=110": {
+      "6": 24.3
+    },
+    "round=2|own=20|peak=11|payoff=110": {
+      "16": 41.037975
+    },
+    "round=2|own=20|peak=9|payoff=110": {
+      "6": 49.477602
+    },
+    "round=2|own=21|peak=11|payoff=110": {
+      "8": 48.279312
+    },
+    "round=2|own=21|peak=12|payoff=110": {
+      "5": 24.12
+    },
+    "round=2|own=21|peak=9|payoff=110": {
+      "2": 32.841009
+    },
+    "round=2|own=2|peak=13|payoff=130": {
+      "6": 69.573068
+    },
+    "round=2|own=2|peak=2|payoff=130": {
+      "17": 45.894223
+    },
+    "round=2|own=3|peak=11|payoff=130": {
+      "10": 44.275185
+    },
+    "round=2|own=3|peak=3|payoff=130": {
+      "17": 21.96
+    },
+    "round=2|own=3|peak=9|payoff=130": {
+      "16": 21.6
+    },
+    "round=2|own=4|peak=13|payoff=130": {
+      "19": 31.544874
+    },
+    "round=2|own=4|peak=4|payoff=130": {
+      "14": 28.741967
+    },
+    "round=2|own=5|peak=5|payoff=130": {
+      "10": 102.348838
+    },
+    "round=2|own=6|peak=10|payoff=130": {
+      "6": 24.3
+    },
+    "round=2|own=6|peak=11|payoff=130": {
+      "3": 43.2432
+    },
+    "round=2|own=6|peak=12|payoff=130": {
+      "12": 31.80407
+    },
+    "round=2|own=7|peak=10|payoff=130": {
+      "19": 32.609092
+    },
+    "round=2|own=7|peak=9|payoff=130": {
+      "18": 55.580272
+    },
+    "round=2|own=8|peak=10|payoff=130": {
+      "1": 23.4
+    },
+    "round=2|own=8|peak=13|payoff=130": {
+      "17": 50.818574
+    },
+    "round=2|own=9|peak=9|payoff=130": {
+      "13": 36.2844
+    },
+    "round=3|own=10|peak=10|payoff=120": {
+      "10": 52.224848
+    },
+    "round=3|own=10|peak=10|payoff=130": {
+      "1": 23.4,
+      "17": 21.96,
+      "20": 194.387016
+    },
+    "round=3|own=10|peak=11|payoff=130": {
+      "4": 106.789574
+    },
+    "round=3|own=10|peak=13|payoff=130": {
+      "1": 32.5462
+    },
+    "round=3|own=10|peak=3|payoff=130": {
+      "1": 34.254464
+    },
+    "round=3|own=10|peak=7|payoff=120": {
+      "17": 39.0672
+    },
+    "round=3|own=10|peak=7|payoff=130": {
+      "19": 41.242377
+    },
+    "round=3|own=10|peak=8|payoff=130": {
+      "13": 22.32
+    },
+    "round=3|own=10|peak=9|payoff=120": {
+      "14": 63.686716
+    },
+    "round=3|own=10|peak=9|payoff=130": {
+      "16": 25.713504
+    },
+    "round=3|own=11|peak=10|payoff=130": {
+      "7": 28.295424
+    },
+    "round=3|own=11|peak=11|payoff=130": {
+      "2": 65.552684
+    },
+    "round=3|own=11|peak=12|payoff=130": {
+      "16": 21.6
+    },
+    "round=3|own=12|peak=10|payoff=110": {
+      "16": 62.108654
+    },
+    "round=3|own=12|peak=10|payoff=120": {
+      "15": 42.028679
+    },
+    "round=3|own=12|peak=11|payoff=110": {
+      "10": 37.487971,
+      "11": 135.149829
+    },
+    "round=3|own=12|peak=12|payoff=110": {
+      "9": 50.977766
+    },
+    "round=3|own=12|peak=12|payoff=120": {
+      "5": 87.827783
+    },
+    "round=3|own=12|peak=12|payoff=130": {
+      "4": 46.332809
+    },
+    "round=3|own=12|peak=13|payoff=120": {
+      "11": 30.040828
+    },
+    "round=3|own=12|peak=7|payoff=120": {
+      "20": 20.34
+    },
+    "round=3|own=12|peak=9|payoff=110": {
+      "12": 21.06,
+      "15": 92.675692
+    },
+    "round=3|own=12|peak=9|payoff=120": {
+      "19": 58.277422
+    },
+    "round=3|own=13|peak=11|payoff=100": {
+      "4": 35.625301
+    },
+    "round=3|own=13|peak=11|payoff=110": {
+      "4": 29.285703
+    },
+    "round=3|own=13|peak=12|payoff=100": {
+      "20": 24.543667
+    },
+    "round=3|own=13|peak=13|payoff=110": {
+      "20": 38.905916
+    },
+    "round=3|own=13|peak=9|payoff=110": {
+      "3": 27.128304
+    },
+    "round=3|own=14|peak=11|payoff=110": {
+      "4": 62.870031
+    },
+    "round=3|own=14|peak=13|payoff=110": {
+      "11": 23.4
+    },
+    "round=3|own=14|peak=9|payoff=110": {
+      "3": 23.76
+    },
+    "round=3|own=15|peak=10|payoff=110": {
+      "3": 30.8394
+    },
+    "round=3|own=15|peak=9|payoff=110": {
+      "7": 63.751519
+    },
+    "round=3|own=16|peak=10|payoff=110": {
+      "13": 20.52
+    },
+    "round=3|own=16|peak=11|payoff=110": {
+      "2": 104.370136
+    },
+    "round=3|own=16|peak=11|payoff=120": {
+      "17": 21.96
+    },
+    "round=3|own=16|peak=12|payoff=120": {
+      "5": 36.163579
+    },
+    "round=3|own=16|peak=9|payoff=110": {
+      "12": 21.06
+    },
+    "round=3|own=16|peak=9|payoff=120": {
+      "17": 26.013888
+    },
+    "round=3|own=17|peak=10|payoff=110": {
+      "11": 22.5,
+      "2": 191.688729
+    },
+    "round=3|own=17|peak=10|payoff=120": {
+      "13": 96.557353
+    },
+    "round=3|own=17|peak=11|payoff=110": {
+      "1": 194.957558,
+      "16": 21.6,
+      "17": 24.239308,
+      "20": 33.52238,
+      "3": 27.486,
+      "6": 24.3
+    },
+    "round=3|own=17|peak=11|payoff=120": {
+      "10": 24.84,
+      "12": 135.354172,
+      "13": 25.852259,
+      "4": 34.875976
+    },
+    "round=3|own=17|peak=12|payoff=110": {
+      "15": 28.818705,
+      "5": 103.036801
+    },
+    "round=3|own=17|peak=12|payoff=120": {
+      "8": 103.797563
+    },
+    "round=3|own=17|peak=13|payoff=110": {
+      "15": 41.935159,
+      "20": 193.894779
+    },
+    "round=3|own=17|peak=13|payoff=120": {
+      "3": 55.419615
+    },
+    "round=3|own=17|peak=2|payoff=120": {
+      "10": 23.04
+    },
+    "round=3|own=17|peak=3|payoff=120": {
+      "15": 23.04
+    },
+    "round=3|own=17|peak=8|payoff=120": {
+      "1": 23.4
+    },
+    "round=3|own=17|peak=9|payoff=120": {
+      "18": 24.69888,
+      "19": 222.627465
+    },
+    "round=3|own=18|peak=10|payoff=110": {
+      "10": 228.431053,
+      "13": 24.709431
+    },
+    "round=3|own=18|peak=11|payoff=110": {
+      "10": 46.096754,
+      "11": 23.4,
+      "12": 21.96,
+      "18": 275.107826,
+      "20": 30.599099,
+      "4": 30.219353,
+      "5": 24.12,
+      "7": 34.637567,
+      "9": 41.637811
+    },
+    "round=3|own=18|peak=12|payoff=100": {
+      "7": 59.493829
+    },
+    "round=3|own=18|peak=12|payoff=110": {
+      "15": 143.058499
+    },
+    "round=3|own=18|peak=13|payoff=110": {
+      "4": 222.158026
+    },
+    "round=3|own=18|peak=7|payoff=110": {
+      "19": 33.269223
+    },
+    "round=3|own=18|peak=9|payoff=110": {
+      "11": 24.87888,
+      "12": 27.126298,
+      "13": 20.52,
+      "20": 240.324229,
+      "5": 33.074471
+    },
+    "round=3|own=19|peak=10|payoff=110": {
+      "19": 40.624971,
+      "2": 98.707042
+    },
+    "round=3|own=19|peak=11|payoff=110": {
+      "12": 83.106556
+    },
+    "round=3|own=19|peak=12|payoff=110": {
+      "6": 24.3
+    },
+    "round=3|own=19|peak=13|payoff=110": {
+      "17": 35.2152
+    },
+    "round=3|own=19|peak=14|payoff=110": {
+      "10": 29.103696
+    },
+    "round=3|own=19|peak=9|payoff=110": {
+      "16": 103.396141
+    },
+    "round=3|own=1|peak=13|payoff=130": {
+      "21": 23.347152
+    },
+    "round=3|own=1|peak=1|payoff=130": {
+      "13": 22.32
+    },
+    "round=3|own=1|peak=9|payoff=130": {
+      "9": 40.529935
+    },
+    "round=3|own=20|peak=11|payoff=110": {
+      "7": 47.877788
+    },
+    "round=3|own=20|peak=9|payoff=110": {
+      "7": 24.48
+    },
+    "round=3|own=21|peak=11|payoff=110": {
+      "2": 26.948304
+    },
+    "round=3|own=21|peak=12|payoff=110": {
+      "17": 21.06
+    },
+    "round=3|own=21|peak=13|payoff=110": {
+      "21": 23.07888
+    },
+    "round=3|own=21|peak=9|payoff=110": {
+      "3": 30.53202
+    },
+    "round=3|own=2|peak=10|payoff=130": {
+      "20": 143.971488
+    },
+    "round=3|own=2|peak=11|payoff=130": {
+      "7": 34.728297,
+      "9": 179.123272
+    },
+    "round=3|own=2|peak=13|payoff=130": {
+      "7": 24.48
+    },
+    "round=3|own=2|peak=2|payoff=130": {
+      "4": 63.338444,
+      "5": 29.4486
+    },
+    "round=3|own=2|peak=9|payoff=130": {
+      "3": 23.76,
+      "4": 88.036109
+    },
+    "round=3|own=3|peak=10|payoff=130": {
+      "8": 80.461543
+    },
+    "round=3|own=3|peak=11|payoff=130": {
+      "18": 139.030406
+    },
+    "round=3|own=3|peak=13|payoff=130": {
+      "9": 24.66
+    },
+    "round=3|own=3|peak=3|payoff=130": {
+      "3": 89.95891
+    },
+    "round=3|own=3|peak=8|payoff=130": {
+      "10": 28.954656
+    },
+    "round=3|own=3|peak=9|payoff=130": {
+      "18": 121.233978
+    },
+    "round=3|own=4|peak=11|payoff=130": {
+      "12": 70.772401
+    },
+    "round=3|own=4|peak=12|payoff=130": {
+      "12": 78.482972
+    },
+    "round=3|own=4|peak=4|payoff=130": {
+      "13": 43.205571
+    },
+    "round=3|own=4|peak=9|payoff=130": {
+      "15": 23.434272,
+      "16": 30.038154
+    },
+    "round=3|own=5|peak=10|payoff=130": {
+      "9": 24.84
+    },
+    "round=3|own=5|peak=12|payoff=130": {
+      "19": 24.814656
+    },
+    "round=3|own=5|peak=5|payoff=130": {
+      "16": 25.659648
+    },
+    "round=3|own=6|peak=10|payoff=130": {
+      "20": 40.714992
+    },
+    "round=3|own=6|peak=11|payoff=130": {
+      "8": 75.62442
+    },
+    "round=3|own=6|peak=12|payoff=130": {
+      "4": 23.94
+    },
+    "round=3|own=6|peak=6|payoff=130": {
+      "2": 65.785807
+    },
+    "round=3|own=6|peak=9|payoff=130": {
+      "3": 23.76
+    },
+    "round=3|own=7|peak=10|payoff=130": {
+      "21": 54.845615
+    },
+    "round=3|own=7|peak=11|payoff=130": {
+      "8": 129.054128
+    },
+    "round=3|own=7|peak=12|payoff=130": {
+      "19": 60.130321
+    },
+    "round=3|own=7|peak=13|payoff=130": {
+      "15": 38.056939,
+      "19": 124.301611
+    },
+    "round=3|own=7|peak=15|payoff=130": {
+      "21": 19.8
+    },
+    "round=3|own=7|peak=7|payoff=130": {
+      "1": 105.422892
+    },
+    "round=3|own=7|peak=9|payoff=130": {
+      "16": 20.7,
+      "8": 54.044941
+    },
+    "round=3|own=8|peak=11|payoff=130": {
+      "18": 75.491265
+    },
+    "round=3|own=8|peak=12|payoff=130": {
+      "13": 41.037571
+    },
+    "round=3|own=8|peak=13|payoff=130": {
+      "3": 23.76
+    },
+    "round=3|own=8|peak=8|payoff=130": {
+      "16": 36.036
+    },
+    "round=3|own=9|peak=9|payoff=130": {
+      "5": 107.358029
+    },
+    "round=4|own=10|peak=10|payoff=120": {
+      "20": 98.19059
+    },
+    "round=4|own=10|peak=10|payoff=130": {
+      "12": 22.628304,
+      "14": 184.674437,
+      "4": 28.560979
+    },
+    "round=4|own=10|peak=11|payoff=130": {
+      "8": 59.739269
+    },
+    "round=4|own=10|peak=12|payoff=130": {
+      "12": 50.990719
+    },
+    "round=4|own=10|peak=13|payoff=130": {
+      "3": 36.750688
+    },
+    "round=4|own=10|peak=8|payoff=130": {
+      "10": 52.310856
+    },
+    "round=4|own=10|peak=9|payoff=110": {
+      "18": 47.453854
+    },
+    "round=4|own=10|peak=9|payoff=120": {
+      "9": 34.218809
+    },
+    "round=4|own=10|peak=9|payoff=130": {
+      "9": 43.635094
+    },
+    "round=4|own=11|peak=10|payoff=110": {
+      "6": 24.3
+    },
+    "round=4|own=11|peak=10|payoff=120": {
+      "21": 41.251314
+    },
+    "round=4|own=11|peak=11|payoff=120": {
+      "10": 66.57295
+    },
+    "round=4|own=11|peak=11|payoff=130": {
+      "2": 130.871484
+    },
+    "round=4|own=11|peak=8|payoff=120": {
+      "21": 23.764464
+    },
+    "round=4|own=11|peak=9|payoff=120": {
+      "6": 27.668304
+    },
+    "round=4|own=11|peak=9|payoff=130": {
+      "6": 24.3
+    },
+    "round=4|own=12|peak=10|payoff=110": {
+      "20": 20.34
+    },
+    "round=4|own=12|peak=10|payoff=120": {
+      "17": 28.70245
+    },
+    "round=4|own=12|peak=11|payoff=100": {
+      "20": 72.573688
+    },
+    "round=4|own=12|peak=11|payoff=110": {
+      "10": 40.461097,
+      "13": 89.187874
+    },
+    "round=4|own=12|peak=12|payoff=110": {
+      "11": 27.843402
+    },
+    "round=4|own=12|peak=12|payoff=120": {
+      "19": 119.288521
+    },
+    "round=4|own=12|peak=13|payoff=130": {
+      "16": 29.605692
+    },
+    "round=4|own=12|peak=8|payoff=110": {
+      "21": 28.137892
+    },
+    "round=4|own=12|peak=9|payoff=110": {
+      "13": 37.3464
+    },
+    "round=4|own=12|peak=9|payoff=120": {
+      "15": 55.181736
+    },
+    "round=4|own=13|peak=10|payoff=100": {
+      "20": 61.535017
+    },
+    "round=4|own=13|peak=10|payoff=110": {
+      "16": 21.6
+    },
+    "round=4|own=13|peak=11|payoff=100": {
+      "3": 56.911897
+    },
+    "round=4|own=13|peak=11|payoff=110": {
+      "9": 84.11486
+    },
+    "round=4|own=13|peak=12|payoff=110": {
+      "17": 41.804767
+    },
+    "round=4|own=13|peak=13|payoff=110": {
+      "12": 53.036883,
+      "20": 26.212772
+    },
+    "round=4|own=13|peak=13|payoff=120": {
+      "16": 20.7
+    },
+    "round=4|own=13|peak=1|payoff=120": {
+      "8": 34.01784
+    },
+    "round=4|own=13|peak=8|payoff=110": {
+      "16": 30.26088
+    },
+    "round=4|own=13|peak=9|payoff=110": {
+      "9": 58.125182
+    },
+    "round=4|own=14|peak=10|payoff=110": {
+      "1": 27.185616
+    },
+    "round=4|own=14|peak=11|payoff=110": {
+      "15": 21.24
+    },
+    "round=4|own=14|peak=8|payoff=120": {
+      "19": 24.695424
+    },
+    "round=4|own=14|peak=9|payoff=110": {
+      "20": 20.34
+    },
+    "round=4|own=15|peak=10|payoff=110": {
+      "9": 158.133205
+    },
+    "round=4|own=15|peak=10|payoff=120": {
+      "8": 24.66
+    },
+    "round=4|own=15|peak=11|payoff=100": {
+      "5": 43.8984
+    },
+    "round=4|own=15|peak=11|payoff=110": {
+      "18": 112.554827
+    },
+    "round=4|own=15|peak=11|payoff=120": {
+      "1": 26.67888
+    },
+    "round=4|own=15|peak=13|payoff=110": {
+      "9": 67.502069
+    },
+    "round=4|own=15|peak=7|payoff=120": {
+      "8": 47.817559
+    },
+    "round=4|own=15|peak=9|payoff=110": {
+      "5": 100.031663
+    },
+    "round=4|own=15|peak=9|payoff=120": {
+      "9": 41.663651
+    },
+    "round=4|own=16|peak=10|payoff=110": {
+      "18": 29.889454,
+      "6": 29.093961
+    },
+    "round=4|own=16|peak=10|payoff=120": {
+      "14": 49.062943
+    },
+    "round=4|own=16|peak=11|payoff=110": {
+      "11": 45.84096
+    },
+    "round=4|own=16|peak=11|payoff=120": {
+      "17": 52.717705
+    },
+    "round=4|own=16|peak=12|payoff=110": {
+      "7": 49.900316
+    },
+    "round=4|own=16|peak=13|payoff=110": {
+      "18": 21.42
+    },
+    "round=4|own=16|peak=8|payoff=120": {
+      "9": 60.50299
+    },
+    "round=4|own=16|peak=9|payoff=120": {
+      "10": 24.84,
+      "19": 115.459348
+    },
+    "round=4|own=17|peak=10|payoff=110": {
+      "9": 24.66
+    },
+    "round=4|own=17|peak=10|payoff=120": {
+      "7": 53.294648
+    },
+    "round=4|own=17|peak=11|payoff=110": {
+      "13": 49.0518
+    },
+    "round=4|own=17|peak=12|payoff=110": {
+      "2": 33.322366
+    },
+    "round=4|own=17|peak=13|payoff=100": {
+      "17": 28.70245
+    },
+    "round=4|own=17|peak=13|payoff=120": {
+      "3": 31.667476
+    },
+    "round=4|own=17|peak=9|payoff=120": {
+      "19": 20.88
+    },
+    "round=4|own=18|peak=10|payoff=110": {
+      "19": 137.179838,
+      "3": 23.76
+    },
+    "round=4|own=18|peak=11|payoff=110": {
+      "11": 22.5,
+      "19": 33.149003,
+      "2": 245.700848,
+      "4": 29.301354
+    },
+    "round=4|own=18|peak=12|payoff=110": {
+      "17": 44.738361
+    },
+    "round=4|own=18|peak=13|payoff=100": {
+      "15": 19.44
+    },
+    "round=4|own=18|peak=13|payoff=110": {
+      "19": 149.008075
+    },
+    "round=4|own=18|peak=7|payoff=110": {
+      "21": 36.036
+    },
+    "round=4|own=18|peak=9|payoff=110": {
+      "1": 30.832899,
+      "13": 19.62,
+      "21": 44.11497,
+      "8": 170.718494
+    },
+    "round=4|own=19|peak=10|payoff=110": {
+      "3": 151.089527
+    },
+    "round=4|own=19|peak=11|payoff=110": {
+      "12": 150.382177,
+      "14": 35.321371,
+      "19": 28.717239,
+      "7": 35.589166
+    },
+    "round=4|own=19|peak=12|payoff=110": {
+      "11": 73.681611
+    },
+    "round=4|own=19|peak=13|payoff=110": {
+      "6": 87.426768
+    },
+    "round=4|own=19|peak=15|payoff=110": {
+      "20": 29.539977
+    },
+    "round=4|own=19|peak=7|payoff=110": {
+      "17": 131.062259
+    },
+    "round=4|own=19|peak=8|payoff=110": {
+      "10": 73.205119
+    },
+    "round=4|own=19|peak=9|payoff=110": {
+      "3": 23.76,
+      "7": 179.68801
+    },
+    "round=4|own=1|peak=10|payoff=130": {
+      "2": 127.702211
+    },
+    "round=4|own=1|peak=11|payoff=130": {
+      "13": 91.672511,
+      "14": 19.98
+    },
+    "round=4|own=1|peak=12|payoff=130": {
+      "12": 19.26,
+      "13": 64.038718
+    },
+    "round=4|own=1|peak=13|payoff=130": {
+      "14": 24.427152
+    },
+    "round=4|own=1|peak=1|payoff=130": {
+      "16": 22.5,
+      "8": 183.981288
+    },
+    "round=4|own=1|peak=6|payoff=130": {
+      "9": 27.93888
+    },
+    "round=4|own=1|peak=9|payoff=130": {
+      "6": 62.119685
+    },
+    "round=4|own=20|peak=10|payoff=110": {
+      "16": 139.344506
+    },
+    "round=4|own=20|peak=11|payoff=110": {
+      "19": 32.974375,
+      "21": 19.8,
+      "7": 38.812201,
+      "9": 227.491249
+    },
+    "round=4|own=20|peak=12|payoff=110": {
+      "18": 25.384464,
+      "3": 60.733246
+    },
+    "round=4|own=20|peak=13|payoff=110": {
+      "16": 116.921965
+    },
+    "round=4|own=20|peak=15|payoff=110": {
+      "7": 44.44405
+    },
+    "round=4|own=20|peak=7|payoff=110": {
+      "7": 57.089884
+    },
+    "round=4|own=20|peak=8|payoff=110": {
+      "13": 88.12601,
+      "17": 21.06
+    },
+    "round=4|own=20|peak=9|payoff=110": {
+      "11": 20.7,
+      "16": 38.716011,
+      "17": 27.959121,
+      "20": 193.577701,
+      "4": 32.35986,
+      "6": 24.3
+    },
+    "round=4|own=21|peak=10|payoff=110": {
+      "16": 19.8,
+      "18": 21.42,
+      "20": 37.038227
+    },
+    "round=4|own=21|peak=11|payoff=110": {
+      "6": 66.469887
+    },
+    "round=4|own=21|peak=13|payoff=110": {
+      "11": 32.282537
+    },
+    "round=4|own=2|peak=10|payoff=130": {
+      "15": 22.14,
+      "20": 124.556478
+    },
+    "round=4|own=2|peak=11|payoff=130": {
+      "18": 133.448308
+    },
+    "round=4|own=2|peak=12|payoff=130": {
+      "17": 50.556599
+    },
+    "round=4|own=2|peak=13|payoff=130": {
+      "8": 64.476399
+    },
+    "round=4|own=2|peak=2|payoff=130": {
+      "20": 123.078456,
+      "9": 24.66
+    },
+    "round=4|own=2|peak=9|payoff=130": {
+      "20": 109.614023
+    },
+    "round=4|own=3|peak=10|payoff=130": {
+      "10": 23.94
+    },
+    "round=4|own=3|peak=11|payoff=130": {
+      "11": 72.053448
+    },
+    "round=4|own=3|peak=12|payoff=130": {
+      "19": 19.98
+    },
+    "round=4|own=3|peak=2|payoff=130": {
+      "4": 23.4
+    },
+    "round=4|own=3|peak=3|payoff=130": {
+      "20": 95.392418
+    },
+    "round=4|own=3|peak=7|payoff=130": {
+      "1": 23.4
+    },
+    "round=4|own=3|peak=9|payoff=130": {
+      "1": 54.302104
+    },
+    "round=4|own=4|peak=10|payoff=130": {
+      "15": 78.759877,
+      "6": 33.30348
+    },
+    "round=4|own=4|peak=11|payoff=130": {
+      "14": 169.254318,
+      "17": 21.96
+    },
+    "round=4|own=4|peak=12|payoff=130": {
+      "9": 37.841051
+    },
+    "round=4|own=4|peak=13|payoff=130": {
+      "1": 94.504137
+    },
+    "round=4|own=4|peak=1|payoff=130": {
+      "19": 20.88
+    },
+    "round=4|own=4|peak=2|payoff=130": {
+      "6": 24.3,
+      "7": 28.35504
+    },
+    "round=4|own=4|peak=4|payoff=130": {
+      "1": 23.4,
+      "3": 135.517587
+    },
+    "round=4|own=4|peak=7|payoff=130": {
+      "10": 25.02
+    },
+    "round=4|own=4|peak=9|payoff=130": {
+      "17": 21.96,
+      "18": 60.760598
+    },
+    "round=4|own=5|peak=10|payoff=130": {
+      "13": 22.32,
+      "6": 75.753164
+    },
+    "round=4|own=5|peak=11|payoff=130": {
+      "10": 32.177537,
+      "21": 19.8
+    },
+    "round=4|own=5|peak=12|payoff=130": {
+      "20": 23.648688
+    },
+    "round=4|own=5|peak=13|payoff=130": {
+      "20": 51.994154
+    },
+    "round=4|own=5|peak=5|payoff=130": {
+      "10": 106.57384
+    },
+    "round=4|own=5|peak=9|payoff=130": {
+      "20": 96.206814
+    },
+    "round=4|own=6|peak=13|payoff=130": {
+      "17": 25.113888
+    },
+    "round=4|own=6|peak=9|payoff=130": {
+      "10": 27.675156
+    },
+    "round=4|own=7|peak=11|payoff=130": {
+      "17": 20.16,
+      "7": 97.820325
+    },
+    "round=4|own=7|peak=12|payoff=130": {
+      "10": 21.24
+    },
+    "round=4|own=7|peak=13|payoff=130": {
+      "12": 23.76
+    },
+    "round=4|own=7|peak=7|payoff=130": {
+      "10": 41.9328
+    },
+    "round=4|own=7|peak=9|payoff=130": {
+      "8": 101.832788
+    },
+    "round=4|own=8|peak=10|payoff=130": {
+      "8": 68.303056
+    },
+    "round=4|own=8|peak=11|payoff=130": {
+      "1": 115.631461,
+      "10": 28.953504,
+      "13": 26.216592,
+      "20": 28.613401
+    },
+    "round=4|own=8|peak=12|payoff=130": {
+      "17": 49.283947
+    },
+    "round=4|own=8|peak=8|payoff=130": {
+      "21": 77.389493
+    },
+    "round=4|own=8|peak=9|payoff=130": {
+      "13": 31.374308
+    },
+    "round=4|own=9|peak=10|payoff=130": {
+      "17": 27.059121
+    },
+    "round=4|own=9|peak=11|payoff=130": {
+      "21": 114.467191
+    },
+    "round=4|own=9|peak=13|payoff=130": {
+      "16": 56.145626
+    },
+    "round=4|own=9|peak=9|payoff=130": {
+      "4": 121.368273
+    },
+    "round=5|own=10|peak=10|payoff=120": {
+      "4": 52.362374
+    },
+    "round=5|own=10|peak=10|payoff=130": {
+      "18": 126.221123
+    },
+    "round=5|own=10|peak=11|payoff=130": {
+      "10": 101.29954
+    },
+    "round=5|own=10|peak=12|payoff=130": {
+      "15": 26.528394,
+      "9": 35.294006
+    },
+    "round=5|own=10|peak=13|payoff=130": {
+      "2": 26.739648
+    },
+    "round=5|own=10|peak=5|payoff=120": {
+      "9": 33.269107
+    },
+    "round=5|own=10|peak=6|payoff=120": {
+      "15": 23.04
+    },
+    "round=5|own=10|peak=6|payoff=130": {
+      "5": 24.12
+    },
+    "round=5|own=10|peak=7|payoff=120": {
+      "9": 29.35461
+    },
+    "round=5|own=10|peak=9|payoff=110": {
+      "15": 20.34
+    },
+    "round=5|own=10|peak=9|payoff=120": {
+      "9": 29.35461
+    },
+    "round=5|own=11|peak=10|payoff=110": {
+      "10": 41.171316
+    },
+    "round=5|own=11|peak=10|payoff=120": {
+      "4": 33.82103
+    },
+    "round=5|own=11|peak=11|payoff=120": {
+      "16": 39.312
+    },
+    "round=5|own=11|peak=11|payoff=130": {
+      "18": 122.648203
+    },
+    "round=5|own=11|peak=12|payoff=130": {
+      "19": 25.564264
+    },
+    "round=5|own=11|peak=12|payoff=140": {
+      "4": 23.94
+    },
+    "round=5|own=11|peak=9|payoff=110": {
+      "13": 23.22
+    },
+    "round=5|own=12|peak=10|payoff=110": {
+      "13": 25.195659
+    },
+    "round=5|own=12|peak=10|payoff=120": {
+      "13": 26.678756
+    },
+    "round=5|own=12|peak=11|payoff=100": {
+      "20": 41.930122
+    },
+    "round=5|own=12|peak=11|payoff=110": {
+      "8": 121.081931
+    },
+    "round=5|own=12|peak=12|payoff=110": {
+      "2": 45.799822
+    },
+    "round=5|own=12|peak=12|payoff=120": {
+      "2": 70.677685
+    },
+    "round=5|own=12|peak=12|payoff=130": {
+      "20": 27.624956
+    },
+    "round=5|own=12|peak=13|payoff=130": {
+      "19": 61.624637
+    },
+    "round=5|own=12|peak=9|payoff=110": {
+      "7": 24.48
+    },
+    "round=5|own=12|peak=9|payoff=120": {
+      "6": 103.973091
+    },
+    "round=5|own=13|peak=10|payoff=100": {
+      "15": 23.797728
+    },
+    "round=5|own=13|peak=10|payoff=110": {
+      "14": 73.193599
+    },
+    "round=5|own=13|peak=11|payoff=100": {
+      "8": 30.939608
+    },
+    "round=5|own=13|peak=11|payoff=110": {
+      "9": 120.744227
+    },
+    "round=5|own=13|peak=12|payoff=100": {
+      "17": 21.96
+    },
+    "round=5|own=13|peak=12|payoff=110": {
+      "20": 24.274656
+    },
+    "round=5|own=13|peak=13|payoff=110": {
+      "12": 63.974358
+    },
+    "round=5|own=13|peak=13|payoff=120": {
+      "2": 23.58
+    },
+    "round=5|own=13|peak=6|payoff=120": {
+      "5": 64.431599
+    },
+    "round=5|own=13|peak=7|payoff=120": {
+      "6": 30.918568
+    },
+    "round=5|own=13|peak=9|payoff=110": {
+      "15": 19.44,
+      "6": 31.678076,
+      "9": 81.81603
+    },
+    "round=5|own=13|peak=9|payoff=120": {
+      "11": 30.474451
+    },
+    "round=5|own=14|peak=10|payoff=110": {
+      "2": 124.001282
+    },
+    "round=5|own=14|peak=11|payoff=100": {
+      "8": 24.66
+    },
+    "round=5|own=14|peak=11|payoff=110": {
+      "18": 170.346538
+    },
+    "round=5|own=14|peak=12|payoff=110": {
+      "7": 24.48
+    },
+    "round=5|own=14|peak=13|payoff=100": {
+      "18": 21.42
+    },
+    "round=5|own=14|peak=9|payoff=110": {
+      "11": 142.609874
+    },
+    "round=5|own=15|peak=10|payoff=110": {
+      "12": 52.350855
+    },
+    "round=5|own=15|peak=11|payoff=100": {
+      "7": 28.444464
+    },
+    "round=5|own=15|peak=11|payoff=110": {
+      "20": 46.716549
+    },
+    "round=5|own=15|peak=11|payoff=120": {
+      "19": 45.244288
+    },
+    "round=5|own=15|peak=13|payoff=100": {
+      "2": 23.58
+    },
+    "round=5|own=15|peak=7|payoff=120": {
+      "15": 24.6719
+    },
+    "round=5|own=15|peak=8|payoff=120": {
+      "18": 21.42
+    },
+    "round=5|own=15|peak=9|payoff=110": {
+      "1": 23.4
+    },
+    "round=5|own=15|peak=9|payoff=120": {
+      "7": 28.116576
+    },
+    "round=5|own=16|peak=10|payoff=110": {
+      "18": 60.225472,
+      "3": 39.589146
+    },
+    "round=5|own=16|peak=10|payoff=120": {
+      "6": 31.176706
+    },
+    "round=5|own=16|peak=11|payoff=110": {
+      "19": 120.737337
+    },
+    "round=5|own=16|peak=11|payoff=120": {
+      "8": 93.170458
+    },
+    "round=5|own=16|peak=12|payoff=100": {
+      "5": 24.12
+    },
+    "round=5|own=16|peak=12|payoff=120": {
+      "17": 20.16
+    },
+    "round=5|own=16|peak=14|payoff=110": {
+      "10": 35.79427
+    },
+    "round=5|own=16|peak=8|payoff=120": {
+      "2": 26.948304
+    },
+    "round=5|own=16|peak=9|payoff=120": {
+      "11": 135.017337
+    },
+    "round=5|own=17|peak=10|payoff=110": {
+      "7": 87.527189
+    },
+    "round=5|own=17|peak=10|payoff=120": {
+      "6": 28.32408
+    },
+    "round=5|own=17|peak=11|payoff=110": {
+      "18": 88.61285,
+      "20": 24.981296,
+      "8": 24.66
+    },
+    "round=5|own=17|peak=11|payoff=120": {
+      "12": 46.093528
+    },
+    "round=5|own=17|peak=12|payoff=110": {
+      "3": 30.256356
+    },
+    "round=5|own=17|peak=13|payoff=110": {
+      "12": 29.953402
+    },
+    "round=5|own=17|peak=5|payoff=120": {
+      "17": 39.9672
+    },
+    "round=5|own=17|peak=7|payoff=120": {
+      "8": 87.696366
+    },
+    "round=5|own=17|peak=8|payoff=120": {
+      "10": 70.072922
+    },
+    "round=5|own=17|peak=9|payoff=120": {
+      "12": 89.728117,
+      "20": 20.34
+    },
+    "round=5|own=18|peak=10|payoff=110": {
+      "5": 48.023357
+    },
+    "round=5|own=18|peak=11|payoff=110": {
+      "4": 155.536286
+    },
+    "round=5|own=18|peak=12|payoff=110": {
+      "13": 76.483306,
+      "16": 18.9
+    },
+    "round=5|own=18|peak=13|payoff=110": {
+      "1": 60.767393
+    },
+    "round=5|own=18|peak=9|payoff=110": {
+      "15": 23.04
+    },
+    "round=5|own=19|peak=10|payoff=110": {
+      "10": 23.04,
+      "16": 83.617816
+    },
+    "round=5|own=19|peak=11|payoff=110": {
+      "5": 139.647165
+    },
+    "round=5|own=19|peak=12|payoff=110": {
+      "19": 84.940997
+    },
+    "round=5|own=19|peak=13|payoff=110": {
+      "7": 24.48
+    },
+    "round=5|own=19|peak=15|payoff=100": {
+      "8": 40.569284
+    },
+    "round=5|own=19|peak=2|payoff=110": {
+      "11": 24.3
+    },
+    "round=5|own=19|peak=9|payoff=110": {
+      "3": 207.035049
+    },
+    "round=5|own=1|peak=10|payoff=130": {
+      "21": 54.1898
+    },
+    "round=5|own=1|peak=11|payoff=130": {
+      "12": 112.524068,
+      "14": 19.98
+    },
+    "round=5|own=1|peak=12|payoff=130": {
+      "12": 22.86,
+      "9": 29.513924
+    },
+    "round=5|own=1|peak=13|payoff=130": {
+      "7": 28.116576
+    },
+    "round=5|own=1|peak=1|payoff=130": {
+      "16": 44.884656,
+      "9": 24.84
+    },
+    "round=5|own=1|peak=9|payoff=130": {
+      "4": 31.155324
+    },
+    "round=5|own=20|peak=10|payoff=110": {
+      "1": 149.274001,
+      "16": 21.6
+    },
+    "round=5|own=20|peak=11|payoff=110": {
+      "3": 171.197787
+    },
+    "round=5|own=20|peak=12|payoff=110": {
+      "14": 94.589549
+    },
+    "round=5|own=20|peak=13|payoff=110": {
+      "10": 118.42923
+    },
+    "round=5|own=20|peak=1|payoff=110": {
+      "4": 76.164677,
+      "5": 24.12
+    },
+    "round=5|own=20|peak=2|payoff=110": {
+      "18": 38.9844
+    },
+    "round=5|own=20|peak=3|payoff=110": {
+      "10": 46.703792
+    },
+    "round=5|own=20|peak=7|payoff=110": {
+      "2": 96.227458
+    },
+    "round=5|own=20|peak=8|payoff=110": {
+      "13": 85.694501
+    },
+    "round=5|own=20|peak=9|payoff=110": {
+      "3": 162.162455
+    },
+    "round=5|own=21|peak=10|payoff=110": {
+      "8": 99.74007
+    },
+    "round=5|own=21|peak=11|payoff=110": {
+      "1": 23.4,
+      "4": 50.349587
+    },
+    "round=5|own=21|peak=12|payoff=110": {
+      "4": 27.487152,
+      "6": 24.3
+    },
+    "round=5|own=21|peak=13|payoff=110": {
+      "12": 36.9573
+    },
+    "round=5|own=21|peak=5|payoff=110": {
+      "3": 30.699939
+    },
+    "round=5|own=21|peak=6|payoff=110": {
+      "11": 48.397054
+    },
+    "round=5|own=21|peak=7|payoff=110": {
+      "2": 34.096233
+    },
+    "round=5|own=21|peak=8|payoff=110": {
+      "13": 41.908409,
+      "19": 20.88
+    },
+    "round=5|own=21|peak=9|payoff=110": {
+      "12": 102.953781
+    },
+    "round=5|own=2|peak=11|payoff=130": {
+      "16": 30.032845,
+      "2": 34.438379,
+      "6": 24.3,
+      "8": 241.38493
+    },
+    "round=5|own=2|peak=12|payoff=130": {
+      "18": 35.583652
+    },
+    "round=5|own=2|peak=13|payoff=130": {
+      "21": 81.790294
+    },
+    "round=5|own=2|peak=2|payoff=130": {
+      "20": 58.574294,
+      "21": 36.036
+    },
+    "round=5|own=2|peak=9|payoff=130": {
+      "15": 76.809363,
+      "16": 36.513716,
+      "7": 30.769528
+    },
+    "round=5|own=3|peak=10|payoff=130": {
+      "19": 72.465906
+    },
+    "round=5|own=3|peak=11|payoff=130": {
+      "20": 34.893276,
+      "3": 151.803697
+    },
+    "round=5|own=3|peak=3|payoff=130": {
+      "5": 131.023792
+    },
+    "round=5|own=3|peak=9|payoff=130": {
+      "3": 27.247536
+    },
+    "round=5|own=4|peak=10|payoff=130": {
+      "9": 55.352233
+    },
+    "round=5|own=4|peak=11|payoff=130": {
+      "14": 24.658292,
+      "6": 77.211068
+    },
+    "round=5|own=4|peak=12|payoff=130": {
+      "1": 52.486647
+    },
+    "round=5|own=4|peak=4|payoff=130": {
+      "4": 67.479931
+    },
+    "round=5|own=4|peak=9|payoff=130": {
+      "2": 23.58
+    },
+    "round=5|own=5|peak=10|payoff=130": {
+      "16": 24.87888
+    },
+    "round=5|own=5|peak=11|payoff=130": {
+      "11": 88.05958
+    },
+    "round=5|own=5|peak=12|payoff=130": {
+      "5": 39.996203
+    },
+    "round=5|own=5|peak=9|payoff=130": {
+      "11": 86.927407
+    },
+    "round=5|own=6|peak=10|payoff=130": {
+      "7": 81.511815
+    },
+    "round=5|own=6|peak=11|payoff=130": {
+      "20": 125.324875
+    },
+    "round=5|own=6|peak=12|payoff=130": {
+      "8": 37.72323
+    },
+    "round=5|own=6|peak=13|payoff=130": {
+      "13": 42.496898
+    },
+    "round=5|own=6|peak=3|payoff=130": {
+      "19": 20.88
+    },
+    "round=5|own=6|peak=6|payoff=130": {
+      "15": 46.778213
+    },
+    "round=5|own=6|peak=9|payoff=130": {
+      "8": 77.020073
+    },
+    "round=5|own=7|peak=10|payoff=130": {
+      "1": 23.4,
+      "18": 41.389966,
+      "7": 105.430294
+    },
+    "round=5|own=7|peak=11|payoff=130": {
+      "18": 167.56874
+    },
+    "round=5|own=7|peak=5|payoff=130": {
+      "20": 20.34
+    },
+    "round=5|own=7|peak=7|payoff=130": {
+      "14": 96.116933
+    },
+    "round=5|own=7|peak=8|payoff=130": {
+      "12": 22.86
+    },
+    "round=5|own=8|peak=10|payoff=130": {
+      "15": 40.058775
+    },
+    "round=5|own=8|peak=11|payoff=130": {
+      "6": 48.10104,
+      "9": 160.836242
+    },
+    "round=5|own=8|peak=12|payoff=130": {
+      "7": 28.414656
+    },
+    "round=5|own=8|peak=13|payoff=130": {
+      "8": 89.940666
+    },
+    "round=5|own=8|peak=1|payoff=130": {
+      "10": 23.04,
+      "19": 128.935077
+    },
+    "round=5|own=8|peak=7|payoff=130": {
+      "6": 24.12
+    },
+    "round=5|own=8|peak=8|payoff=130": {
+      "18": 122.063761
+    },
+    "round=5|own=8|peak=9|payoff=130": {
+      "11": 118.16611
+    },
+    "round=5|own=9|peak=10|payoff=130": {
+      "12": 42.789312
+    },
+    "round=5|own=9|peak=11|payoff=130": {
+      "12": 36.644844,
+      "18": 172.745658
+    },
+    "round=5|own=9|peak=12|payoff=130": {
+      "17": 37.5912
+    },
+    "round=5|own=9|peak=13|payoff=130": {
+      "10": 42.894184
+    },
+    "round=5|own=9|peak=6|payoff=130": {
+      "21": 40.06008
+    },
+    "round=5|own=9|peak=8|payoff=130": {
+      "7": 36.608397
+    },
+    "round=5|own=9|peak=9|payoff=130": {
+      "1": 34.148264,
+      "11": 176.429549,
+      "19": 48.890503
+    },
+    "round=6|own=10|peak=10|payoff=120": {
+      "16": 32.17798
+    },
+    "round=6|own=10|peak=10|payoff=130": {
+      "20": 145.495157
+    },
+    "round=6|own=10|peak=11|payoff=130": {
+      "20": 42.757708
+    },
+    "round=6|own=10|peak=12|payoff=130": {
+      "16": 59.420326
+    },
+    "round=6|own=10|peak=13|payoff=130": {
+      "8": 39.489545
+    },
+    "round=6|own=10|peak=9|payoff=120": {
+      "10": 54.703771
+    },
+    "round=6|own=11|peak=10|payoff=110": {
+      "2": 27.60408
+    },
+    "round=6|own=11|peak=10|payoff=120": {
+      "15": 84.278882,
+      "5": 28.024848
+    },
+    "round=6|own=11|peak=11|payoff=110": {
+      "18": 38.9844
+    },
+    "round=6|own=11|peak=11|payoff=120": {
+      "12": 21.06,
+      "17": 155.090328
+    },
+    "round=6|own=11|peak=11|payoff=130": {
+      "14": 19.08,
+      "6": 27.698112,
+      "8": 185.568771
+    },
+    "round=6|own=11|peak=13|payoff=130": {
+      "9": 24.84
+    },
+    "round=6|own=11|peak=2|payoff=130": {
+      "9": 34.942887
+    },
+    "round=6|own=11|peak=7|payoff=130": {
+      "19": 55.341058
+    },
+    "round=6|own=11|peak=9|payoff=110": {
+      "17": 43.140384
+    },
+    "round=6|own=11|peak=9|payoff=120": {
+      "12": 95.13023
+    },
+    "round=6|own=12|peak=10|payoff=110": {
+      "1": 23.4
+    },
+    "round=6|own=12|peak=10|payoff=120": {
+      "20": 43.862717
+    },
+    "round=6|own=12|peak=11|payoff=100": {
+      "13": 24.424848
+    },
+    "round=6|own=12|peak=11|payoff=110": {
+      "9": 108.64263
+    },
+    "round=6|own=12|peak=11|payoff=120": {
+      "3": 65.309228
+    },
+    "round=6|own=12|peak=12|payoff=110": {
+      "21": 39.384631
+    },
+    "round=6|own=12|peak=12|payoff=120": {
+      "18": 104.806229,
+      "9": 28.207152
+    },
+    "round=6|own=12|peak=8|payoff=120": {
+      "4": 39.588209
+    },
+    "round=6|own=12|peak=9|payoff=110": {
+      "6": 139.406165
+    },
+    "round=6|own=12|peak=9|payoff=120": {
+      "14": 40.205805
+    },
+    "round=6|own=12|peak=9|payoff=130": {
+      "15": 28.39827
+    },
+    "round=6|own=13|peak=10|payoff=110": {
+      "6": 47.452418
+    },
+    "round=6|own=13|peak=11|payoff=100": {
+      "2": 71.859797
+    },
+    "round=6|own=13|peak=11|payoff=110": {
+      "8": 98.277532
+    },
+    "round=6|own=13|peak=12|payoff=100": {
+      "8": 80.116034
+    },
+    "round=6|own=13|peak=13|payoff=110": {
+      "5": 40.771306
+    },
+    "round=6|own=13|peak=13|payoff=120": {
+      "7": 71.137653
+    },
+    "round=6|own=13|peak=6|payoff=120": {
+      "17": 25.417728
+    },
+    "round=6|own=13|peak=9|payoff=110": {
+      "15": 39.576528
+    },
+    "round=6|own=14|peak=10|payoff=110": {
+      "2": 61.911272
+    },
+    "round=6|own=14|peak=11|payoff=100": {
+      "20": 65.262186
+    },
+    "round=6|own=14|peak=11|payoff=110": {
+      "21": 31.651937
+    },
+    "round=6|own=14|peak=11|payoff=120": {
+      "1": 32.702153
+    },
+    "round=6|own=14|peak=12|payoff=100": {
+      "8": 34.873183
+    },
+    "round=6|own=14|peak=12|payoff=110": {
+      "8": 29.285529
+    },
+    "round=6|own=14|peak=13|payoff=110": {
+      "20": 20.34
+    },
+    "round=6|own=14|peak=6|payoff=130": {
+      "21": 19.8
+    },
+    "round=6|own=14|peak=7|payoff=120": {
+      "6": 24.3
+    },
+    "round=6|own=14|peak=8|payoff=120": {
+      "12": 25.83504
+    },
+    "round=6|own=14|peak=9|payoff=110": {
+      "12": 93.724096
+    },
+    "round=6|own=14|peak=9|payoff=120": {
+      "20": 54.472785
+    },
+    "round=6|own=15|peak=11|payoff=100": {
+      "5": 24.12
+    },
+    "round=6|own=15|peak=11|payoff=110": {
+      "14": 37.1016
+    },
+    "round=6|own=15|peak=11|payoff=120": {
+      "8": 43.411596
+    },
+    "round=6|own=15|peak=12|payoff=100": {
+      "3": 64.221585
+    },
+    "round=6|own=15|peak=12|payoff=120": {
+      "12": 25.210125
+    },
+    "round=6|own=15|peak=13|payoff=110": {
+      "11": 70.490065
+    },
+    "round=6|own=15|peak=6|payoff=120": {
+      "14": 22.68
+    },
+    "round=6|own=15|peak=7|payoff=120": {
+      "7": 24.3
+    },
+    "round=6|own=15|peak=9|payoff=110": {
+      "2": 91.186699
+    },
+    "round=6|own=16|peak=11|payoff=120": {
+      "21": 47.887937
+    },
+    "round=6|own=16|peak=12|payoff=100": {
+      "14": 20.88
+    },
+    "round=6|own=16|peak=13|payoff=120": {
+      "15": 27.49827
+    },
+    "round=6|own=16|peak=1|payoff=120": {
+      "3": 56.659017
+    },
+    "round=6|own=16|peak=9|payoff=120": {
+      "6": 119.999843
+    },
+    "round=6|own=17|peak=11|payoff=110": {
+      "1": 23.4
+    },
+    "round=6|own=17|peak=12|payoff=110": {
+      "21": 19.8
+    },
+    "round=6|own=17|peak=13|payoff=110": {
+      "6": 31.876355
+    },
+    "round=6|own=17|peak=4|payoff=120": {
+      "12": 20.16
+    },
+    "round=6|own=17|peak=5|payoff=120": {
+      "21": 19.8
+    },
+    "round=6|own=17|peak=9|payoff=120": {
+      "13": 21.42
+    },
+    "round=6|own=18|peak=10|payoff=110": {
+      "2": 33.881755,
+      "5": 30.738568,
+      "6": 33.040592,
+      "9": 160.831867
+    },
+    "round=6|own=18|peak=11|payoff=110": {
+      "16": 131.466299,
+      "17": 21.06,
+      "21": 23.615424
+    },
+    "round=6|own=18|peak=12|payoff=110": {
+      "3": 166.553869
+    },
+    "round=6|own=18|peak=13|payoff=110": {
+      "15": 95.232221,
+      "8": 24.66
+    },
+    "round=6|own=18|peak=1|payoff=110": {
+      "19": 35.464811
+    },
+    "round=6|own=18|peak=3|payoff=110": {
+      "17": 25.894656
+    },
+    "round=6|own=18|peak=6|payoff=110": {
+      "4": 42.647757
+    },
+    "round=6|own=18|peak=9|payoff=110": {
+      "19": 130.323691
+    },
+    "round=6|own=19|peak=10|payoff=110": {
+      "3": 66.461826
+    },
+    "round=6|own=19|peak=11|payoff=110": {
+      "1": 165.761641
+    },
+    "round=6|own=19|peak=12|payoff=110": {
+      "19": 48.17105
+    },
+    "round=6|own=19|peak=13|payoff=110": {
+      "18": 25.55456
+    },
+    "round=6|own=19|peak=1|payoff=110": {
+      "11": 102.471411
+    },
+    "round=6|own=19|peak=2|payoff=110": {
+      "15": 43.802615
+    },
+    "round=6|own=19|peak=7|payoff=110": {
+      "16": 22.5
+    },
+    "round=6|own=19|peak=8|payoff=110": {
+      "2": 30.569502
+    },
+    "round=6|own=19|peak=9|payoff=110": {
+      "5": 94.582524,
+      "8": 45.03309
+    },
+    "round=6|own=1|peak=10|payoff=130": {
+      "11": 27.44698
+    },
+    "round=6|own=1|peak=11|payoff=130": {
+      "17": 21.96,
+      "8": 121.815444
+    },
+    "round=6|own=1|peak=12|payoff=130": {
+      "5": 55.856468
+    },
+    "round=6|own=1|peak=13|payoff=130": {
+      "14": 26.226536
+    },
+    "round=6|own=1|peak=14|payoff=130": {
+      "17": 24.368688
+    },
+    "round=6|own=1|peak=1|payoff=130": {
+      "18": 106.743809
+    },
+    "round=6|own=1|peak=9|payoff=130": {
+      "12": 61.900992
+    },
+    "round=6|own=20|peak=11|payoff=110": {
+      "11": 36.469529,
+      "17": 129.214498
+    },
+    "round=6|own=20|peak=12|payoff=110": {
+      "18": 54.877089
+    },
+    "round=6|own=20|peak=13|payoff=110": {
+      "17": 72.029532,
+      "3": 23.76
+    },
+    "round=6|own=20|peak=1|payoff=110": {
+      "13": 39.4704
+    },
+    "round=6|own=20|peak=5|payoff=110": {
+      "8": 24.48
+    },
+    "round=6|own=20|peak=8|payoff=110": {
+      "10": 21.24
+    },
+    "round=6|own=20|peak=9|payoff=110": {
+      "8": 116.520504
+    },
+    "round=6|own=21|peak=10|payoff=110": {
+      "12": 32.405757
+    },
+    "round=6|own=21|peak=11|payoff=110": {
+      "5": 107.133291
+    },
+    "round=6|own=21|peak=13|payoff=110": {
+      "9": 24.84
+    },
+    "round=6|own=21|peak=1|payoff=110": {
+      "5": 24.12
+    },
+    "round=6|own=21|peak=2|payoff=110": {
+      "14": 26.544892
+    },
+    "round=6|own=21|peak=8|payoff=110": {
+      "13": 19.62
+    },
+    "round=6|own=21|peak=9|payoff=110": {
+      "6": 51.802355
+    },
+    "round=6|own=2|peak=10|payoff=130": {
+      "6": 32.137334
+    },
+    "round=6|own=2|peak=11|payoff=130": {
+      "9": 125.568885
+    },
+    "round=6|own=2|peak=12|payoff=130": {
+      "15": 72.413135
+    },
+    "round=6|own=2|peak=13|payoff=130": {
+      "14": 58.16036
+    },
+    "round=6|own=2|peak=2|payoff=130": {
+      "20": 99.388159
+    },
+    "round=6|own=2|peak=8|payoff=130": {
+      "3": 58.662045
+    },
+    "round=6|own=2|peak=9|payoff=130": {
+      "4": 61.447406
+    },
+    "round=6|own=3|peak=10|payoff=130": {
+      "13": 78.371884
+    },
+    "round=6|own=3|peak=11|payoff=130": {
+      "16": 23.07888,
+      "17": 179.301842
+    },
+    "round=6|own=3|peak=12|payoff=130": {
+      "8": 66.918807
+    },
+    "round=6|own=3|peak=13|payoff=130": {
+      "3": 46.078537
+    },
+    "round=6|own=3|peak=3|payoff=130": {
+      "10": 102.691601,
+      "14": 21.78,
+      "4": 32.935586
+    },
+    "round=6|own=3|peak=7|payoff=130": {
+      "16": 35.287447
+    },
+    "round=6|own=3|peak=8|payoff=130": {
+      "10": 24.84
+    },
+    "round=6|own=3|peak=9|payoff=130": {
+      "1": 138.690355
+    },
+    "round=6|own=4|peak=10|payoff=130": {
+      "10": 54.275661
+    },
+    "round=6|own=4|peak=11|payoff=130": {
+      "15": 20.34,
+      "4": 172.232323
+    },
+    "round=6|own=4|peak=12|payoff=130": {
+      "19": 54.44646
+    },
+    "round=6|own=4|peak=1|payoff=130": {
+      "19": 43.971325
+    },
+    "round=6|own=4|peak=4|payoff=130": {
+      "13": 38.9844,
+      "17": 29.121074
+    },
+    "round=6|own=4|peak=5|payoff=130": {
+      "19": 25.754746
+    },
+    "round=6|own=4|peak=9|payoff=130": {
+      "3": 65.1084
+    },
+    "round=6|own=5|peak=10|payoff=130": {
+      "13": 44.188825
+    },
+    "round=6|own=5|peak=11|payoff=130": {
+      "15": 97.044899,
+      "16": 20.7
+    },
+    "round=6|own=5|peak=12|payoff=130": {
+      "20": 20.34,
+      "9": 36.639119
+    },
+    "round=6|own=5|peak=1|payoff=130": {
+      "21": 27.262135
+    },
+    "round=6|own=5|peak=2|payoff=130": {
+      "16": 22.5
+    },
+    "round=6|own=5|peak=4|payoff=130": {
+      "11": 59.035051
+    },
+    "round=6|own=5|peak=5|payoff=130": {
+      "4": 130.544915
+    },
+    "round=6|own=5|peak=6|payoff=130": {
+      "7": 24.3
+    },
+    "round=6|own=5|peak=9|payoff=130": {
+      "2": 71.946333
+    },
+    "round=6|own=6|peak=10|payoff=130": {
+      "12": 46.711457
+    },
+    "round=6|own=6|peak=11|payoff=130": {
+      "1": 23.4,
+      "7": 74.511441
+    },
+    "round=6|own=6|peak=6|payoff=130": {
+      "17": 98.097341
+    },
+    "round=6|own=6|peak=9|payoff=130": {
+      "11": 97.761782
+    },
+    "round=6|own=7|peak=10|payoff=130": {
+      "8": 101.832773
+    },
+    "round=6|own=7|peak=11|payoff=130": {
+      "13": 28.22904,
+      "4": 118.288847
+    },
+    "round=6|own=7|peak=12|payoff=130": {
+      "3": 48.028377
+    },
+    "round=6|own=7|peak=14|payoff=130": {
+      "12": 41.891031
+    },
+    "round=6|own=7|peak=7|payoff=130": {
+      "17": 87.063131
+    },
+    "round=6|own=7|peak=8|payoff=130": {
+      "17": 21.96
+    },
+    "round=6|own=7|peak=9|payoff=130": {
+      "17": 55.77851
+    },
+    "round=6|own=8|peak=10|payoff=130": {
+      "4": 27.993888
+    },
+    "round=6|own=8|peak=11|payoff=130": {
+      "3": 199.667367
+    },
+    "round=6|own=8|peak=12|payoff=130": {
+      "19": 69.411043
+    },
+    "round=6|own=8|peak=13|payoff=130": {
+      "5": 83.311252
+    },
+    "round=6|own=8|peak=7|payoff=120": {
+      "21": 19.8
+    },
+    "round=6|own=8|peak=7|payoff=130": {
+      "7": 29.374459
+    },
+    "round=6|own=8|peak=8|payoff=130": {
+      "2": 154.640534,
+      "5": 24.12
+    },
+    "round=6|own=8|peak=9|payoff=130": {
+      "12": 99.606416
+    },
+    "round=6|own=9|peak=10|payoff=130": {
+      "4": 48.291255
+    },
+    "round=6|own=9|peak=11|payoff=130": {
+      "21": 83.794437,
+      "8": 24.66
+    },
+    "round=6|own=9|peak=12|payoff=130": {
+      "5": 92.045997
+    },
+    "round=6|own=9|peak=13|payoff=130": {
+      "20": 38.856367
+    },
+    "round=6|own=9|peak=1|payoff=130": {
+      "6": 36.468532
+    },
+    "round=6|own=9|peak=7|payoff=130": {
+      "19": 25.023312
+    },
+    "round=6|own=9|peak=8|payoff=130": {
+      "21": 19.8
+    },
+    "round=6|own=9|peak=9|payoff=130": {
+      "10": 147.537368
+    },
+    "round=7|own=10|peak=10|payoff=120": {
+      "6": 28.383696
+    },
+    "round=7|own=10|peak=10|payoff=130": {
+      "13": 20.52,
+      "20": 109.046619
+    },
+    "round=7|own=10|peak=11|payoff=130": {
+      "14": 19.98,
+      "15": 85.50713
+    },
+    "round=7|own=10|peak=1|payoff=130": {
+      "7": 31.969851
+    },
+    "round=7|own=10|peak=5|payoff=130": {
+      "5": 30.639186
+    },
+    "round=7|own=10|peak=6|payoff=130": {
+      "19": 41.500971
+    },
+    "round=7|own=10|peak=7|payoff=120": {
+      "9": 32.157387
+    },
+    "round=7|own=10|peak=9|payoff=110": {
+      "1": 33.188805
+    },
+    "round=7|own=10|peak=9|payoff=120": {
+      "17": 21.96,
+      "20": 23.976576
+    },
+    "round=7|own=11|peak=10|payoff=110": {
+      "6": 52.182093
+    },
+    "round=7|own=11|peak=11|payoff=120": {
+      "2": 121.837276
+    },
+    "round=7|own=11|peak=11|payoff=130": {
+      "12": 26.089052,
+      "16": 132.884586,
+      "19": 32.835072
+    },
+    "round=7|own=11|peak=6|payoff=130": {
+      "17": 32.669116
+    },
+    "round=7|own=12|peak=10|payoff=110": {
+      "9": 97.858274
+    },
+    "round=7|own=12|peak=10|payoff=120": {
+      "1": 55.339062
+    },
+    "round=7|own=12|peak=11|payoff=110": {
+      "4": 57.440967
+    },
+    "round=7|own=12|peak=11|payoff=120": {
+      "15": 33.757216
+    },
+    "round=7|own=12|peak=12|payoff=110": {
+      "2": 36.476985
+    },
+    "round=7|own=12|peak=12|payoff=120": {
+      "7": 139.501519
+    },
+    "round=7|own=12|peak=13|payoff=130": {
+      "9": 62.092112
+    },
+    "round=7|own=12|peak=7|payoff=120": {
+      "11": 76.573001
+    },
+    "round=7|own=12|peak=7|payoff=130": {
+      "20": 20.34
+    },
+    "round=7|own=12|peak=9|payoff=110": {
+      "5": 72.752691
+    },
+    "round=7|own=12|peak=9|payoff=120": {
+      "10": 54.660619
+    },
+    "round=7|own=13|peak=10|payoff=100": {
+      "16": 20.7
+    },
+    "round=7|own=13|peak=10|payoff=110": {
+      "17": 39.360799
+    },
+    "round=7|own=13|peak=11|payoff=100": {
+      "20": 28.942503
+    },
+    "round=7|own=13|peak=11|payoff=110": {
+      "13": 26.002279,
+      "18": 26.826777
+    },
+    "round=7|own=13|peak=12|payoff=100": {
+      "10": 63.962188
+    },
+    "round=7|own=13|peak=12|payoff=110": {
+      "19": 23.884848
+    },
+    "round=7|own=13|peak=13|payoff=110": {
+      "2": 83.083603
+    },
+    "round=7|own=13|peak=1|payoff=130": {
+      "10": 29.760211
+    },
+    "round=7|own=13|peak=9|payoff=110": {
+      "18": 21.42,
+      "19": 54.227327
+    },
+    "round=7|own=14|peak=10|payoff=110": {
+      "3": 27.217728
+    },
+    "round=7|own=14|peak=10|payoff=120": {
+      "6": 44.737045
+    },
+    "round=7|own=14|peak=11|payoff=100": {
+      "9": 28.117728
+    },
+    "round=7|own=14|peak=11|payoff=110": {
+      "17": 44.882506,
+      "6": 40.781208
+    },
+    "round=7|own=14|peak=11|payoff=120": {
+      "9": 63.299507
+    },
+    "round=7|own=14|peak=12|payoff=100": {
+      "21": 27.190816
+    },
+    "round=7|own=14|peak=13|payoff=110": {
+      "3": 61.39383
+    },
+    "round=7|own=14|peak=14|payoff=120": {
+      "14": 28.684086
+    },
+    "round=7|own=14|peak=9|payoff=110": {
+      "12": 42.5052
+    },
+    "round=7|own=15|peak=10|payoff=110": {
+      "12": 40.648795
+    },
+    "round=7|own=15|peak=10|payoff=120": {
+      "18": 27.713065
+    },
+    "round=7|own=15|peak=11|payoff=100": {
+      "19": 59.608153
+    },
+    "round=7|own=15|peak=11|payoff=110": {
+      "12": 21.06,
+      "16": 98.760755
+    },
+    "round=7|own=15|peak=12|payoff=100": {
+      "17": 25.338283
+    },
+    "round=7|own=15|peak=12|payoff=110": {
+      "14": 43.650418
+    },
+    "round=7|own=15|peak=13|payoff=100": {
+      "9": 49.823895
+    },
+    "round=7|own=15|peak=13|payoff=110": {
+      "12": 22.86
+    },
+    "round=7|own=15|peak=15|payoff=110": {
+      "15": 27.609575
+    },
+    "round=7|own=15|peak=15|payoff=120": {
+      "5": 24.12
+    },
+    "round=7|own=15|peak=1|payoff=120": {
+      "3": 28.04746
+    },
+    "round=7|own=15|peak=8|payoff=110": {
+      "9": 37.8077
+    },
+    "round=7|own=15|peak=9|payoff=110": {
+      "13": 24.639264,
+      "4": 107.976714
+    },
+    "round=7|own=16|peak=10|payoff=110": {
+      "17": 43.164786
+    },
+    "round=7|own=16|peak=11|payoff=110": {
+      "21": 19.8,
+      "7": 32.195121
+    },
+    "round=7|own=16|peak=11|payoff=120": {
+      "11": 104.024316
+    },
+    "round=7|own=16|peak=12|payoff=100": {
+      "19": 20.88
+    },
+    "round=7|own=16|peak=12|payoff=110": {
+      "19": 26.211334
+    },
+    "round=7|own=16|peak=12|payoff=120": {
+      "7": 28.265616
+    },
+    "round=7|own=16|peak=13|payoff=110": {
+      "2": 27.684371
+    },
+    "round=7|own=16|peak=13|payoff=120": {
+      "20": 20.34
+    },
+    "round=7|own=16|peak=1|payoff=120": {
+      "15": 35.03346
+    },
+    "round=7|own=16|peak=7|payoff=120": {
+      "1": 32.119892
+    },
+    "round=7|own=16|peak=9|payoff=120": {
+      "6": 36.925971,
+      "9": 105.065306
+    },
+    "round=7|own=17|peak=10|payoff=110": {
+      "14": 77.336751
+    },
+    "round=7|own=17|peak=10|payoff=120": {
+      "21": 69.162389,
+      "5": 27.39888
+    },
+    "round=7|own=17|peak=11|payoff=110": {
+      "1": 23.4,
+      "4": 163.293852,
+      "7": 41.505346
+    },
+    "round=7|own=17|peak=11|payoff=120": {
+      "3": 160.60999
+    },
+    "round=7|own=17|peak=12|payoff=110": {
+      "7": 39.683353,
+      "8": 24.66
+    },
+    "round=7|own=17|peak=12|payoff=120": {
+      "21": 19.8
+    },
+    "round=7|own=17|peak=13|payoff=110": {
+      "14": 89.798187
+    },
+    "round=7|own=17|peak=13|payoff=120": {
+      "4": 61.894705
+    },
+    "round=7|own=17|peak=5|payoff=120": {
+      "19": 53.288416,
+      "21": 19.8
+    },
+    "round=7|own=17|peak=6|payoff=120": {
+      "6": 49.703535
+    },
+    "round=7|own=17|peak=7|payoff=120": {
+      "4": 23.94
+    },
+    "round=7|own=17|peak=8|payoff=120": {
+      "14": 24.675404
+    },
+    "round=7|own=17|peak=9|payoff=120": {
+      "13": 28.499565,
+      "6": 143.829297
+    },
+    "round=7|own=18|peak=10|payoff=110": {
+      "7": 49.629513
+    },
+    "round=7|own=18|peak=11|payoff=110": {
+      "18": 100.293372,
+      "5": 27.69696
+    },
+    "round=7|own=18|peak=12|payoff=110": {
+      "5": 64.669867
+    },
+    "round=7|own=18|peak=1|payoff=110": {
+      "10": 120.647969
+    },
+    "round=7|own=18|peak=9|payoff=110": {
+      "5": 55.650459
+    },
+    "round=7|own=19|peak=10|payoff=110": {
+      "2": 37.344563,
+      "8": 65.866245
+    },
+    "round=7|own=19|peak=11|payoff=110": {
+      "21": 27.190816,
+      "6": 84.425768
+    },
+    "round=7|own=19|peak=12|payoff=110": {
+      "16": 91.119475
+    },
+    "round=7|own=19|peak=13|payoff=110": {
+      "4": 52.233417
+    },
+    "round=7|own=19|peak=1|payoff=110": {
+      "18": 21.42
+    },
+    "round=7|own=19|peak=5|payoff=110": {
+      "9": 36.403285
+    },
+    "round=7|own=19|peak=6|payoff=110": {
+      "10": 49.291056
+    },
+    "round=7|own=19|peak=7|payoff=110": {
+      "16": 40.95
+    },
+    "round=7|own=19|peak=9|payoff=110": {
+      "15": 38.531201,
+      "20": 87.253408
+    },
+    "round=7|own=1|peak=10|payoff=130": {
+      "10": 111.915038
+    },
+    "round=7|own=1|peak=11|payoff=130": {
+      "10": 36.845258,
+      "15": 21.24,
+      "18": 149.78908
+    },
+    "round=7|own=1|peak=13|payoff=130": {
+      "19": 29.397022,
+      "6": 40.781208,
+      "8": 34.305078
+    },
+    "round=7|own=1|peak=1|payoff=130": {
+      "7": 48.702969
+    },
+    "round=7|own=1|peak=9|payoff=130": {
+      "8": 48.13206
+    },
+    "round=7|own=20|peak=10|payoff=110": {
+      "17": 47.697237
+    },
+    "round=7|own=20|peak=11|payoff=110": {
+      "12": 130.775885,
+      "18": 27.889528
+    },
+    "round=7|own=20|peak=12|payoff=110": {
+      "11": 74.789527
+    },
+    "round=7|own=20|peak=13|payoff=100": {
+      "4": 23.94
+    },
+    "round=7|own=20|peak=13|payoff=110": {
+      "4": 37.768981
+    },
+    "round=7|own=20|peak=2|payoff=110": {
+      "16": 41.968688
+    },
+    "round=7|own=20|peak=3|payoff=110": {
+      "12": 48.327738
+    },
+    "round=7|own=20|peak=8|payoff=110": {
+      "15": 41.1948
+    },
+    "round=7|own=20|peak=9|payoff=110": {
+      "1": 23.4,
+      "17": 108.38674
+    },
+    "round=7|own=21|peak=10|payoff=110": {
+      "18": 105.65005
+    },
+    "round=7|own=21|peak=11|payoff=110": {
+      "17": 21.06,
+      "2": 32.051914,
+      "9": 104.371433
+    },
+    "round=7|own=21|peak=13|payoff=110": {
+      "5": 43.8984
+    },
+    "round=7|own=21|peak=5|payoff=110": {
+      "10": 29.073888
+    },
+    "round=7|own=21|peak=6|payoff=110": {
+      "5": 49.879885
+    },
+    "round=7|own=21|peak=7|payoff=110": {
+      "11": 35.555244
+    },
+    "round=7|own=21|peak=9|payoff=110": {
+      "10": 68.162426
+    },
+    "round=7|own=2|peak=10|payoff=130": {
+      "1": 129.608168,
+      "18": 21.42
+    },
+    "round=7|own=2|peak=11|payoff=130": {
+      "14": 86.874317
+    },
+    "round=7|own=2|peak=13|payoff=130": {
+      "6": 44.226
+    },
+    "round=7|own=2|peak=2|payoff=130": {
+      "12": 130.114041
+    },
+    "round=7|own=2|peak=8|payoff=130": {
+      "21": 19.8
+    },
+    "round=7|own=2|peak=9|payoff=130": {
+      "17": 89.88466
+    },
+    "round=7|own=3|peak=10|payoff=130": {
+      "14": 20.88,
+      "7": 123.550727
+    },
+    "round=7|own=3|peak=11|payoff=130": {
+      "11": 26.602951,
+      "18": 192.724487,
+      "4": 23.94
+    },
+    "round=7|own=3|peak=12|payoff=130": {
+      "3": 113.056468
+    },
+    "round=7|own=3|peak=13|payoff=130": {
+      "2": 73.370953
+    },
+    "round=7|own=3|peak=3|payoff=130": {
+      "11": 142.400981,
+      "4": 23.76
+    },
+    "round=7|own=3|peak=9|payoff=130": {
+      "13": 69.795374
+    },
+    "round=7|own=4|peak=10|payoff=130": {
+      "14": 67.272042
+    },
+    "round=7|own=4|peak=11|payoff=130": {
+      "15": 206.134153
+    },
+    "round=7|own=4|peak=12|payoff=130": {
+      "6": 33.00468
+    },
+    "round=7|own=4|peak=13|payoff=130": {
+      "7": 88.553275
+    },
+    "round=7|own=4|peak=4|payoff=130": {
+      "17": 56.495085,
+      "18": 21.42
+    },
+    "round=7|own=4|peak=9|payoff=130": {
+      "10": 104.362647,
+      "20": 24.274656
+    },
+    "round=7|own=5|peak=10|payoff=130": {
+      "13": 27.405454
+    },
+    "round=7|own=5|peak=11|payoff=130": {
+      "16": 102.477052
+    },
+    "round=7|own=5|peak=12|payoff=130": {
+      "8": 64.707401
+    },
+    "round=7|own=5|peak=1|payoff=130": {
+      "2": 23.4
+    },
+    "round=7|own=5|peak=5|payoff=130": {
+      "17": 119.123961
+    },
+    "round=7|own=5|peak=9|payoff=130": {
+      "15": 22.14,
+      "19": 20.88,
+      "2": 99.328272
+    },
+    "round=7|own=6|peak=10|payoff=130": {
+      "20": 20.34
+    },
+    "round=7|own=6|peak=11|payoff=130": {
+      "13": 92.081338
+    },
+    "round=7|own=6|peak=12|payoff=130": {
+      "17": 21.06
+    },
+    "round=7|own=6|peak=6|payoff=130": {
+      "3": 118.480498
+    },
+    "round=7|own=6|peak=7|payoff=130": {
+      "4": 36.696923
+    },
+    "round=7|own=6|peak=8|payoff=130": {
+      "7": 75.752062
+    },
+    "round=7|own=6|peak=9|payoff=130": {
+      "11": 20.7,
+      "19": 20.88,
+      "2": 102.517861,
+      "21": 25.008078
+    },
+    "round=7|own=7|peak=10|payoff=130": {
+      "18": 38.105474
+    },
+    "round=7|own=7|peak=11|payoff=130": {
+      "12": 48.638027
+    },
+    "round=7|own=7|peak=12|payoff=130": {
+      "18": 19.62
+    },
+    "round=7|own=7|peak=13|payoff=130": {
+      "10": 25.02,
+      "7": 61.605101
+    },
+    "round=7|own=7|peak=6|payoff=130": {
+      "3": 34.312186
+    },
+    "round=7|own=7|peak=7|payoff=130": {
+      "15": 46.581233
+    },
+    "round=7|own=8|peak=10|payoff=130": {
+      "21": 173.954031
+    },
+    "round=7|own=8|peak=11|payoff=130": {
+      "11": 154.524531
+    },
+    "round=7|own=8|peak=12|payoff=130": {
+      "5": 83.464739
+    },
+    "round=7|own=8|peak=13|payoff=130": {
+      "1": 51.014513,
+      "19": 24.516576,
+      "4": 50.721817
+    },
+    "round=7|own=8|peak=3|payoff=130": {
+      "7": 24.48
+    },
+    "round=7|own=8|peak=8|payoff=130": {
+      "18": 149.71331
+    },
+    "round=7|own=9|peak=10|payoff=130": {
+      "20": 37.0188
+    },
+    "round=7|own=9|peak=11|payoff=130": {
+      "18": 82.306863
+    },
+    "round=7|own=9|peak=12|payoff=130": {
+      "3": 23.76
+    },
+    "round=7|own=9|peak=8|payoff=130": {
+      "10": 22.14
+    },
+    "round=7|own=9|peak=9|payoff=130": {
+      "13": 145.082198,
+      "6": 24.3,
+      "7": 24.48
+    },
+    "round=8|own=10|peak=10|payoff=120": {
+      "3": 74.64268
+    },
+    "round=8|own=10|peak=10|payoff=130": {
+      "17": 117.891874
+    },
+    "round=8|own=10|peak=11|payoff=130": {
+      "7": 163.995017
+    },
+    "round=8|own=10|peak=12|payoff=130": {
+      "8": 58.945365
+    },
+    "round=8|own=10|peak=13|payoff=130": {
+      "12": 49.258756
+    },
+    "round=8|own=10|peak=14|payoff=130": {
+      "7": 32.092247
+    },
+    "round=8|own=10|peak=1|payoff=130": {
+      "2": 73.070147
+    },
+    "round=8|own=10|peak=4|payoff=130": {
+      "11": 38.187216,
+      "12": 23.76
+    },
+    "round=8|own=10|peak=8|payoff=130": {
+      "7": 61.53407
+    },
+    "round=8|own=10|peak=9|payoff=120": {
+      "10": 113.456999
+    },
+    "round=8|own=11|peak=10|payoff=120": {
+      "7": 28.420904
+    },
+    "round=8|own=11|peak=11|payoff=110": {
+      "14": 51.108883,
+      "7": 35.942478
+    },
+    "round=8|own=11|peak=11|payoff=120": {
+      "15": 24.36408,
+      "18": 96.154417
+    },
+    "round=8|own=11|peak=11|payoff=130": {
+      "10": 32.629403,
+      "12": 173.000405,
+      "14": 35.325976
+    },
+    "round=8|own=11|peak=12|payoff=130": {
+      "15": 36.912297
+    },
+    "round=8|own=11|peak=12|payoff=140": {
+      "20": 41.653988
+    },
+    "round=8|own=11|peak=13|payoff=130": {
+      "3": 23.76
+    },
+    "round=8|own=11|peak=3|payoff=140": {
+      "3": 39.327454
+    },
+    "round=8|own=11|peak=9|payoff=110": {
+      "13": 55.272729
+    },
+    "round=8|own=11|peak=9|payoff=120": {
+      "18": 92.701926
+    },
+    "round=8|own=11|peak=9|payoff=130": {
+      "14": 20.88
+    },
+    "round=8|own=12|peak=10|payoff=110": {
+      "10": 29.104046,
+      "7": 42.732592
+    },
+    "round=8|own=12|peak=10|payoff=120": {
+      "19": 54.188776
+    },
+    "round=8|own=12|peak=11|payoff=100": {
+      "10": 25.02
+    },
+    "round=8|own=12|peak=11|payoff=110": {
+      "8": 164.832738
+    },
+    "round=8|own=12|peak=12|payoff=110": {
+      "13": 26.085183
+    },
+    "round=8|own=12|peak=12|payoff=120": {
+      "7": 93.034102
+    },
+    "round=8|own=12|peak=12|payoff=130": {
+      "10": 55.341914,
+      "13": 32.004208
+    },
+    "round=8|own=12|peak=2|payoff=120": {
+      "7": 57.767929
+    },
+    "round=8|own=12|peak=2|payoff=130": {
+      "1": 38.872742,
+      "8": 34.567857
+    },
+    "round=8|own=12|peak=7|payoff=130": {
+      "18": 21.42
+    },
+    "round=8|own=12|peak=8|payoff=120": {
+      "15": 21.24
+    },
+    "round=8|own=12|peak=9|payoff=110": {
+      "3": 23.76,
+      "8": 71.639176
+    },
+    "round=8|own=12|peak=9|payoff=120": {
+      "14": 84.760077
+    },
+    "round=8|own=13|peak=10|payoff=100": {
+      "5": 56.548692
+    },
+    "round=8|own=13|peak=10|payoff=110": {
+      "20": 124.900112
+    },
+    "round=8|own=13|peak=11|payoff=100": {
+      "13": 40.716433
+    },
+    "round=8|own=13|peak=11|payoff=110": {
+      "4": 27.844848,
+      "7": 77.863291
+    },
+    "round=8|own=13|peak=11|payoff=120": {
+      "18": 45.859135
+    },
+    "round=8|own=13|peak=12|payoff=100": {
+      "12": 25.83504
+    },
+    "round=8|own=13|peak=12|payoff=110": {
+      "1": 46.944712
+    },
+    "round=8|own=13|peak=13|payoff=110": {
+      "15": 49.352256
+    },
+    "round=8|own=13|peak=13|payoff=120": {
+      "13": 43.789081
+    },
+    "round=8|own=13|peak=8|payoff=110": {
+      "6": 77.986815
+    },
+    "round=8|own=13|peak=9|payoff=110": {
+      "1": 122.945825
+    },
+    "round=8|own=13|peak=9|payoff=120": {
+      "2": 28.438048
+    },
+    "round=8|own=14|peak=10|payoff=110": {
+      "18": 21.42,
+      "6": 107.420804
+    },
+    "round=8|own=14|peak=11|payoff=100": {
+      "15": 43.106929
+    },
+    "round=8|own=14|peak=11|payoff=110": {
+      "3": 45.608596
+    },
+    "round=8|own=14|peak=12|payoff=110": {
+      "18": 52.560905,
+      "21": 33.702275
+    },
+    "round=8|own=14|peak=13|payoff=110": {
+      "13": 65.165923
+    },
+    "round=8|own=14|peak=14|payoff=120": {
+      "16": 20.7
+    },
+    "round=8|own=14|peak=9|payoff=110": {
+      "6": 118.518931,
+      "7": 37.411077,
+      "8": 58.618961
+    },
+    "round=8|own=14|peak=9|payoff=120": {
+      "9": 39.68228
+    },
+    "round=8|own=15|peak=10|payoff=110": {
+      "18": 101.803763
+    },
+    "round=8|own=15|peak=11|payoff=110": {
+      "5": 111.773546,
+      "7": 55.931481
+    },
+    "round=8|own=15|peak=11|payoff=120": {
+      "3": 30.267387
+    },
+    "round=8|own=15|peak=12|payoff=110": {
+      "1": 23.4
+    },
+    "round=8|own=15|peak=13|payoff=110": {
+      "16": 76.148697,
+      "3": 49.532063
+    },
+    "round=8|own=15|peak=7|payoff=120": {
+      "5": 24.12
+    },
+    "round=8|own=15|peak=9|payoff=110": {
+      "9": 222.75007
+    },
+    "round=8|own=15|peak=9|payoff=120": {
+      "6": 35.288544
+    },
+    "round=8|own=16|peak=10|payoff=110": {
+      "13": 19.62,
+      "14": 94.020219,
+      "4": 34.13107
+    },
+    "round=8|own=16|peak=10|payoff=120": {
+      "14": 19.98
+    },
+    "round=8|own=16|peak=11|payoff=110": {
+      "8": 219.207134
+    },
+    "round=8|own=16|peak=11|payoff=120": {
+      "21": 76.752073
+    },
+    "round=8|own=16|peak=12|payoff=100": {
+      "3": 38.921552
+    },
+    "round=8|own=16|peak=12|payoff=110": {
+      "5": 31.839542
+    },
+    "round=8|own=16|peak=12|payoff=120": {
+      "13": 34.095954
+    },
+    "round=8|own=16|peak=13|payoff=110": {
+      "4": 55.474629
+    },
+    "round=8|own=16|peak=13|payoff=120": {
+      "3": 53.608763
+    },
+    "round=8|own=16|peak=5|payoff=120": {
+      "11": 55.977784
+    },
+    "round=8|own=16|peak=8|payoff=120": {
+      "9": 59.017668
+    },
+    "round=8|own=17|peak=10|payoff=110": {
+      "12": 43.470867
+    },
+    "round=8|own=17|peak=10|payoff=120": {
+      "14": 48.39746
+    },
+    "round=8|own=17|peak=11|payoff=110": {
+      "12": 84.319421
+    },
+    "round=8|own=17|peak=11|payoff=120": {
+      "3": 167.459691
+    },
+    "round=8|own=17|peak=13|payoff=110": {
+      "19": 55.567089
+    },
+    "round=8|own=17|peak=3|payoff=120": {
+      "12": 68.021944
+    },
+    "round=8|own=17|peak=4|payoff=120": {
+      "7": 59.243215
+    },
+    "round=8|own=17|peak=5|payoff=120": {
+      "6": 134.164475
+    },
+    "round=8|own=17|peak=7|payoff=120": {
+      "3": 23.76
+    },
+    "round=8|own=17|peak=8|payoff=120": {
+      "18": 24.659497
+    },
+    "round=8|own=17|peak=9|payoff=120": {
+      "3": 143.990443
+    },
+    "round=8|own=18|peak=10|payoff=110": {
+      "11": 23.07888,
+      "17": 26.013888,
+      "18": 21.42,
+      "19": 177.413699
+    },
+    "round=8|own=18|peak=11|payoff=110": {
+      "14": 183.2362
+    },
+    "round=8|own=18|peak=12|payoff=100": {
+      "14": 21.78
+    },
+    "round=8|own=18|peak=12|payoff=110": {
+      "15": 30.259682,
+      "4": 23.94
+    },
+    "round=8|own=18|peak=13|payoff=110": {
+      "18": 64.544965
+    },
+    "round=8|own=18|peak=3|payoff=110": {
+      "11": 25.2
+    },
+    "round=8|own=18|peak=4|payoff=110": {
+      "12": 29.768698
+    },
+    "round=8|own=18|peak=7|payoff=110": {
+      "6": 56.586334
+    },
+    "round=8|own=18|peak=8|payoff=110": {
+      "8": 115.367701
+    },
+    "round=8|own=18|peak=9|payoff=110": {
+      "17": 171.037855
+    },
+    "round=8|own=19|peak=10|payoff=110": {
+      "21": 51.851223
+    },
+    "round=8|own=19|peak=11|payoff=110": {
+      "17": 137.307593
+    },
+    "round=8|own=19|peak=12|payoff=110": {
+      "2": 23.58,
+      "9": 31.170067
+    },
+    "round=8|own=19|peak=5|payoff=110": {
+      "17": 21.96
+    },
+    "round=8|own=19|peak=7|payoff=110": {
+      "4": 23.94
+    },
+    "round=8|own=19|peak=9|payoff=110": {
+      "2": 106.494019
+    },
+    "round=8|own=1|peak=10|payoff=130": {
+      "2": 82.940979
+    },
+    "round=8|own=1|peak=11|payoff=130": {
+      "4": 71.267578
+    },
+    "round=8|own=1|peak=13|payoff=130": {
+      "13": 20.52
+    },
+    "round=8|own=1|peak=1|payoff=130": {
+      "20": 155.441832,
+      "3": 27.366768
+    },
+    "round=8|own=20|peak=10|payoff=110": {
+      "14": 21.78,
+      "16": 127.891626,
+      "17": 21.96
+    },
+    "round=8|own=20|peak=11|payoff=110": {
+      "12": 21.06,
+      "8": 108.30799
+    },
+    "round=8|own=20|peak=12|payoff=110": {
+      "6": 28.204848
+    },
+    "round=8|own=20|peak=13|payoff=110": {
+      "14": 36.020856
+    },
+    "round=8|own=20|peak=6|payoff=110": {
+      "19": 30.835324
+    },
+    "round=8|own=20|peak=8|payoff=110": {
+      "3": 43.2432
+    },
+    "round=8|own=20|peak=9|payoff=110": {
+      "13": 20.52,
+      "6": 70.903396
+    },
+    "round=8|own=21|peak=10|payoff=110": {
+      "11": 74.518806,
+      "7": 37.903312
+    },
+    "round=8|own=21|peak=11|payoff=110": {
+      "10": 34.016968,
+      "8": 173.378198
+    },
+    "round=8|own=21|peak=12|payoff=110": {
+      "14": 28.354796
+    },
+    "round=8|own=21|peak=5|payoff=110": {
+      "6": 37.109781
+    },
+    "round=8|own=21|peak=9|payoff=110": {
+      "6": 178.564788
+    },
+    "round=8|own=2|peak=10|payoff=130": {
+      "5": 136.962866
+    },
+    "round=8|own=2|peak=11|payoff=130": {
+      "17": 78.865486
+    },
+    "round=8|own=2|peak=12|payoff=130": {
+      "19": 172.340174
+    },
+    "round=8|own=2|peak=13|payoff=130": {
+      "11": 97.569537
+    },
+    "round=8|own=2|peak=1|payoff=130": {
+      "18": 21.42
+    },
+    "round=8|own=2|peak=2|payoff=130": {
+      "6": 92.277858
+    },
+    "round=8|own=2|peak=9|payoff=130": {
+      "14": 62.504312
+    },
+    "round=8|own=3|peak=10|payoff=130": {
+      "12": 125.796393,
+      "19": 20.88
+    },
+    "round=8|own=3|peak=11|payoff=130": {
+      "15": 124.578946,
+      "6": 46.872258
+    },
+    "round=8|own=3|peak=13|payoff=130": {
+      "20": 66.289709
+    },
+    "round=8|own=3|peak=3|payoff=130": {
+      "8": 122.588084
+    },
+    "round=8|own=3|peak=9|payoff=130": {
+      "11": 46.13186
+    },
+    "round=8|own=4|peak=10|payoff=130": {
+      "1": 59.777182
+    },
+    "round=8|own=4|peak=11|payoff=130": {
+      "21": 30.117641,
+      "8": 125.874323,
+      "9": 24.84
+    },
+    "round=8|own=4|peak=12|payoff=130": {
+      "5": 70.773615
+    },
+    "round=8|own=4|peak=13|payoff=130": {
+      "13": 164.27401
+    },
+    "round=8|own=4|peak=14|payoff=130": {
+      "3": 49.806213
+    },
+    "round=8|own=4|peak=3|payoff=130": {
+      "8": 47.464201
+    },
+    "round=8|own=4|peak=4|payoff=130": {
+      "20": 119.22118
+    },
+    "round=8|own=4|peak=9|payoff=130": {
+      "14": 55.475542
+    },
+    "round=8|own=5|peak=10|payoff=130": {
+      "21": 55.703638
+    },
+    "round=8|own=5|peak=11|payoff=130": {
+      "11": 21.6,
+      "8": 191.060316
+    },
+    "round=8|own=5|peak=12|payoff=130": {
+      "3": 58.400561
+    },
+    "round=8|own=5|peak=5|payoff=130": {
+      "21": 82.946983
+    },
+    "round=8|own=5|peak=9|payoff=130": {
+      "5": 106.739749
+    },
+    "round=8|own=6|peak=11|payoff=130": {
+      "15": 27.363049,
+      "3": 128.970902,
+      "8": 24.66
+    },
+    "round=8|own=6|peak=12|payoff=130": {
+      "1": 67.73193
+    },
+    "round=8|own=6|peak=13|payoff=130": {
+      "18": 42.786913
+    },
+    "round=8|own=6|peak=4|payoff=130": {
+      "6": 44.865212
+    },
+    "round=8|own=6|peak=6|payoff=130": {
+      "8": 195.487118
+    },
+    "round=8|own=6|peak=7|payoff=130": {
+      "2": 36.027014
+    },
+    "round=8|own=6|peak=9|payoff=130": {
+      "8": 142.276234
+    },
+    "round=8|own=7|peak=10|payoff=130": {
+      "16": 89.709384
+    },
+    "round=8|own=7|peak=11|payoff=130": {
+      "15": 20.34,
+      "2": 147.899018
+    },
+    "round=8|own=7|peak=13|payoff=130": {
+      "1": 61.323332
+    },
+    "round=8|own=7|peak=1|payoff=130": {
+      "18": 45.752008
+    },
+    "round=8|own=7|peak=2|payoff=130": {
+      "7": 24.48
+    },
+    "round=8|own=7|peak=7|payoff=130": {
+      "12": 131.239401
+    },
+    "round=8|own=7|peak=9|payoff=130": {
+      "19": 50.183665,
+      "7": 158.142908
+    },
+    "round=8|own=8|peak=10|payoff=130": {
+      "4": 50.520435
+    },
+    "round=8|own=8|peak=12|payoff=130": {
+      "21": 43.156767
+    },
+    "round=8|own=8|peak=13|payoff=130": {
+      "9": 104.393804
+    },
+    "round=8|own=8|peak=14|payoff=130": {
+      "14": 26.286768
+    },
+    "round=8|own=8|peak=8|payoff=130": {
+      "12": 24.66,
+      "9": 47.475497
+    },
+    "round=8|own=8|peak=9|payoff=130": {
+      "6": 43.148067
+    },
+    "round=8|own=9|peak=10|payoff=130": {
+      "3": 133.180767
+    },
+    "round=8|own=9|peak=11|payoff=130": {
+      "18": 24.69888,
+      "9": 122.258375
+    },
+    "round=8|own=9|peak=13|payoff=130": {
+      "11": 22.5
+    },
+    "round=8|own=9|peak=7|payoff=130": {
+      "16": 22.5
+    },
+    "round=8|own=9|peak=9|payoff=130": {
+      "10": 37.874932,
+      "14": 163.43211
+    },
+    "round=9|own=10|peak=10|payoff=120": {
+      "3": 50.404274
+    },
+    "round=9|own=10|peak=10|payoff=130": {
+      "13": 19.62,
+      "16": 213.212178,
+      "20": 20.34,
+      "9": 63.175725
+    },
+    "round=9|own=10|peak=11|payoff=130": {
+      "20": 184.363382
+    },
+    "round=9|own=10|peak=12|payoff=130": {
+      "5": 24.12
+    },
+    "round=9|own=10|peak=13|payoff=130": {
+      "11": 33.35289,
+      "18": 81.451435
+    },
+    "round=9|own=10|peak=4|payoff=130": {
+      "3": 23.58
+    },
+    "round=9|own=10|peak=6|payoff=130": {
+      "10": 40.349461
+    },
+    "round=9|own=10|peak=7|payoff=130": {
+      "1": 65.203652
+    },
+    "round=9|own=10|peak=8|payoff=130": {
+      "7": 43.918368
+    },
+    "round=9|own=10|peak=9|payoff=110": {
+      "17": 47.779224
+    },
+    "round=9|own=10|peak=9|payoff=120": {
+      "17": 26.516999,
+      "20": 85.81746
+    },
+    "round=9|own=10|peak=9|payoff=130": {
+      "11": 25.749072,
+      "2": 67.984019
+    },
+    "round=9|own=11|peak=10|payoff=110": {
+      "21": 78.346305
+    },
+    "round=9|own=11|peak=10|payoff=120": {
+      "20": 65.536776
+    },
+    "round=9|own=11|peak=11|payoff=120": {
+      "13": 174.162824
+    },
+    "round=9|own=11|peak=11|payoff=130": {
+      "10": 32.629403,
+      "9": 252.470682
+    },
+    "round=9|own=11|peak=12|payoff=130": {
+      "5": 88.714961
+    },
+    "round=9|own=11|peak=12|payoff=140": {
+      "20": 86.656971
+    },
+    "round=9|own=11|peak=13|payoff=130": {
+      "2": 71.870919
+    },
+    "round=9|own=11|peak=1|payoff=140": {
+      "4": 23.94
+    },
+    "round=9|own=11|peak=9|payoff=110": {
+      "18": 36.017952
+    },
+    "round=9|own=11|peak=9|payoff=120": {
+      "5": 48.529633
+    },
+    "round=9|own=12|peak=10|payoff=110": {
+      "15": 36.912297,
+      "19": 90.029162,
+      "5": 49.062814
+    },
+    "round=9|own=12|peak=10|payoff=120": {
+      "4": 59.678458
+    },
+    "round=9|own=12|peak=11|payoff=110": {
+      "11": 177.0849
+    },
+    "round=9|own=12|peak=11|payoff=120": {
+      "21": 129.228853
+    },
+    "round=9|own=12|peak=12|payoff=110": {
+      "7": 49.686027
+    },
+    "round=9|own=12|peak=12|payoff=120": {
+      "16": 170.815171
+    },
+    "round=9|own=12|peak=12|payoff=130": {
+      "13": 21.42,
+      "8": 49.557241
+    },
+    "round=9|own=12|peak=13|payoff=120": {
+      "19": 31.8427
+    },
+    "round=9|own=12|peak=13|payoff=130": {
+      "3": 23.76,
+      "6": 123.599208
+    },
+    "round=9|own=12|peak=3|payoff=130": {
+      "10": 25.508304
+    },
+    "round=9|own=12|peak=5|payoff=120": {
+      "13": 21.42
+    },
+    "round=9|own=12|peak=5|payoff=130": {
+      "17": 26.064562
+    },
+    "round=9|own=12|peak=7|payoff=120": {
+      "6": 50.950563
+    },
+    "round=9|own=12|peak=8|payoff=130": {
+      "15": 23.04
+    },
+    "round=9|own=12|peak=9|payoff=110": {
+      "5": 28.751233
+    },
+    "round=9|own=12|peak=9|payoff=120": {
+      "1": 23.4,
+      "13": 72.368625,
+      "20": 20.34
+    },
+    "round=9|own=13|peak=10|payoff=100": {
+      "2": 99.458034
+    },
+    "round=9|own=13|peak=10|payoff=110": {
+      "10": 94.109272,
+      "2": 41.86055
+    },
+    "round=9|own=13|peak=11|payoff=100": {
+      "1": 97.703761
+    },
+    "round=9|own=13|peak=11|payoff=110": {
+      "1": 26.67888,
+      "5": 169.963249
+    },
+    "round=9|own=13|peak=11|payoff=120": {
+      "18": 31.320005
+    },
+    "round=9|own=13|peak=12|payoff=100": {
+      "5": 86.569586
+    },
+    "round=9|own=13|peak=12|payoff=110": {
+      "21": 30.117641,
+      "9": 158.369726
+    },
+    "round=9|own=13|peak=13|payoff=110": {
+      "10": 131.191022
+    },
+    "round=9|own=13|peak=13|payoff=120": {
+      "17": 152.850355
+    },
+    "round=9|own=13|peak=13|payoff=130": {
+      "5": 38.189431
+    },
+    "round=9|own=13|peak=14|payoff=120": {
+      "3": 23.76
+    },
+    "round=9|own=13|peak=3|payoff=120": {
+      "15": 49.256898
+    },
+    "round=9|own=13|peak=4|payoff=130": {
+      "11": 23.4
+    },
+    "round=9|own=13|peak=5|payoff=120": {
+      "9": 24.84
+    },
+    "round=9|own=13|peak=7|payoff=120": {
+      "6": 24.12
+    },
+    "round=9|own=13|peak=9|payoff=110": {
+      "16": 119.470555,
+      "2": 30.632573
+    },
+    "round=9|own=13|peak=9|payoff=120": {
+      "9": 49.456402
+    },
+    "round=9|own=14|peak=10|payoff=110": {
+      "12": 22.86,
+      "19": 126.194245
+    },
+    "round=9|own=14|peak=10|payoff=120": {
+      "6": 27.966384
+    },
+    "round=9|own=14|peak=11|payoff=100": {
+      "11": 25.749072
+    },
+    "round=9|own=14|peak=11|payoff=110": {
+      "7": 224.573656
+    },
+    "round=9|own=14|peak=11|payoff=120": {
+      "12": 25.970505
+    },
+    "round=9|own=14|peak=12|payoff=110": {
+      "11": 56.684884
+    },
+    "round=9|own=14|peak=13|payoff=100": {
+      "20": 33.074431
+    },
+    "round=9|own=14|peak=13|payoff=110": {
+      "20": 158.462299
+    },
+    "round=9|own=14|peak=1|payoff=120": {
+      "10": 34.016968
+    },
+    "round=9|own=14|peak=5|payoff=130": {
+      "3": 49.532063
+    },
+    "round=9|own=14|peak=7|payoff=110": {
+      "13": 27.930067
+    },
+    "round=9|own=14|peak=8|payoff=120": {
+      "10": 63.815551
+    },
+    "round=9|own=14|peak=9|payoff=110": {
+      "15": 34.379705,
+      "7": 221.046165
+    },
+    "round=9|own=14|peak=9|payoff=120": {
+      "14": 44.020419
+    },
+    "round=9|own=15|peak=10|payoff=110": {
+      "9": 113.374924
+    },
+    "round=9|own=15|peak=10|payoff=120": {
+      "11": 27.450677
+    },
+    "round=9|own=15|peak=11|payoff=100": {
+      "3": 106.159812
+    },
+    "round=9|own=15|peak=11|payoff=110": {
+      "7": 69.596965
+    },
+    "round=9|own=15|peak=12|payoff=110": {
+      "11": 45.675072
+    },
+    "round=9|own=15|peak=13|payoff=100": {
+      "10": 24.84
+    },
+    "round=9|own=15|peak=13|payoff=110": {
+      "13": 21.42
+    },
+    "round=9|own=15|peak=14|payoff=110": {
+      "13": 34.095954
+    },
+    "round=9|own=15|peak=2|payoff=120": {
+      "20": 20.34
+    },
+    "round=9|own=15|peak=7|payoff=120": {
+      "3": 59.703122
+    },
+    "round=9|own=15|peak=9|payoff=110": {
+      "10": 36.974932,
+      "13": 150.423483
+    },
+    "round=9|own=16|peak=10|payoff=110": {
+      "17": 107.416909
+    },
+    "round=9|own=16|peak=10|payoff=120": {
+      "16": 134.719023
+    },
+    "round=9|own=16|peak=11|payoff=110": {
+      "11": 30.315096,
+      "17": 27.259897,
+      "20": 184.813949,
+      "3": 23.76
+    },
+    "round=9|own=16|peak=11|payoff=120": {
+      "11": 46.311959,
+      "4": 132.582352
+    },
+    "round=9|own=16|peak=12|payoff=100": {
+      "4": 60.125546
+    },
+    "round=9|own=16|peak=12|payoff=110": {
+      "5": 100.127984
+    },
+    "round=9|own=16|peak=12|payoff=120": {
+      "4": 73.50333
+    },
+    "round=9|own=16|peak=13|payoff=110": {
+      "11": 54.360051,
+      "4": 30.889635
+    },
+    "round=9|own=16|peak=13|payoff=120": {
+      "9": 77.073438
+    },
+    "round=9|own=16|peak=16|payoff=110": {
+      "13": 24.12
+    },
+    "round=9|own=16|peak=7|payoff=120": {
+      "11": 44.117781
+    },
+    "round=9|own=16|peak=8|payoff=120": {
+      "16": 32.103194,
+      "2": 63.039133
+    },
+    "round=9|own=16|peak=9|payoff=120": {
+      "3": 208.497971
+    },
+    "round=9|own=17|peak=10|payoff=110": {
+      "20": 152.653501
+    },
+    "round=9|own=17|peak=10|payoff=120": {
+      "8": 170.433719
+    },
+    "round=9|own=17|peak=11|payoff=110": {
+      "16": 126.333193
+    },
+    "round=9|own=17|peak=11|payoff=120": {
+      "13": 99.4218
+    },
+    "round=9|own=17|peak=12|payoff=110": {
+      "14": 38.891167
+    },
+    "round=9|own=17|peak=12|payoff=120": {
+      "12": 24.786
+    },
+    "round=9|own=17|peak=13|payoff=110": {
+      "19": 104.218013
+    },
+    "round=9|own=17|peak=13|payoff=120": {
+      "15": 32.765257
+    },
+    "round=9|own=17|peak=1|payoff=120": {
+      "3": 23.04
+    },
+    "round=9|own=17|peak=5|payoff=120": {
+      "4": 23.94
+    },
+    "round=9|own=17|peak=7|payoff=120": {
+      "5": 80.951245
+    },
+    "round=9|own=17|peak=8|payoff=120": {
+      "7": 92.718635
+    },
+    "round=9|own=17|peak=9|payoff=120": {
+      "11": 181.663173
+    },
+    "round=9|own=18|peak=10|payoff=110": {
+      "12": 85.243175
+    },
+    "round=9|own=18|peak=11|payoff=110": {
+      "1": 29.367562,
+      "21": 152.751633,
+      "8": 24.66
+    },
+    "round=9|own=18|peak=12|payoff=110": {
+      "13": 53.269345
+    },
+    "round=9|own=18|peak=13|payoff=110": {
+      "12": 53.126082
+    },
+    "round=9|own=18|peak=1|payoff=110": {
+      "17": 21.96,
+      "18": 51.866397
+    },
+    "round=9|own=18|peak=3|payoff=110": {
+      "3": 64.003211
+    },
+    "round=9|own=18|peak=4|payoff=110": {
+      "8": 33.951913
+    },
+    "round=9|own=18|peak=6|payoff=110": {
+      "7": 48.566321
+    },
+    "round=9|own=18|peak=8|payoff=110": {
+      "13": 26.196386
+    },
+    "round=9|own=18|peak=9|payoff=110": {
+      "13": 28.556507,
+      "21": 165.662296
+    },
+    "round=9|own=19|peak=10|payoff=110": {
+      "11": 102.598923,
+      "13": 20.52,
+      "18": 25.205616
+    },
+    "round=9|own=19|peak=11|payoff=110": {
+      "16": 40.419956,
+      "2": 233.699254,
+      "9": 33.679312
+    },
+    "round=9|own=19|peak=12|payoff=110": {
+      "16": 42.948522,
+      "6": 24.3
+    },
+    "round=9|own=19|peak=13|payoff=110": {
+      "16": 76.154579
+    },
+    "round=9|own=19|peak=8|payoff=110": {
+      "9": 116.485478
+    },
+    "round=9|own=19|peak=9|payoff=110": {
+      "18": 21.42,
+      "5": 189.512759
+    },
+    "round=9|own=1|peak=10|payoff=130": {
+      "20": 121.501618
+    },
+    "round=9|own=1|peak=11|payoff=130": {
+      "4": 33.025553,
+      "6": 165.700081,
+      "8": 29.336041
+    },
+    "round=9|own=1|peak=12|payoff=130": {
+      "21": 112.038168
+    },
+    "round=9|own=1|peak=13|payoff=130": {
+      "15": 19.44
+    },
+    "round=9|own=1|peak=1|payoff=130": {
+      "12": 23.76,
+      "20": 148.518224
+    },
+    "round=9|own=1|peak=3|payoff=130": {
+      "12": 39.60133
+    },
+    "round=9|own=1|peak=4|payoff=130": {
+      "11": 37.287216
+    },
+    "round=9|own=1|peak=8|payoff=130": {
+      "15": 23.04
+    },
+    "round=9|own=1|peak=9|payoff=130": {
+      "21": 125.010047
+    },
+    "round=9|own=20|peak=10|payoff=110": {
+      "13": 28.97103,
+      "5": 171.905263
+    },
+    "round=9|own=20|peak=11|payoff=110": {
+      "11": 29.636507,
+      "14": 19.08,
+      "16": 32.103194,
+      "19": 243.621356
+    },
+    "round=9|own=20|peak=12|payoff=110": {
+      "6": 133.048282
+    },
+    "round=9|own=20|peak=13|payoff=110": {
+      "15": 43.140969,
+      "6": 61.31599
+    },
+    "round=9|own=20|peak=14|payoff=110": {
+      "19": 30.835324
+    },
+    "round=9|own=20|peak=1|payoff=110": {
+      "8": 55.979028
+    },
+    "round=9|own=20|peak=2|payoff=110": {
+      "18": 21.42
+    },
+    "round=9|own=20|peak=3|payoff=110": {
+      "15": 23.04
+    },
+    "round=9|own=20|peak=4|payoff=110": {
+      "13": 54.611112
+    },
+    "round=9|own=20|peak=8|payoff=110": {
+      "2": 39.34413
+    },
+    "round=9|own=20|peak=9|payoff=110": {
+      "10": 197.705544
+    },
+    "round=9|own=21|peak=10|payoff=110": {
+      "10": 117.690082
+    },
+    "round=9|own=21|peak=11|payoff=110": {
+      "10": 43.023087,
+      "13": 173.947631
+    },
+    "round=9|own=21|peak=12|payoff=110": {
+      "18": 21.42,
+      "2": 23.58,
+      "5": 101.648348
+    },
+    "round=9|own=21|peak=13|payoff=110": {
+      "14": 37.517245
+    },
+    "round=9|own=21|peak=3|payoff=110": {
+      "2": 52.240003
+    },
+    "round=9|own=21|peak=4|payoff=110": {
+      "4": 23.22
+    },
+    "round=9|own=21|peak=8|payoff=110": {
+      "4": 62.118547
+    },
+    "round=9|own=21|peak=9|payoff=110": {
+      "1": 167.137581
+    },
+    "round=9|own=2|peak=10|payoff=130": {
+      "1": 62.351915
+    },
+    "round=9|own=2|peak=11|payoff=130": {
+      "10": 37.251371,
+      "16": 33.5263,
+      "2": 149.389052,
+      "6": 34.977919
+    },
+    "round=9|own=2|peak=12|payoff=130": {
+      "12": 40.252034
+    },
+    "round=9|own=2|peak=13|payoff=130": {
+      "19": 24.82515,
+      "8": 136.624254
+    },
+    "round=9|own=2|peak=14|payoff=130": {
+      "5": 28.203696
+    },
+    "round=9|own=2|peak=1|payoff=120": {
+      "7": 41.171406
+    },
+    "round=9|own=2|peak=1|payoff=130": {
+      "9": 59.042739
+    },
+    "round=9|own=2|peak=2|payoff=130": {
+      "20": 43.320878,
+      "3": 152.690192
+    },
+    "round=9|own=2|peak=9|payoff=130": {
+      "15": 95.460632,
+      "19": 25.526042
+    },
+    "round=9|own=3|peak=10|payoff=130": {
+      "10": 25.02,
+      "8": 91.555265
+    },
+    "round=9|own=3|peak=11|payoff=130": {
+      "16": 182.334102,
+      "20": 49.053911,
+      "6": 51.9206
+    },
+    "round=9|own=3|peak=12|payoff=130": {
+      "20": 175.937497
+    },
+    "round=9|own=3|peak=13|payoff=130": {
+      "12": 80.419345,
+      "16": 20.7,
+      "20": 20.34
+    },
+    "round=9|own=3|peak=14|payoff=130": {
+      "14": 19.08
+    },
+    "round=9|own=3|peak=1|payoff=130": {
+      "14": 64.659448
+    },
+    "round=9|own=3|peak=2|payoff=120": {
+      "2": 23.22
+    },
+    "round=9|own=3|peak=3|payoff=130": {
+      "12": 136.760661,
+      "21": 24.356427
+    },
+    "round=9|own=3|peak=7|payoff=130": {
+      "17": 30.130031
+    },
+    "round=9|own=3|peak=9|payoff=130": {
+      "20": 122.903785
+    },
+    "round=9|own=4|peak=10|payoff=130": {
+      "21": 78.523485
+    },
+    "round=9|own=4|peak=11|payoff=130": {
+      "2": 93.307675,
+      "3": 35.268471
+    },
+    "round=9|own=4|peak=12|payoff=130": {
+      "19": 68.586575
+    },
+    "round=9|own=4|peak=13|payoff=130": {
+      "17": 67.383431
+    },
+    "round=9|own=4|peak=1|payoff=130": {
+      "6": 24.12
+    },
+    "round=9|own=4|peak=2|payoff=130": {
+      "11": 24.3
+    },
+    "round=9|own=4|peak=3|payoff=120": {
+      "11": 28.055808
+    },
+    "round=9|own=4|peak=4|payoff=130": {
+      "1": 23.4,
+      "18": 80.364082,
+      "7": 24.3
+    },
+    "round=9|own=4|peak=6|payoff=130": {
+      "11": 24.3
+    },
+    "round=9|own=4|peak=9|payoff=130": {
+      "1": 29.530313,
+      "6": 34.977919
+    },
+    "round=9|own=5|peak=10|payoff=130": {
+      "16": 184.990911
+    },
+    "round=9|own=5|peak=11|payoff=130": {
+      "11": 30.315096,
+      "13": 40.912437,
+      "6": 159.653267
+    },
+    "round=9|own=5|peak=12|payoff=130": {
+      "8": 24.66
+    },
+    "round=9|own=5|peak=13|payoff=130": {
+      "8": 55.026493
+    },
+    "round=9|own=5|peak=5|payoff=130": {
+      "1": 33.742514,
+      "13": 170.858077,
+      "21": 28.450944
+    },
+    "round=9|own=5|peak=7|payoff=130": {
+      "1": 46.944712
+    },
+    "round=9|own=5|peak=8|payoff=130": {
+      "9": 24.84
+    },
+    "round=9|own=5|peak=9|payoff=130": {
+      "12": 96.991113,
+      "15": 34.379705,
+      "5": 29.158731
+    },
+    "round=9|own=6|peak=10|payoff=130": {
+      "8": 66.026388,
+      "9": 178.743656
+    },
+    "round=9|own=6|peak=11|payoff=130": {
+      "7": 241.173485
+    },
+    "round=9|own=6|peak=12|payoff=130": {
+      "4": 76.874718
+    },
+    "round=9|own=6|peak=13|payoff=130": {
+      "15": 66.916052
+    },
+    "round=9|own=6|peak=14|payoff=130": {
+      "2": 30.65165
+    },
+    "round=9|own=6|peak=2|payoff=130": {
+      "8": 28.624464
+    },
+    "round=9|own=6|peak=3|payoff=130": {
+      "3": 54.632575
+    },
+    "round=9|own=6|peak=4|payoff=130": {
+      "1": 23.4
+    },
+    "round=9|own=6|peak=6|payoff=130": {
+      "10": 155.005347,
+      "21": 27.85215
+    },
+    "round=9|own=6|peak=9|payoff=130": {
+      "13": 138.863719,
+      "4": 27.844848
+    },
+    "round=9|own=7|peak=10|payoff=130": {
+      "11": 145.512453,
+      "13": 29.87103
+    },
+    "round=9|own=7|peak=11|payoff=130": {
+      "19": 246.347155,
+      "8": 53.862443
+    },
+    "round=9|own=7|peak=12|payoff=130": {
+      "20": 119.649278
+    },
+    "round=9|own=7|peak=13|payoff=130": {
+      "6": 184.394888
+    },
+    "round=9|own=7|peak=1|payoff=130": {
+      "14": 29.64529
+    },
+    "round=9|own=7|peak=2|payoff=130": {
+      "2": 39.216859
+    },
+    "round=9|own=7|peak=6|payoff=130": {
+      "19": 78.090989
+    },
+    "round=9|own=7|peak=7|payoff=130": {
+      "1": 29.367562,
+      "13": 154.901674,
+      "17": 37.418503,
+      "7": 35.781567
+    },
+    "round=9|own=7|peak=9|payoff=130": {
+      "12": 23.76,
+      "4": 30.781346,
+      "6": 117.381447
+    },
+    "round=9|own=8|peak=10|payoff=130": {
+      "5": 152.414806
+    },
+    "round=9|own=8|peak=11|payoff=130": {
+      "10": 265.6149,
+      "12": 30.10147,
+      "17": 26.98772,
+      "9": 51.8787
+    },
+    "round=9|own=8|peak=12|payoff=130": {
+      "7": 56.110584
+    },
+    "round=9|own=8|peak=13|payoff=130": {
+      "19": 109.354111,
+      "9": 28.23696
+    },
+    "round=9|own=8|peak=1|payoff=130": {
+      "4": 66.250031
+    },
+    "round=9|own=8|peak=2|payoff=130": {
+      "9": 24.84
+    },
+    "round=9|own=8|peak=3|payoff=130": {
+      "11": 86.880127
+    },
+    "round=9|own=8|peak=4|payoff=130": {
+      "12": 26.168603
+    },
+    "round=9|own=8|peak=5|payoff=130": {
+      "14": 23.58
+    },
+    "round=9|own=8|peak=7|payoff=130": {
+      "16": 26.464464
+    },
+    "round=9|own=8|peak=8|payoff=130": {
+      "1": 221.585339,
+      "10": 23.94
+    },
+    "round=9|own=8|peak=9|payoff=130": {
+      "12": 39.352034,
+      "9": 195.260518
+    },
+    "round=9|own=9|peak=10|payoff=130": {
+      "7": 85.164252
+    },
+    "round=9|own=9|peak=11|payoff=130": {
+      "1": 148.649772
+    },
+    "round=9|own=9|peak=12|payoff=130": {
+      "11": 28.055808
+    },
+    "round=9|own=9|peak=2|payoff=130": {
+      "17": 21.96
+    },
+    "round=9|own=9|peak=7|payoff=130": {
+      "7": 56.871694
+    },
+    "round=9|own=9|peak=8|payoff=130": {
+      "18": 25.384464
+    },
+    "round=9|own=9|peak=9|payoff=130": {
+      "14": 58.606883,
+      "16": 239.621427,
+      "6": 24.3
+    }
+  }
+}

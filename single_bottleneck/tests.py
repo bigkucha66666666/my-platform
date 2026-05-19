@@ -3,6 +3,8 @@ from otree.api import Bot, Submission, expect
 from . import (
     C,
     COARSE_TOLL_AUTO_RESULT_VAR,
+    COMPREHENSION_SEEN_VAR,
+    ComprehensionCheck,
     Decision,
     Introduction,
     Results,
@@ -19,6 +21,8 @@ class PlayerBot(Bot):
     def play_round(self):
         if self.round_number == 1:
             yield Submission(Introduction, check_html=False)
+            yield Submission(ComprehensionCheck, check_html=False)
+            expect(self.participant.vars.get(COMPREHENSION_SEEN_VAR), '==', True)
             if self.session.config.get('coarse_toll_auto_enabled'):
                 auto_toll_result = self.participant.vars.get(COARSE_TOLL_AUTO_RESULT_VAR, {})
                 expect(auto_toll_result.get('calibration_source'), '==', 'cache')

@@ -30,6 +30,7 @@ COARSE_TOLL_CALIBRATION_SOURCE_CACHE = 'cache'
 COARSE_TOLL_CALIBRATION_SOURCE_COMPUTED = 'computed'
 COARSE_TOLL_CALIBRATION_CACHE_FILE = 'toll_calibration_cache.json'
 COARSE_TOLL_CALIBRATION_CACHE = None
+COMPREHENSION_SEEN_VAR = 'single_bottleneck_comprehension_seen'
 
 DEPARTURE_SCHEDULE_SOURCE_STATIC = 'static'
 DEPARTURE_SCHEDULE_SOURCE_AUTO = 'auto'
@@ -1930,6 +1931,24 @@ class Introduction(Page):
         )
 
 
+class ComprehensionCheck(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == 1 and access_allowed(player)
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        return dict(
+            preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
+            free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
+            coarse_toll_description=coarse_toll_description_for_player(player),
+        )
+
+    @staticmethod
+    def before_next_page(player: Player, timeout_happened):
+        player.participant.vars[COMPREHENSION_SEEN_VAR] = True
+
+
 class Decision(Page):
     form_model = 'player'
     form_fields = ['departure_minute']
@@ -2119,4 +2138,4 @@ def custom_export(players):
         yield export_row_for_player(player)
 
 
-page_sequence = [Introduction, Decision, ResultsSync, Results]
+page_sequence = [Introduction, ComprehensionCheck, Decision, ResultsSync, Results]

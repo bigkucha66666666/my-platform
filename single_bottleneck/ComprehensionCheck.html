@@ -1,0 +1,320 @@
+{{ block title }}
+    正式实验前规则测试
+{{ endblock }}
+
+{{ block global_styles }}
+    {{ super() }}
+    <style>
+        .check-shell {
+            display: grid;
+            gap: 16px;
+        }
+
+        .check-hero {
+            padding: 18px;
+            border: 1px solid #dbe5f0;
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 12% 16%, rgba(31, 95, 204, 0.10), transparent 28%),
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .check-title {
+            margin: 0;
+            color: #172033;
+            font-size: 19px;
+            font-weight: 900;
+        }
+
+        .check-note {
+            margin: 7px 0 0;
+            color: #52657c;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .check-context {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .check-context-item,
+        .question-card {
+            border: 1px solid #dbe5f0;
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+        }
+
+        .check-context-item {
+            padding: 12px 14px;
+        }
+
+        .check-context-key {
+            margin: 0 0 4px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .check-context-value {
+            margin: 0;
+            color: #172033;
+            font-size: 15px;
+            font-weight: 900;
+            line-height: 1.45;
+        }
+
+        .question-card {
+            padding: 16px;
+        }
+
+        .question-head {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .question-number {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            background: #172033;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .question-title {
+            margin: 2px 0 0;
+            color: #172033;
+            font-size: 15px;
+            font-weight: 900;
+            line-height: 1.45;
+        }
+
+        .answer-options {
+            display: grid;
+            gap: 8px;
+        }
+
+        .answer-option {
+            display: flex;
+            gap: 9px;
+            align-items: flex-start;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #334155;
+            cursor: pointer;
+        }
+
+        .answer-option input {
+            margin-top: 3px;
+        }
+
+        .answer-option span {
+            line-height: 1.5;
+        }
+
+        .answer-feedback {
+            display: none;
+            margin: 12px 0 0;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .question-card.is-correct .answer-feedback {
+            display: block;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .question-card.is-wrong .answer-feedback,
+        .question-card.is-missing .answer-feedback {
+            display: block;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+
+        .check-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .check-button {
+            border: 0;
+            border-radius: 12px;
+            background: #172033;
+            color: #ffffff;
+            padding: 10px 15px;
+            font-weight: 900;
+        }
+
+        .check-status {
+            margin: 0;
+            color: #52657c;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .comprehension-next:disabled {
+            cursor: not-allowed;
+            opacity: 0.45;
+        }
+
+        @media (max-width: 575px) {
+            .check-context {
+                grid-template-columns: 1fr;
+            }
+
+            .check-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .check-button,
+            .comprehension-next {
+                width: 100%;
+            }
+        }
+    </style>
+{{ endblock }}
+
+{{ block content }}
+    <div class="check-shell">
+        <section class="check-hero">
+            <p class="check-title">正式开始前，请完成 3 个规则判断</p>
+            <p class="check-note">
+                这个测试只用于帮助你确认规则理解，不计入正式实验结果，也不会进入后台导出数据。
+                点击“检查答案”后会显示解释；阅读后即可进入第 1 轮正式选择。
+            </p>
+        </section>
+
+        <section class="check-context" aria-label="规则速记">
+            <div class="check-context-item">
+                <p class="check-context-key">目标到达</p>
+                <p class="check-context-value">{{ preferred_arrival_time }}</p>
+            </div>
+            <div class="check-context-item">
+                <p class="check-context-key">无排队基准</p>
+                <p class="check-context-value">{{ free_flow_departure_time }}</p>
+            </div>
+            <div class="check-context-item">
+                <p class="check-context-key">收费处理</p>
+                <p class="check-context-value">{{ coarse_toll_description }}</p>
+            </div>
+        </section>
+
+        <section class="question-card" data-correct="a">
+            <div class="question-head">
+                <span class="question-number">1</span>
+                <p class="question-title">本实验中，最终选择成本主要由哪些部分组成？</p>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q1" value="a">
+                    <span>排队成本、早到/晚到成本，以及可能存在的粗收费。</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q1" value="b">
+                    <span>只由出发时间本身决定，与排队和收费无关。</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。最终选择成本会综合排队延误、到达偏差和粗收费。" data-wrong-text="请注意：最终选择成本不是只看出发时间本身，还包括排队成本、早到/晚到成本和粗收费。"></p>
+        </section>
+
+        <section class="question-card" data-correct="a">
+            <div class="question-head">
+                <span class="question-number">2</span>
+                <p class="question-title">如果多人选择同一分钟出发，他们在结果中的排队延误和成本如何处理？</p>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q2" value="a">
+                    <span>按该分钟随机通过顺序的平均排队成本计算，因此同一分钟成本相同。</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q2" value="b">
+                    <span>同一分钟出发的人会因随机顺序不同而显示不同成本。</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。同一分钟使用平均排队成本，所以同一分钟参与者的排队延误、到达时间和成本相同。" data-wrong-text="请注意：同一分钟不会因随机顺序显示不同成本，系统使用该分钟的平均排队成本。"></p>
+        </section>
+
+        <section class="question-card" data-correct="a">
+            <div class="question-head">
+                <span class="question-number">3</span>
+                <p class="question-title">如果滚轮某个出发时间标注“收费 X 成本分”，这意味着什么？</p>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q3" value="a">
+                    <span>选择该时间时，最终选择成本会额外加上 X 成本分。</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q3" value="b">
+                    <span>该标注只是提示，不会进入最终选择成本。</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。收费时段的金额会额外计入最终选择成本。" data-wrong-text="请注意：滚轮中标出的收费金额会进入最终选择成本，不只是提示。"></p>
+        </section>
+
+        <div class="check-actions">
+            <button class="check-button" type="button" id="check-answers">检查答案</button>
+            <button class="otree-btn-next btn btn-primary comprehension-next" id="comprehension-next" disabled>进入正式实验</button>
+            <p class="check-status" id="check-status">请先作答并点击“检查答案”。</p>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var checkButton = document.getElementById('check-answers');
+            var nextButton = document.getElementById('comprehension-next');
+            var statusEl = document.getElementById('check-status');
+            var cards = Array.prototype.slice.call(document.querySelectorAll('.question-card'));
+
+            checkButton.addEventListener('click', function () {
+                var correctCount = 0;
+                cards.forEach(function (card) {
+                    var correct = card.getAttribute('data-correct');
+                    var checked = card.querySelector('input[type="radio"]:checked');
+                    var feedback = card.querySelector('.answer-feedback');
+                    card.classList.remove('is-correct', 'is-wrong', 'is-missing');
+
+                    if (!checked) {
+                        card.classList.add('is-missing');
+                        feedback.textContent = '这题尚未选择。' + feedback.getAttribute('data-wrong-text');
+                        return;
+                    }
+
+                    if (checked.value === correct) {
+                        correctCount += 1;
+                        card.classList.add('is-correct');
+                        feedback.textContent = feedback.getAttribute('data-correct-text');
+                        return;
+                    }
+
+                    card.classList.add('is-wrong');
+                    feedback.textContent = feedback.getAttribute('data-wrong-text');
+                });
+
+                nextButton.disabled = false;
+                statusEl.textContent = '你答对 ' + correctCount + ' / ' + cards.length + ' 题。请阅读解释后进入正式实验。';
+            });
+        })();
+    </script>
+{{ endblock }}

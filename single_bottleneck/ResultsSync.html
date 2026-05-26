@@ -2,43 +2,402 @@
     正在同步本轮结果
 {{ endblock }}
 
+{{ block global_styles }}
+    {{ super() }}
+    <style>
+        .sync-page {
+            --sync-ink: #252a31;
+            --sync-muted: #6f756f;
+            --sync-panel: #fffaf0;
+            --sync-panel-deep: #f3eadc;
+            --sync-line: #d4c8b8;
+            --sync-line-strong: #b9aa96;
+            --sync-road: #263644;
+            --sync-rust: #a94e2b;
+            --sync-rust-dark: #7f321a;
+            --sync-sage: #627159;
+            color: var(--sync-ink);
+        }
+
+        .sync-card {
+            position: relative;
+            overflow: hidden;
+            padding: 22px;
+            border: 1px solid var(--sync-line-strong);
+            border-radius: 8px;
+            background:
+                linear-gradient(90deg, rgba(38, 54, 68, 0.055) 1px, transparent 1px) 0 0 / 30px 30px,
+                linear-gradient(180deg, var(--sync-panel) 0%, var(--sync-panel-deep) 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+        }
+
+        .sync-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 5px;
+            background: var(--sync-rust);
+        }
+
+        .sync-head,
+        .sync-road,
+        .sync-meta-grid,
+        .sync-note,
+        .sync-actions {
+            position: relative;
+            z-index: 1;
+        }
+
+        .sync-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .sync-kicker {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--sync-muted);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+        }
+
+        .sync-title {
+            margin: 0;
+            color: var(--sync-ink);
+            font-size: clamp(22px, 4vw, 30px);
+            font-weight: 900;
+            line-height: 1.12;
+        }
+
+        .sync-subtitle {
+            max-width: 620px;
+            margin: 8px 0 0;
+            color: var(--sync-muted);
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .sync-status {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--sync-line);
+            border-radius: 6px;
+            background: #fffdf8;
+            color: var(--sync-ink);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .sync-status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--sync-rust);
+            box-shadow: 0 0 0 4px rgba(169, 78, 43, 0.16);
+        }
+
+        .sync-page-ready .sync-status-dot {
+            background: var(--sync-sage);
+            box-shadow: 0 0 0 4px rgba(98, 113, 89, 0.16);
+        }
+
+        .sync-road {
+            display: grid;
+            grid-template-columns: 72px minmax(180px, 1fr) 72px;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            border: 1px solid var(--sync-line);
+            border-radius: 6px;
+            background: rgba(255, 250, 240, 0.72);
+        }
+
+        .sync-node {
+            display: grid;
+            place-items: center;
+            width: 52px;
+            height: 52px;
+            border: 5px solid #fffdf8;
+            border-radius: 50%;
+            background: var(--sync-road);
+            color: #ffffff;
+            font-weight: 900;
+            justify-self: center;
+            box-shadow: 0 8px 18px rgba(37, 42, 49, 0.12);
+        }
+
+        .sync-node-end {
+            background: var(--sync-sage);
+        }
+
+        .sync-road-line {
+            position: relative;
+            height: 42px;
+        }
+
+        .sync-road-line::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 18px;
+            transform: translateY(-50%);
+            border-radius: 999px;
+            background:
+                repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, 0.82) 22px 30px),
+                linear-gradient(90deg, #31404f 0%, #111827 48%, #31404f 100%);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+        }
+
+        .sync-bottleneck {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 66px;
+            height: 30px;
+            transform: translate(-50%, -50%);
+            border: 1px solid rgba(169, 78, 43, 0.46);
+            border-radius: 6px;
+            background: #fff4dc;
+            color: var(--sync-rust-dark);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .sync-car {
+            position: absolute;
+            top: 8px;
+            left: 18%;
+            width: 34px;
+            height: 18px;
+            border: 2px solid #fffdf8;
+            border-radius: 8px 10px 6px 6px;
+            background: var(--sync-rust);
+            box-shadow:
+                52px 9px 0 -2px #c7862a,
+                100px 0 0 -2px #5e8294;
+            animation: sync-car-pulse 1.8s ease-in-out infinite;
+        }
+
+        .sync-car::before,
+        .sync-car::after {
+            content: "";
+            position: absolute;
+            bottom: -6px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--sync-ink);
+        }
+
+        .sync-car::before {
+            left: 5px;
+        }
+
+        .sync-car::after {
+            right: 5px;
+        }
+
+        .sync-page-ready .sync-car {
+            left: 62%;
+            background: var(--sync-sage);
+            box-shadow: none;
+            animation: none;
+        }
+
+        .sync-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .sync-meta {
+            padding: 10px 12px;
+            border: 1px solid var(--sync-line);
+            border-radius: 6px;
+            background: #fffdf8;
+        }
+
+        .sync-meta-key {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--sync-muted);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .sync-meta-value {
+            display: block;
+            color: var(--sync-ink);
+            font-size: 15px;
+            font-weight: 900;
+            line-height: 1.25;
+        }
+
+        .sync-note {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid #dcc2ac;
+            border-left: 4px solid var(--sync-rust);
+            border-radius: 6px;
+            background: #fff6e7;
+            color: #6b4a35;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .sync-actions {
+            margin-top: 16px;
+        }
+
+        .sync-actions .otree-btn-next.btn.btn-primary {
+            border-radius: 6px;
+            border-color: var(--sync-road);
+            background: var(--sync-road);
+            box-shadow: none;
+            font-weight: 800;
+        }
+
+        @keyframes sync-car-pulse {
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(12px);
+            }
+        }
+
+        @media (max-width: 575px) {
+            .sync-card {
+                padding: 16px;
+            }
+
+            .sync-head {
+                display: grid;
+                gap: 12px;
+            }
+
+            .sync-status {
+                justify-self: start;
+            }
+
+            .sync-road {
+                grid-template-columns: 52px minmax(130px, 1fr) 52px;
+                padding: 10px;
+            }
+
+            .sync-node {
+                width: 42px;
+                height: 42px;
+                border-width: 4px;
+            }
+
+            .sync-meta-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{{ endblock }}
+
 {{ block content }}
-    {{ if results_ready }}
-        <div class="card-lite">
-            <p class="text-main">本轮结果已生成，正在进入结果页。</p>
-            <p class="text-sub">若页面未自动跳转，可点击下方按钮继续。</p>
-        </div>
+    <div
+        class="sync-page {{ if results_ready }}sync-page-ready{{ else }}sync-page-waiting{{ endif }}"
+        data-results-ready="{{ if results_ready }}1{{ else }}0{{ endif }}"
+        data-auto-continue-delay="{{ auto_continue_delay_ms }}"
+        data-poll-interval="{{ poll_interval_ms }}"
+    >
+        <section class="sync-card" aria-label="本轮结果同步状态">
+            <div class="sync-head">
+                <div>
+                    <span class="sync-kicker">RESULT SYNC</span>
+                    {{ if results_ready }}
+                        <h2 class="sync-title">本轮结果已生成</h2>
+                        <p class="sync-subtitle">系统已完成同组数据结算，正在进入本轮结果页。</p>
+                    {{ else }}
+                        <h2 class="sync-title">正在等待同组完成决策</h2>
+                        <p class="sync-subtitle">所有同组参与者完成本轮选择后，系统会统一计算瓶颈排队、到达时间和最终选择成本。</p>
+                    {{ endif }}
+                </div>
+                <div class="sync-status">
+                    <span class="sync-status-dot" aria-hidden="true"></span>
+                    {{ if results_ready }}可查看结果{{ else }}等待结算{{ endif }}
+                </div>
+            </div>
 
-        <button class="otree-btn-next btn btn-primary" id="results-sync-next">查看本轮结果</button>
-    {{ else }}
-        <div class="card-lite">
-            <p class="text-main">正在等待同组参与者完成本轮决策。</p>
-            <p class="text-sub">系统会持续检查全组状态，并在可结算后自动进入结果页。</p>
-        </div>
+            <div class="sync-road" aria-hidden="true">
+                <div class="sync-node">A</div>
+                <div class="sync-road-line">
+                    <span class="sync-car"></span>
+                    <span class="sync-bottleneck">瓶颈</span>
+                </div>
+                <div class="sync-node sync-node-end">B</div>
+            </div>
 
-        <div class="hint-lite">
-            若有参与者因断线未及时到达，系统会在截止后自动补全其选择并继续实验；该参与者之后重新通过原入口登录，追到当前开放轮次时可恢复正常作答。
-        </div>
+            <div class="sync-meta-grid" aria-label="同步状态详情">
+                <div class="sync-meta">
+                    <span class="sync-meta-key">当前状态</span>
+                    <span class="sync-meta-value">{{ if results_ready }}已完成结算{{ else }}等待同组提交{{ endif }}</span>
+                </div>
+                <div class="sync-meta">
+                    <span class="sync-meta-key">预计等待</span>
+                    <span class="sync-meta-value">{{ if results_ready }}即将跳转{{ else }}{{ remaining_seconds }} 秒{{ endif }}</span>
+                </div>
+                <div class="sync-meta">
+                    <span class="sync-meta-key">页面操作</span>
+                    <span class="sync-meta-value">{{ if results_ready }}自动进入结果{{ else }}自动刷新检查{{ endif }}</span>
+                </div>
+            </div>
 
-        <p class="text-sub">当前预计还需等待 {{ remaining_seconds }} 秒，页面会自动刷新。</p>
-    {{ endif }}
+            {{ if results_ready }}
+                <div class="sync-actions">
+                    <button class="otree-btn-next btn btn-primary" id="results-sync-next">查看本轮结果</button>
+                </div>
+            {{ else }}
+                <div class="sync-note">
+                    若有参与者断线或未及时提交，系统会在截止后自动补全其选择并继续实验；参与者之后可通过原入口重新登录并恢复到当前开放轮次。
+                </div>
+            {{ endif }}
+        </section>
+    </div>
 
     <script>
       (function () {
-        const resultsReady = {{ if results_ready }}true{{ else }}false{{ endif }};
+        const root = document.querySelector('.sync-page');
+        if (!root) {
+          return;
+        }
+
+        const resultsReady = root.dataset.resultsReady === '1';
+        const autoContinueDelay = Number(root.dataset.autoContinueDelay || 800);
+        const pollInterval = Number(root.dataset.pollInterval || 2000);
+
         if (resultsReady) {
           window.setTimeout(function () {
             const nextButton = document.getElementById('results-sync-next');
             if (nextButton) {
               nextButton.click();
             }
-          }, {{ auto_continue_delay_ms }});
+          }, autoContinueDelay);
           return;
         }
 
         window.setTimeout(function () {
           window.location.reload();
-        }, {{ poll_interval_ms }});
+        }, pollInterval);
       })();
     </script>
 {{ endblock }}

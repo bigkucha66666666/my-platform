@@ -1849,7 +1849,7 @@ def choice_cost_components_for_player(player: Player):
     )
 
 
-def result_cost_history(player: Player):
+def result_current_round_cost_snapshot(player: Player):
     chart_left = 42
     chart_right = 596
     chart_top = 24
@@ -1857,53 +1857,63 @@ def result_cost_history(player: Player):
     plot_width = chart_right - chart_left
     plot_height = chart_bottom - chart_top
 
-    cost_rows = []
-    for round_player in player.in_rounds(1, player.round_number):
-        if not player_has_departure_slot(round_player):
-            continue
-        components = choice_cost_components_for_player(round_player)
-        cost_rows.append(
-            dict(
-                round_number=round_player.round_number,
-                cost=components['total_choice_cost'],
-                cost_label=minute_value_display(components['total_choice_cost']),
-            )
-        )
-
-    if not cost_rows:
+    round_players = [
+        round_player
+        for round_player in player.group.get_players()
+        if player_has_departure_slot(round_player)
+    ]
+    if not round_players:
         return dict(
             points=[],
-            line_points='',
-            has_multiple_points=False,
+            average_cost_label='0',
+            average_line_y=chart_bottom,
             axis_max_label='0',
         )
 
-    max_cost = max(row['cost'] for row in cost_rows)
+    cost_rows = []
+    for member_index, round_player in enumerate(round_players):
+        components = choice_cost_components_for_player(round_player)
+        cost = components['total_choice_cost']
+        cost_rows.append(
+            dict(
+                member_index=member_index,
+                member_count=len(round_players),
+                cost=cost,
+                cost_label=minute_value_display(cost),
+                is_current_player=round_player.participant == player.participant,
+            )
+        )
+
+    average_cost = round(sum(row['cost'] for row in cost_rows) / len(cost_rows), 2)
+    max_cost = max(max(row['cost'] for row in cost_rows), average_cost)
     axis_max = max(5, int(ceil(max_cost / 5) * 5))
-    if len(cost_rows) == 1:
-        x_step = 0
-    else:
-        x_step = plot_width / (len(cost_rows) - 1)
+
+    def x_for_member(member_index):
+        if len(cost_rows) == 1:
+            return chart_left + plot_width / 2
+        return chart_left + member_index * (plot_width / (len(cost_rows) - 1))
 
     points = []
-    for index, row in enumerate(cost_rows):
-        x = chart_left + (plot_width / 2 if len(cost_rows) == 1 else index * x_step)
+    for row in cost_rows:
+        x = x_for_member(row['member_index'])
         y = chart_bottom - (row['cost'] / axis_max * plot_height if axis_max else 0)
         points.append(
             dict(
-                round_number=row['round_number'],
                 cost=row['cost'],
                 cost_label=row['cost_label'],
-                is_current=row['round_number'] == player.round_number,
+                is_current_player=row['is_current_player'],
+                member_label='你' if row['is_current_player'] else '同组成员',
                 x=round(x, 2),
                 y=round(y, 2),
             )
         )
 
+    average_line_y = chart_bottom - (average_cost / axis_max * plot_height if axis_max else 0)
+
     return dict(
         points=points,
-        line_points=' '.join(f"{point['x']},{point['y']}" for point in points),
-        has_multiple_points=len(points) > 1,
+        average_cost_label=minute_value_display(average_cost),
+        average_line_y=round(average_line_y, 2),
         axis_max_label=minute_value_display(axis_max),
     )
 
@@ -1938,10 +1948,42 @@ class ComprehensionCheck(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
+        example_queue_minutes = 4
+        example_queue_cost = example_queue_minutes * C.QUEUE_COST_PER_MINUTE
+        example_early_minutes = 3
+        example_early_cost = example_early_minutes * C.EARLY_COST_PER_MINUTE
+        example_queue_people_ahead = 3
+        example_service_interval_minutes = service_interval_minutes(player.session)
+        example_departure_minute = free_flow_departure_minute()
+        example_queue_wait_minutes = example_queue_people_ahead * example_service_interval_minutes
+        example_arrival_without_queue_minute = (
+            example_departure_minute + C.FREE_FLOW_TRAVEL_MINUTES
+        )
+        example_arrival_with_two_people_minute = (
+            example_arrival_without_queue_minute + 2 * example_service_interval_minutes
+        )
+        example_arrival_minute = example_arrival_without_queue_minute + example_queue_wait_minutes
         return dict(
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
             coarse_toll_description=coarse_toll_description_for_player(player),
+            free_flow_travel_minutes=minute_value_display(C.FREE_FLOW_TRAVEL_MINUTES),
+            queue_cost_per_minute=C.QUEUE_COST_PER_MINUTE,
+            early_cost_per_minute=C.EARLY_COST_PER_MINUTE,
+            late_cost_per_minute=C.LATE_COST_PER_MINUTE,
+            example_queue_minutes=minute_value_display(example_queue_minutes),
+            example_queue_cost=point_value_display(example_queue_cost),
+            example_early_minutes=minute_value_display(example_early_minutes),
+            example_early_cost=point_value_display(example_early_cost),
+            example_queue_people_ahead=example_queue_people_ahead,
+            example_service_interval_minutes=minute_value_display(example_service_interval_minutes),
+            example_departure_time=minute_to_clock(example_departure_minute),
+            example_queue_wait_minutes=minute_value_display(example_queue_wait_minutes),
+            example_arrival_without_queue_time=minute_to_clock(example_arrival_without_queue_minute),
+            example_arrival_with_two_people_time=minute_to_clock(
+                example_arrival_with_two_people_minute
+            ),
+            example_arrival_time=minute_to_clock(example_arrival_minute),
         )
 
     @staticmethod
@@ -2093,7 +2135,7 @@ class Results(Page):
         free_flow_time_pct = bounded_percent(C.FREE_FLOW_TRAVEL_MINUTES, travel_time)
         queue_time_pct = bounded_percent(queue_delay, travel_time)
         slot_summaries = result_slot_summaries(player, current_slot)
-        cost_history = result_cost_history(player)
+        cost_snapshot = result_current_round_cost_snapshot(player)
 
         return dict(
             departure_time_label=safe_model_field(player, 'departure_time_label', ''),
@@ -2124,10 +2166,10 @@ class Results(Page):
             cost_bar_min_width_px=cost_bar_min_width_px,
             coarse_toll_description=coarse_toll_description_for_player(player),
             slot_summaries=slot_summaries,
-            cost_history_points=cost_history['points'],
-            cost_history_line_points=cost_history['line_points'],
-            cost_history_has_multiple_points=cost_history['has_multiple_points'],
-            cost_history_axis_max_label=cost_history['axis_max_label'],
+            cost_snapshot_points=cost_snapshot['points'],
+            cost_snapshot_average_cost_label=cost_snapshot['average_cost_label'],
+            cost_snapshot_average_line_y=cost_snapshot['average_line_y'],
+            cost_snapshot_axis_max_label=cost_snapshot['axis_max_label'],
             auto_advance_seconds=Results.get_timeout_seconds(player),
         )
 

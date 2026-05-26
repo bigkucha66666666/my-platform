@@ -5,37 +5,248 @@
 {{ block global_styles }}
     {{ super() }}
     <style>
+        .result-page {
+            --result-ink: #252a31;
+            --result-muted: #6f756f;
+            --result-panel: #fffaf0;
+            --result-panel-strong: #fff4dc;
+            --result-line: #d4c8b8;
+            --result-line-strong: #b9aa96;
+            --result-navy: #263644;
+            --result-blue: #2f5d73;
+            --result-rust: #a94e2b;
+            --result-rust-dark: #7f321a;
+            --result-sage: #627159;
+            --result-amber: #c7862a;
+            color: var(--result-ink);
+        }
+
+        .result-page .card-lite {
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            margin-bottom: 16px;
+        }
+
+        .result-page .text-sub {
+            color: var(--result-muted);
+            font-size: 13px;
+            letter-spacing: 0.01em;
+        }
+
+        .result-page .otree-btn-next.btn.btn-primary {
+            border-radius: 6px;
+            border-color: var(--result-navy);
+            background: var(--result-navy);
+            box-shadow: none;
+            font-weight: 800;
+        }
+
         .result-cost-chart {
             margin-top: 16px;
             padding: 14px 14px 12px;
-            border: 1px solid #dbe5f0;
-            border-radius: 14px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid var(--result-line);
+            border-radius: 8px;
+            background: var(--result-panel);
         }
 
         .result-cost-chart-title {
             margin: 0 0 4px;
             font-size: 15px;
-            font-weight: 700;
-            color: #1e2a3a;
+            font-weight: 800;
+            color: var(--result-ink);
         }
 
         .result-cost-chart-note {
             margin: 0 0 12px;
             font-size: 12px;
             line-height: 1.5;
-            color: #5a6b82;
+            color: var(--result-muted);
         }
 
-        .same-time-cost-note {
-            margin: 6px 0 0;
+        .result-overview {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            gap: 14px;
+            margin-bottom: 16px;
+            padding: 18px;
+            border: 1px solid var(--result-line-strong);
+            border-radius: 8px;
+            background:
+                linear-gradient(90deg, rgba(38, 54, 68, 0.055) 1px, transparent 1px) 0 0 / 28px 28px,
+                linear-gradient(180deg, #fffaf0 0%, #f1eadf 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        }
+
+        .result-overview::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(90deg, rgba(169, 78, 43, 0.09) 0 2px, transparent 2px) left top / 68px 100% no-repeat,
+                linear-gradient(90deg, transparent, rgba(255, 250, 240, 0.62));
+            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 70%);
+        }
+
+        .result-overview-main,
+        .result-overview-timeline,
+        .result-overview-grid {
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-overview-main {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 8px 12px;
+        }
+
+        .result-overview-kicker {
+            flex-basis: 100%;
+            color: var(--result-muted);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+        }
+
+        .result-overview-cost {
+            color: var(--result-rust-dark);
+            font-size: clamp(36px, 8vw, 58px);
+            font-weight: 900;
+            line-height: 0.95;
+        }
+
+        .result-overview-unit {
+            color: var(--result-ink);
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .result-overview-timeline {
+            display: grid;
+            grid-template-columns: minmax(92px, 0.8fr) minmax(160px, 2fr) minmax(92px, 0.8fr);
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border: 1px solid var(--result-line);
+            border-radius: 6px;
+            background: rgba(255, 250, 240, 0.78);
+        }
+
+        .result-overview-point {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .result-overview-point span {
+            color: var(--result-muted);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .result-overview-point b {
+            color: var(--result-ink);
+            font-size: 18px;
+            line-height: 1.1;
+        }
+
+        .result-overview-point-end {
+            text-align: right;
+        }
+
+        .result-overview-road {
+            position: relative;
+            min-height: 44px;
+        }
+
+        .result-overview-road-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 16px;
+            transform: translateY(-50%);
+            border-radius: 999px;
+            background:
+                repeating-linear-gradient(90deg, transparent 0 20px, rgba(255, 255, 255, 0.78) 20px 28px),
+                linear-gradient(90deg, #263246 0%, #111827 48%, #263246 100%);
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+                0 6px 12px rgba(37, 42, 49, 0.12);
+        }
+
+        .result-overview-road-line::before,
+        .result-overview-road-line::after {
+            content: "";
+            position: absolute;
+            top: -4px;
+            width: 10px;
+            height: 24px;
+            border-radius: 999px;
+            background: var(--result-blue);
+            box-shadow: 0 0 0 4px var(--result-panel);
+        }
+
+        .result-overview-road-line::before {
+            left: 0;
+        }
+
+        .result-overview-road-line::after {
+            right: 0;
+            background: var(--result-sage);
+        }
+
+        .result-overview-bottleneck {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 54px;
+            min-height: 28px;
+            transform: translate(-50%, -50%);
+            border: 1px solid rgba(169, 78, 43, 0.45);
+            border-radius: 6px;
+            background: var(--result-panel-strong);
+            color: var(--result-rust-dark);
+            font-size: 12px;
+            font-weight: 900;
+            box-shadow: 0 6px 14px rgba(169, 78, 43, 0.16);
+        }
+
+        .result-overview-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .result-overview-chip {
             padding: 10px 12px;
-            border-left: 3px solid #c8551f;
-            border-radius: 10px;
-            background: #fff7ed;
-            color: #7c2d12;
-            font-size: 13px;
-            line-height: 1.55;
+            border: 1px solid var(--result-line);
+            border-radius: 6px;
+            background: rgba(255, 250, 240, 0.76);
+        }
+
+        .result-overview-chip-key {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--result-muted);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .result-overview-chip-value {
+            display: block;
+            color: var(--result-ink);
+            font-size: 15px;
+            font-weight: 900;
+            line-height: 1.25;
         }
 
         .result-cost-row + .result-cost-row {
@@ -52,74 +263,72 @@
 
         .result-cost-label {
             font-size: 13px;
-            font-weight: 600;
-            color: #1e2a3a;
+            font-weight: 700;
+            color: var(--result-ink);
         }
 
         .result-cost-value {
             flex-shrink: 0;
             font-size: 14px;
-            font-weight: 700;
-            color: #9f3a17;
+            font-weight: 800;
+            color: var(--result-rust-dark);
         }
 
         .result-cost-track {
             position: relative;
             overflow: hidden;
             height: 16px;
-            border: 1px solid #ead6ca;
-            border-radius: 999px;
-            background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+            border: 1px solid #e1cbb7;
+            border-radius: 4px;
+            background: #f1e4d3;
         }
 
         .result-cost-fill {
             height: 100%;
             min-width: 0;
             border-radius: inherit;
-            background: linear-gradient(90deg, #f7b267 0%, #c8551f 100%);
+            background: linear-gradient(90deg, #d59a50 0%, var(--result-rust) 100%);
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
             transition: width 220ms ease;
         }
 
         .result-cost-fill-early {
-            background: linear-gradient(90deg, #9fd3c7 0%, #2f8f7b 100%);
+            background: linear-gradient(90deg, #9aae88 0%, var(--result-sage) 100%);
         }
 
         .result-cost-fill-late {
-            background: linear-gradient(90deg, #f4a7a2 0%, #bc3f3a 100%);
+            background: linear-gradient(90deg, #d8917a 0%, #9a3f32 100%);
         }
 
         .result-cost-fill-toll {
-            background: linear-gradient(90deg, #ffd166 0%, #a66c00 100%);
+            background: linear-gradient(90deg, #d7ad60 0%, #8a651b 100%);
         }
 
         .bottleneck-route-visual {
             margin-top: 16px;
             padding: 20px;
-            border: 1px solid rgba(148, 163, 184, 0.34);
-            border-radius: 22px;
+            border: 1px solid var(--result-line-strong);
+            border-radius: 8px;
             background:
-                radial-gradient(circle at 15% 18%, rgba(31, 95, 204, 0.15) 0 15%, transparent 28%),
-                radial-gradient(circle at 84% 80%, rgba(79, 111, 82, 0.15) 0 16%, transparent 29%),
-                linear-gradient(135deg, rgba(15, 23, 42, 0.04) 25%, transparent 25%) 0 0 / 20px 20px,
-                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+                linear-gradient(90deg, rgba(38, 54, 68, 0.05) 1px, transparent 1px) 0 0 / 34px 34px,
+                linear-gradient(180deg, #fffaf0 0%, #f3eee5 100%);
             box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.92),
-                0 22px 44px rgba(15, 23, 42, 0.10);
+                inset 0 1px 0 rgba(255, 255, 255, 0.72),
+                0 8px 18px rgba(37, 42, 49, 0.08);
         }
 
         .bottleneck-route-title {
             margin: 0 0 4px;
             font-size: 15px;
-            font-weight: 700;
-            color: #1e2a3a;
+            font-weight: 800;
+            color: var(--result-ink);
         }
 
         .bottleneck-route-note {
             margin: 0 0 12px;
             font-size: 12px;
             line-height: 1.5;
-            color: #5a6b82;
+            color: var(--result-muted);
         }
 
         .route-svg {
@@ -132,8 +341,8 @@
 
         .route-label {
             font-size: 15px;
-            font-weight: 700;
-            fill: #1e2a3a;
+            font-weight: 800;
+            fill: var(--result-ink);
         }
 
         .route-label-inverse {
@@ -142,20 +351,20 @@
 
         .route-label-muted {
             font-size: 12px;
-            fill: #65758a;
+            fill: var(--result-muted);
         }
 
         .route-label-chip {
             font-size: 12px;
             font-weight: 800;
-            fill: #7c2d12;
+            fill: var(--result-rust-dark);
         }
 
         .route-label-small {
             font-size: 11px;
             font-weight: 800;
             letter-spacing: 0.04em;
-            fill: #64748b;
+            fill: var(--result-muted);
         }
 
         .route-metric-grid {
@@ -167,48 +376,48 @@
 
         .route-metric {
             padding: 10px 12px;
-            border: 1px solid #dbe5f0;
-            border-radius: 10px;
-            background: #ffffff;
+            border: 1px solid var(--result-line);
+            border-radius: 6px;
+            background: #fffdf8;
         }
 
         .route-metric-key {
             display: block;
             margin-bottom: 3px;
-            color: #65758a;
+            color: var(--result-muted);
             font-size: 12px;
         }
 
         .route-metric-value {
             display: block;
-            color: #1e2a3a;
+            color: var(--result-ink);
             font-size: 16px;
             font-weight: 700;
             line-height: 1.2;
         }
 
         .route-metric-value-cost {
-            color: #9f3a17;
+            color: var(--result-rust-dark);
         }
 
         .result-viz-card {
             margin-top: 16px;
             padding: 15px;
-            border: 1px solid #dbe5f0;
-            border-radius: 14px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid var(--result-line-strong);
+            border-radius: 8px;
+            background: #fffaf0;
         }
 
         .result-viz-title {
             margin: 0 0 4px;
-            color: #1e2a3a;
+            color: var(--result-ink);
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 800;
         }
 
         .result-viz-note {
             margin: 0 0 12px;
-            color: #5a6b82;
+            color: var(--result-muted);
             font-size: 12px;
             line-height: 1.5;
         }
@@ -222,44 +431,92 @@
         }
 
         .trend-axis {
-            stroke: #cbd5e1;
+            stroke: #bfb3a4;
             stroke-width: 1.5;
         }
 
         .trend-grid {
-            stroke: #e2e8f0;
+            stroke: #ddd2c3;
             stroke-width: 1;
-            stroke-dasharray: 5 7;
+            stroke-dasharray: 4 8;
         }
 
-        .trend-line {
-            fill: none;
-            stroke: #1f5fcc;
+        .trend-line,
+        .trend-average-line {
+            stroke: var(--result-rust);
             stroke-width: 4;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
 
+        .trend-average-line {
+            stroke-width: 3;
+            stroke-dasharray: 10 8;
+        }
+
         .trend-dot {
-            fill: #ffffff;
-            stroke: #1f5fcc;
+            fill: #fffdf8;
+            stroke: var(--result-blue);
             stroke-width: 4;
+        }
+
+        .trend-average-dot {
+            fill: var(--result-rust);
+            stroke: #fffdf8;
+            stroke-width: 3;
         }
 
         .trend-dot-current {
-            fill: #1f5fcc;
-            stroke: #ffffff;
+            fill: var(--result-ink);
+            stroke: #fffdf8;
             stroke-width: 4;
         }
 
+        .trend-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            margin: 10px 0 0;
+            color: var(--result-muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .trend-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .trend-legend-mark {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #fffdf8;
+            border: 3px solid var(--result-blue);
+        }
+
+        .trend-legend-mark-self {
+            background: var(--result-ink);
+            border-color: var(--result-ink);
+        }
+
+        .trend-legend-mark-average {
+            width: 18px;
+            height: 4px;
+            border: 0;
+            border-radius: 2px;
+            background: var(--result-rust);
+        }
+
         .trend-label {
-            fill: #64748b;
+            fill: var(--result-muted);
             font-size: 12px;
             font-weight: 700;
         }
 
         .trend-current-label {
-            fill: #1e2a3a;
+            fill: var(--result-ink);
             font-size: 13px;
             font-weight: 800;
         }
@@ -268,10 +525,9 @@
             overflow-x: auto;
             margin-top: 10px;
             padding: 16px 14px 12px;
-            border: 1px solid #dbe5f0;
-            border-radius: 16px;
-            background:
-                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid var(--result-line-strong);
+            border-radius: 8px;
+            background: #fffaf0;
         }
 
         .slot-bar-chart {
@@ -288,18 +544,18 @@
             justify-items: center;
             min-width: 48px;
             height: 100%;
-            color: #64748b;
+            color: var(--result-muted);
             font-size: 12px;
         }
 
         .slot-bar-count {
             align-self: start;
             padding: 4px 7px;
-            border-radius: 999px;
-            background: #ffffff;
-            color: #334155;
+            border: 1px solid #dfd3c4;
+            border-radius: 4px;
+            background: #fffdf8;
+            color: var(--result-ink);
             font-weight: 800;
-            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
         }
 
         .slot-bar-track {
@@ -307,10 +563,10 @@
             align-items: flex-end;
             width: 100%;
             height: 100%;
-            border-radius: 999px 999px 8px 8px;
-            background: #eef2f7;
+            border-radius: 6px 6px 2px 2px;
+            background: #ebe3d8;
             overflow: hidden;
-            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.24);
+            box-shadow: inset 0 0 0 1px rgba(151, 135, 114, 0.32);
         }
 
         .slot-bar-fill {
@@ -321,30 +577,30 @@
         }
 
         .slot-bar-level-zero .slot-bar-fill {
-            background: #d7dee8;
+            background: #d7d0c5;
         }
 
         .slot-bar-level-low .slot-bar-fill {
-            background: linear-gradient(180deg, #b9d7ff 0%, #5b93df 100%);
+            background: linear-gradient(180deg, #9fb6c2 0%, #5e8294 100%);
         }
 
         .slot-bar-level-medium .slot-bar-fill {
-            background: linear-gradient(180deg, #8fb8ff 0%, #1f5fcc 100%);
+            background: linear-gradient(180deg, #6f98aa 0%, var(--result-blue) 100%);
         }
 
         .slot-bar-level-high .slot-bar-fill {
-            background: linear-gradient(180deg, #f7b267 0%, #d96b2a 100%);
+            background: linear-gradient(180deg, #d3a051 0%, var(--result-amber) 100%);
         }
 
         .slot-bar-level-peak .slot-bar-fill {
-            background: linear-gradient(180deg, #f97316 0%, #9f3a17 100%);
+            background: linear-gradient(180deg, #c9713f 0%, var(--result-rust-dark) 100%);
         }
 
         .slot-bar-label {
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            color: #64748b;
+            color: var(--result-muted);
             font-size: 11px;
             line-height: 1.1;
             white-space: nowrap;
@@ -352,35 +608,35 @@
 
         .slot-bar-item-current .slot-bar-track {
             box-shadow:
-                inset 0 0 0 3px #172033,
-                0 0 0 4px rgba(247, 178, 103, 0.18);
+                inset 0 0 0 3px var(--result-ink),
+                0 0 0 3px rgba(169, 78, 43, 0.18);
         }
 
         .slot-bar-item-current .slot-bar-label,
         .slot-bar-item-current .slot-bar-count {
-            color: #172033;
+            color: var(--result-ink);
         }
 
         .time-spent-card {
             margin-top: 16px;
             padding: 16px;
-            border: 1px solid #dbe5f0;
-            border-radius: 16px;
+            border: 1px solid var(--result-line-strong);
+            border-radius: 8px;
             background:
-                radial-gradient(circle at 12% 16%, rgba(31, 95, 204, 0.08), transparent 28%),
-                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+                linear-gradient(90deg, rgba(38, 54, 68, 0.045) 1px, transparent 1px) 0 0 / 30px 30px,
+                #fffaf0;
         }
 
         .time-spent-title {
             margin: 0 0 4px;
-            color: #1e2a3a;
+            color: var(--result-ink);
             font-size: 15px;
             font-weight: 800;
         }
 
         .time-spent-note {
             margin: 0 0 14px;
-            color: #5a6b82;
+            color: var(--result-muted);
             font-size: 12px;
             line-height: 1.5;
         }
@@ -390,7 +646,7 @@
             justify-content: space-between;
             gap: 12px;
             margin-bottom: 8px;
-            color: #64748b;
+            color: var(--result-muted);
             font-size: 12px;
             font-weight: 700;
         }
@@ -399,9 +655,9 @@
             display: flex;
             overflow: hidden;
             min-height: 34px;
-            border-radius: 999px;
-            background: #e2e8f0;
-            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.26);
+            border-radius: 6px;
+            background: #e7ded1;
+            box-shadow: inset 0 0 0 1px rgba(151, 135, 114, 0.32);
         }
 
         .time-spent-segment {
@@ -416,11 +672,11 @@
         }
 
         .time-spent-free {
-            background: linear-gradient(90deg, #1f5fcc 0%, #4f8fe8 100%);
+            background: linear-gradient(90deg, var(--result-blue) 0%, #5e8294 100%);
         }
 
         .time-spent-queue {
-            background: linear-gradient(90deg, #f7b267 0%, #c8551f 100%);
+            background: linear-gradient(90deg, #d2a04f 0%, var(--result-rust) 100%);
         }
 
         .time-spent-summary {
@@ -432,27 +688,47 @@
 
         .time-spent-stat {
             padding: 10px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: #ffffff;
+            border: 1px solid var(--result-line);
+            border-radius: 6px;
+            background: #fffdf8;
         }
 
         .time-spent-key {
             display: block;
             margin-bottom: 3px;
-            color: #64748b;
+            color: var(--result-muted);
             font-size: 12px;
             font-weight: 700;
         }
 
         .time-spent-value {
             display: block;
-            color: #172033;
+            color: var(--result-ink);
             font-size: 15px;
             font-weight: 800;
         }
 
         @media (max-width: 575px) {
+            .result-overview {
+                padding: 14px;
+            }
+
+            .result-overview-timeline {
+                grid-template-columns: 1fr;
+            }
+
+            .result-overview-point-end {
+                text-align: left;
+            }
+
+            .result-overview-road {
+                min-height: 34px;
+            }
+
+            .result-overview-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .result-cost-head {
                 flex-direction: column;
                 align-items: flex-start;
@@ -488,21 +764,49 @@
 {{ endblock }}
 
 {{ block content }}
-    <p class="text-sub">第 {{ player.round_number }} / {{ C.NUM_ROUNDS }} 轮已完成，看看你这轮选择带来的成本。</p>
-
+<div class="result-page">
     <div class="card-lite">
-        <p><b>你的本轮成本</b></p>
-        <p>出发时间：<b>{{ departure_time_label }}</b></p>
-        <p>到达时间：<b>{{ arrival_time_label }}</b>（目标到达时间 {{ preferred_arrival_time }}）</p>
-        <p>总行程时间：<b>{{ travel_time_minutes }}</b> 分钟</p>
-        <p>排队延误：<b>{{ queue_delay_minutes }}</b> 分钟</p>
-        <p>早到时间：<b>{{ schedule_early_minutes }}</b> 分钟</p>
-        <p>晚到时间：<b>{{ schedule_late_minutes }}</b> 分钟</p>
-        <p>同一分钟选择人数：<b>{{ slot_load }}</b></p>
-        <p>出行成本：<b>{{ total_travel_cost_points }}</b> 成本分</p>
-        <p>粗收费：<b>{{ toll_charge_points }}</b> 成本分</p>
-        <p>最终选择成本：<b>{{ total_choice_cost_points }}</b> 成本分</p>
-        <p class="same-time-cost-note">若多人选择同一分钟，系统按该分钟随机通过顺序的平均排队成本计算，因此同一分钟参与者的排队延误、到达时间和成本相同。</p>
+        <div class="result-overview" aria-label="本轮成本概览">
+            <div class="result-overview-main">
+                <span class="result-overview-kicker">本轮成本概览</span>
+                <span class="result-overview-cost">{{ total_choice_cost_points }}</span>
+                <span class="result-overview-unit">最终选择成本 / 成本分</span>
+            </div>
+
+            <div class="result-overview-timeline" aria-label="A 点到 B 点的本轮时间轴">
+                <div class="result-overview-point">
+                    <span>A 出发</span>
+                    <b>{{ departure_time_label }}</b>
+                </div>
+                <div class="result-overview-road" aria-hidden="true">
+                    <span class="result-overview-road-line"></span>
+                    <span class="result-overview-bottleneck">瓶颈</span>
+                </div>
+                <div class="result-overview-point result-overview-point-end">
+                    <span>B 到达</span>
+                    <b>{{ arrival_time_label }}</b>
+                </div>
+            </div>
+
+            <div class="result-overview-grid" aria-label="本轮关键成本因素">
+                <div class="result-overview-chip">
+                    <span class="result-overview-chip-key">排队</span>
+                    <span class="result-overview-chip-value">{{ queue_delay_minutes }} 分钟</span>
+                </div>
+                <div class="result-overview-chip">
+                    <span class="result-overview-chip-key">偏差</span>
+                    <span class="result-overview-chip-value">早 {{ schedule_early_minutes }} / 晚 {{ schedule_late_minutes }}</span>
+                </div>
+                <div class="result-overview-chip">
+                    <span class="result-overview-chip-key">同分钟</span>
+                    <span class="result-overview-chip-value">{{ slot_load }} 人</span>
+                </div>
+                <div class="result-overview-chip">
+                    <span class="result-overview-chip-key">收费</span>
+                    <span class="result-overview-chip-value">{{ toll_charge_points }} 成本分</span>
+                </div>
+            </div>
+        </div>
 
         <div class="result-cost-chart" aria-label="成本分解可视化">
             <p class="result-cost-chart-title">成本分解</p>
@@ -563,17 +867,15 @@
     </div>
 
     <div class="bottleneck-route-visual" aria-label="A 点到 B 点的瓶颈路径与成本示意">
-        <p class="bottleneck-route-title">成本路径示意</p>
-        <p class="bottleneck-route-note">本轮路径可理解为从 A 点出发，沿一条直线路径经过中途瓶颈，最终到达 B 点；排队延误、到达偏差和收费共同形成本轮最终选择成本。</p>
+        <p class="bottleneck-route-title">真实车道收窄示意</p>
+        <p class="bottleneck-route-note">双车道汇入单车道后通过中途瓶颈；排队车辆表示本轮可能形成的等待。</p>
 
-        <svg class="route-svg" viewBox="0 0 760 330" role="img" aria-label="A 点出发，经过中途瓶颈，到达 B 点">
+        <svg class="route-svg" viewBox="0 0 760 330" role="img" aria-label="A 点出发，双车道汇入单车道，通过中途瓶颈，到达 B 点">
             <defs>
                 <linearGradient id="routeRoadGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                    <stop offset="0%" stop-color="#273449" />
-                    <stop offset="43%" stop-color="#34465f" />
-                    <stop offset="50%" stop-color="#111827" />
-                    <stop offset="57%" stop-color="#34465f" />
-                    <stop offset="100%" stop-color="#273449" />
+                    <stop offset="0%" stop-color="#2c3444" />
+                    <stop offset="48%" stop-color="#151b27" />
+                    <stop offset="100%" stop-color="#303b4c" />
                 </linearGradient>
                 <linearGradient id="routeStartGradient" x1="0%" x2="100%" y1="0%" y2="100%">
                     <stop offset="0%" stop-color="#2c7be5" />
@@ -587,76 +889,97 @@
                     <stop offset="0%" stop-color="#f7b267" />
                     <stop offset="100%" stop-color="#c8551f" />
                 </linearGradient>
-                <linearGradient id="routeSignalGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                    <stop offset="0%" stop-color="#fff7ed" stop-opacity="0.15" />
-                    <stop offset="50%" stop-color="#fff7ed" />
-                    <stop offset="100%" stop-color="#fff7ed" stop-opacity="0.15" />
+                <linearGradient id="routeGrassGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#e9f2de" />
+                    <stop offset="100%" stop-color="#c7ddba" />
+                </linearGradient>
+                <linearGradient id="routeCarCurrentGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#4f8fe8" />
+                    <stop offset="100%" stop-color="#1f5fcc" />
+                </linearGradient>
+                <linearGradient id="routeCarOtherGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                    <stop offset="0%" stop-color="#f9b46a" />
+                    <stop offset="100%" stop-color="#c8551f" />
                 </linearGradient>
                 <filter id="routeSoftShadow" x="-20%" y="-30%" width="140%" height="170%">
                     <feDropShadow dx="0" dy="14" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.18" />
                 </filter>
-                <filter id="routeGlow" x="-30%" y="-80%" width="160%" height="260%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                </filter>
-                <pattern id="routeGrid" width="22" height="22" patternUnits="userSpaceOnUse">
-                    <path d="M22 0H0V22" fill="none" stroke="#e2e8f0" stroke-width="1" opacity="0.55" />
-                </pattern>
-                <pattern id="routeHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                    <rect width="4" height="10" fill="#fed7aa" opacity="0.68" />
+                <pattern id="routeAsphaltTexture" width="16" height="16" patternUnits="userSpaceOnUse">
+                    <rect width="16" height="16" fill="#273142" />
+                    <circle cx="3" cy="5" r="0.9" fill="#475569" opacity="0.55" />
+                    <circle cx="11" cy="12" r="0.8" fill="#111827" opacity="0.45" />
+                    <circle cx="14" cy="4" r="0.6" fill="#64748b" opacity="0.35" />
                 </pattern>
                 <marker id="route-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-                    <path d="M0 0 L10 5 L0 10 Z" fill="#fff7ed" />
+                    <path d="M0 0 L10 5 L0 10 Z" fill="#f8fafc" />
                 </marker>
             </defs>
 
-            <rect x="22" y="20" width="716" height="272" rx="34" fill="url(#routeGrid)" opacity="0.82" />
-            <path d="M68 270 C154 220 234 308 322 252 S492 214 676 276" fill="none" stroke="#dbe5f0" stroke-width="2" opacity="0.72" />
-            <path d="M66 62 C156 100 246 28 332 78 S515 108 690 48" fill="none" stroke="#dbe5f0" stroke-width="2" opacity="0.72" />
+            <path d="M38 230 C168 286 308 250 418 280 S618 280 724 230 V296 H38Z" fill="url(#routeGrassGradient)" opacity="0.82" />
+            <path d="M40 76 C172 42 286 76 392 48 S610 40 720 70 V20 H40Z" fill="url(#routeGrassGradient)" opacity="0.56" />
 
-            <rect x="48" y="38" width="130" height="32" rx="16" fill="#ffffff" stroke="#dbe5f0" />
-            <text x="113" y="59" text-anchor="middle" class="route-label-small">A → B 单一路径</text>
-            <rect x="500" y="38" width="210" height="32" rx="16" fill="#ffffff" stroke="#dbe5f0" />
-            <text x="605" y="59" text-anchor="middle" class="route-label-small">{{ departure_time_label }} 出发 / {{ arrival_time_label }} 到达</text>
+            <path d="M72 112 H292 L350 146 H432 L488 112 H688 V216 H488 L432 184 H350 L292 216 H72Z" fill="#0f172a" opacity="0.16" filter="url(#routeSoftShadow)" />
+            <path d="M72 106 H292 L350 140 H432 L488 106 H688 V210 H488 L432 190 H350 L292 210 H72Z" fill="url(#routeRoadGradient)" stroke="#f8fafc" stroke-width="4" />
+            <path d="M78 112 H287 L346 144 H434 L493 112 H682 V204 H493 L434 186 H346 L287 204 H78Z" fill="url(#routeAsphaltTexture)" opacity="0.52" />
 
-            <path d="M90 162 H324" fill="none" stroke="#e9d5c4" stroke-width="68" stroke-linecap="round" filter="url(#routeSoftShadow)" />
-            <path d="M436 162 H670" fill="none" stroke="#e9d5c4" stroke-width="68" stroke-linecap="round" filter="url(#routeSoftShadow)" />
-            <path d="M324 162 H436" fill="none" stroke="#e9d5c4" stroke-width="40" stroke-linecap="round" filter="url(#routeSoftShadow)" />
-            <path d="M90 162 H324" fill="none" stroke="url(#routeRoadGradient)" stroke-width="44" stroke-linecap="round" />
-            <path d="M436 162 H670" fill="none" stroke="url(#routeRoadGradient)" stroke-width="44" stroke-linecap="round" />
-            <path d="M324 162 H436" fill="none" stroke="#111827" stroke-width="24" stroke-linecap="round" />
-            <path d="M124 162 H636" fill="none" stroke="url(#routeSignalGradient)" stroke-width="5" stroke-linecap="round" stroke-dasharray="20 15" marker-end="url(#route-arrow)" filter="url(#routeGlow)" />
+            <path d="M90 158 H286" fill="none" stroke="#f8fafc" stroke-width="4" stroke-dasharray="22 16" opacity="0.92" />
+            <path d="M494 158 H668" fill="none" stroke="#f8fafc" stroke-width="4" stroke-dasharray="22 16" opacity="0.84" />
+            <path d="M124 135 H274 L350 154" fill="none" stroke="#facc15" stroke-width="3" stroke-linecap="round" stroke-dasharray="18 13" opacity="0.95" />
+            <path d="M124 183 H274 L350 172" fill="none" stroke="#facc15" stroke-width="3" stroke-linecap="round" stroke-dasharray="18 13" opacity="0.95" />
+            <path d="M440 162 H648" fill="none" stroke="#f8fafc" stroke-width="5" stroke-linecap="round" stroke-dasharray="24 18" marker-end="url(#route-arrow)" />
 
-            <rect x="320" y="82" width="22" height="160" rx="11" fill="#9f3a17" />
-            <rect x="418" y="82" width="22" height="160" rx="11" fill="#9f3a17" />
-            <rect x="343" y="98" width="74" height="128" rx="28" fill="url(#routeHatch)" opacity="0.88" />
-            <rect x="344" y="112" width="72" height="100" rx="24" fill="url(#routeBottleneckGradient)" stroke="#ffffff" stroke-width="6" filter="url(#routeSoftShadow)" />
-            <rect x="356" y="146" width="48" height="32" rx="16" fill="#172033" opacity="0.95" />
-            <text x="380" y="79" text-anchor="middle" class="route-label">瓶颈通行口</text>
-            <text x="380" y="253" text-anchor="middle" class="route-label-muted">排队、收费与到达偏差在此转化为成本</text>
+            <rect x="324" y="88" width="112" height="28" rx="14" fill="#fff7ed" stroke="#fed7aa" stroke-width="2" />
+            <text x="380" y="107" text-anchor="middle" class="route-label-chip">瓶颈收窄路段</text>
 
-            <g filter="url(#routeSoftShadow)">
-                <circle cx="88" cy="162" r="34" fill="url(#routeStartGradient)" stroke="#ffffff" stroke-width="7" />
-                <circle cx="672" cy="162" r="34" fill="url(#routeEndGradient)" stroke="#ffffff" stroke-width="7" />
-                <circle cx="190" cy="224" r="16" fill="#1f5fcc" stroke="#ffffff" stroke-width="4" />
-                <circle cx="232" cy="224" r="16" fill="#f7b267" stroke="#ffffff" stroke-width="4" />
-                <circle cx="274" cy="224" r="16" fill="#f7b267" stroke="#ffffff" stroke-width="4" />
-                <circle cx="316" cy="224" r="16" fill="#f7b267" stroke="#ffffff" stroke-width="4" />
+            <g opacity="0.95">
+                <rect x="304" y="112" width="14" height="28" rx="5" fill="#f97316" stroke="#ffffff" stroke-width="2" />
+                <rect x="442" y="112" width="14" height="28" rx="5" fill="#f97316" stroke="#ffffff" stroke-width="2" />
+                <path d="M350 154 H410" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.94" />
+                <path d="M350 154 H410" stroke="url(#routeBottleneckGradient)" stroke-width="4" stroke-linecap="round" />
             </g>
 
-            <path d="M190 199 C228 184 270 184 316 199" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5 6" />
-            <rect x="326" y="270" width="108" height="30" rx="15" fill="#fff7ed" stroke="#fed7aa" stroke-width="2" />
-            <text x="380" y="290" text-anchor="middle" class="route-label-chip">成本汇集</text>
+            <g filter="url(#routeSoftShadow)">
+                <circle cx="88" cy="158" r="32" fill="url(#routeStartGradient)" stroke="#ffffff" stroke-width="7" />
+                <circle cx="672" cy="158" r="32" fill="url(#routeEndGradient)" stroke="#ffffff" stroke-width="7" />
+            </g>
+            <text x="88" y="166" text-anchor="middle" class="route-label route-label-inverse">A</text>
+            <text x="672" y="166" text-anchor="middle" class="route-label route-label-inverse">B</text>
+            <text x="88" y="228" text-anchor="middle" class="route-label">出发点</text>
+            <text x="672" y="228" text-anchor="middle" class="route-label">到达点</text>
 
-            <text x="88" y="170" text-anchor="middle" class="route-label route-label-inverse">A</text>
-            <text x="672" y="170" text-anchor="middle" class="route-label route-label-inverse">B</text>
-            <text x="88" y="217" text-anchor="middle" class="route-label">出发点</text>
-            <text x="672" y="217" text-anchor="middle" class="route-label">到达点</text>
-            <text x="253" y="262" text-anchor="middle" class="route-label-muted">同分钟等待队列</text>
-            <text x="380" y="167" text-anchor="middle" class="route-label route-label-inverse">窄</text>
+            <g filter="url(#routeSoftShadow)" aria-label="排队小汽车">
+                <g transform="translate(203 118)">
+                    <path d="M4 18 L11 8 H34 L42 18 Q46 20 46 25 V29 H0 V24 Q0 20 4 18Z" fill="url(#routeCarCurrentGradient)" stroke="#ffffff" stroke-width="3" />
+                    <path d="M14 11 H31 L36 18 H9Z" fill="#dbeafe" opacity="0.9" />
+                    <circle cx="11" cy="29" r="4" fill="#172033" />
+                    <circle cx="35" cy="29" r="4" fill="#172033" />
+                </g>
+                <g transform="translate(166 170)">
+                    <path d="M4 18 L11 8 H34 L42 18 Q46 20 46 25 V29 H0 V24 Q0 20 4 18Z" fill="url(#routeCarOtherGradient)" stroke="#ffffff" stroke-width="3" />
+                    <path d="M14 11 H31 L36 18 H9Z" fill="#ffedd5" opacity="0.9" />
+                    <circle cx="11" cy="29" r="4" fill="#172033" />
+                    <circle cx="35" cy="29" r="4" fill="#172033" />
+                </g>
+                <g transform="translate(226 170)">
+                    <path d="M4 18 L11 8 H34 L42 18 Q46 20 46 25 V29 H0 V24 Q0 20 4 18Z" fill="url(#routeCarOtherGradient)" stroke="#ffffff" stroke-width="3" />
+                    <path d="M14 11 H31 L36 18 H9Z" fill="#ffedd5" opacity="0.9" />
+                    <circle cx="11" cy="29" r="4" fill="#172033" />
+                    <circle cx="35" cy="29" r="4" fill="#172033" />
+                </g>
+                <g transform="translate(266 121)">
+                    <path d="M4 18 L11 8 H32 L40 18 Q44 20 44 25 V29 H0 V24 Q0 20 4 18Z" fill="#94a3b8" stroke="#ffffff" stroke-width="3" />
+                    <path d="M13 11 H30 L35 18 H9Z" fill="#e2e8f0" opacity="0.9" />
+                    <circle cx="10" cy="29" r="4" fill="#172033" />
+                    <circle cx="34" cy="29" r="4" fill="#172033" />
+                </g>
+                <g transform="translate(456 146)">
+                    <path d="M4 18 L11 8 H32 L40 18 Q44 20 44 25 V29 H0 V24 Q0 20 4 18Z" fill="#6f8f5f" stroke="#ffffff" stroke-width="3" />
+                    <path d="M13 11 H30 L35 18 H9Z" fill="#dcfce7" opacity="0.9" />
+                    <circle cx="10" cy="29" r="4" fill="#172033" />
+                    <circle cx="34" cy="29" r="4" fill="#172033" />
+                </g>
+            </g>
+            <text x="229" y="115" text-anchor="middle" class="route-label-small">你</text>
         </svg>
 
         <div class="route-metric-grid">
@@ -675,36 +998,48 @@
         </div>
     </div>
 
-    <div class="result-viz-card" aria-label="个人成本随轮次变化折线图">
-        <p class="result-viz-title">个人成本变化</p>
-        <p class="result-viz-note">折线展示你从第 1 轮到当前轮的最终选择成本，数值越低表示该轮选择成本越低。</p>
+    <div class="result-viz-card" aria-label="当前轮同组所有参与者成本分布图">
+        <p class="result-viz-title">当前轮同组成本分布</p>
+        <p class="result-viz-note">散点为当前轮同组参与者成本，横线为同组平均成本；当前参与者：你。</p>
 
-        <svg class="cost-trend-svg" viewBox="0 0 620 220" role="img" aria-label="个人最终选择成本随轮次变化">
+        <svg class="cost-trend-svg" viewBox="0 0 620 220" role="img" aria-label="当前轮同组所有参与者最终选择成本分布">
             <line x1="42" y1="24" x2="42" y2="174" class="trend-axis" />
             <line x1="42" y1="174" x2="596" y2="174" class="trend-axis" />
             <line x1="42" y1="99" x2="596" y2="99" class="trend-grid" />
-            <text x="12" y="28" class="trend-label">{{ cost_history_axis_max_label }}</text>
+            <text x="12" y="28" class="trend-label">{{ cost_snapshot_axis_max_label }}</text>
             <text x="24" y="178" class="trend-label">0</text>
 
-            {{ if cost_history_has_multiple_points }}
-                <polyline points="{{ cost_history_line_points }}" class="trend-line" />
-            {{ endif }}
+            <line
+                x1="42"
+                y1="{{ cost_snapshot_average_line_y }}"
+                x2="596"
+                y2="{{ cost_snapshot_average_line_y }}"
+                class="trend-average-line"
+            >
+                <title>当前轮同组平均成本 {{ cost_snapshot_average_cost_label }} 成本分</title>
+            </line>
+            <text x="596" y="{{ cost_snapshot_average_line_y }}" dx="-4" dy="-8" text-anchor="end" class="trend-current-label">同组平均成本 {{ cost_snapshot_average_cost_label }}</text>
 
-            {{ for item in cost_history_points }}
+            {{ for item in cost_snapshot_points }}
                 <circle
                     cx="{{ item.x }}"
                     cy="{{ item.y }}"
-                    r="{{ if item.is_current }}7{{ else }}5{{ endif }}"
-                    class="{{ if item.is_current }}trend-dot-current{{ else }}trend-dot{{ endif }}"
+                    r="{{ if item.is_current_player }}7{{ else }}5{{ endif }}"
+                    class="{{ if item.is_current_player }}trend-dot-current{{ else }}trend-dot{{ endif }}"
                 >
-                    <title>第 {{ item.round_number }} 轮：{{ item.cost_label }} 成本分</title>
+                    <title>当前轮：{{ item.member_label }}，成本 {{ item.cost_label }} 成本分</title>
                 </circle>
-                {{ if item.is_current }}
-                    <text x="{{ item.x }}" y="{{ item.y }}" dy="-13" text-anchor="middle" class="trend-current-label">{{ item.cost_label }}</text>
+                {{ if item.is_current_player }}
+                    <text x="{{ item.x }}" y="{{ item.y }}" dy="-13" text-anchor="middle" class="trend-current-label">你 {{ item.cost_label }}</text>
                 {{ endif }}
-                <text x="{{ item.x }}" y="205" text-anchor="middle" class="trend-label">R{{ item.round_number }}</text>
             {{ endfor }}
         </svg>
+
+        <div class="trend-legend" aria-label="当前轮同组成本分布图例">
+            <span class="trend-legend-item"><span class="trend-legend-mark"></span>匿名同组成员</span>
+            <span class="trend-legend-item"><span class="trend-legend-mark trend-legend-mark-self"></span>当前参与者：你</span>
+            <span class="trend-legend-item"><span class="trend-legend-mark trend-legend-mark-average"></span>同组平均成本</span>
+        </div>
     </div>
 
     <p class="text-sub">本轮各出发时间选择人数：</p>
@@ -768,4 +1103,5 @@
         <p class="text-sub">你已完成全部轮次，点击下方按钮查看最终奖励。</p>
         <button class="otree-btn-next btn btn-primary">查看最终奖励</button>
     {{ endif }}
+</div>
 {{ endblock }}

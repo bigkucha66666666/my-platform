@@ -11,70 +11,116 @@
         }
 
         .check-hero {
-            padding: 18px;
-            border: 1px solid #dbe5f0;
-            border-radius: 18px;
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+            border: 1px solid #d9e5dd;
+            border-radius: 22px;
             background:
-                radial-gradient(circle at 12% 16%, rgba(31, 95, 204, 0.10), transparent 28%),
-                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+                radial-gradient(circle at 10% 18%, rgba(32, 122, 90, 0.14), transparent 30%),
+                linear-gradient(135deg, #fffaf0 0%, #f4faf6 54%, #edf6f1 100%);
+            box-shadow: 0 18px 40px rgba(24, 49, 38, 0.08);
+        }
+
+        .check-hero::after {
+            content: "";
+            position: absolute;
+            right: -48px;
+            top: -62px;
+            width: 150px;
+            height: 150px;
+            border: 22px solid rgba(32, 122, 90, 0.09);
+            border-radius: 50%;
+        }
+
+        .check-kicker {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            color: #207a5a;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+        }
+
+        .check-kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #207a5a;
+            box-shadow: 0 0 0 5px rgba(32, 122, 90, 0.14);
         }
 
         .check-title {
+            position: relative;
+            z-index: 1;
             margin: 0;
-            color: #172033;
-            font-size: 19px;
-            font-weight: 900;
+            color: #17231f;
+            font-size: clamp(22px, 4vw, 34px);
+            line-height: 1.15;
+            font-weight: 950;
+            letter-spacing: -0.04em;
         }
 
         .check-note {
-            margin: 7px 0 0;
-            color: #52657c;
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            margin: 10px 0 0;
+            color: #5d6d66;
             font-size: 14px;
-            line-height: 1.6;
+            line-height: 1.65;
         }
 
         .check-context {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 10px;
         }
 
         .check-context-item,
         .question-card {
-            border: 1px solid #dbe5f0;
-            border-radius: 16px;
+            border: 1px solid #dce7e0;
             background: #ffffff;
-            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.055);
         }
 
         .check-context-item {
-            padding: 12px 14px;
+            min-height: 92px;
+            padding: 13px 14px;
+            border-radius: 18px;
         }
 
         .check-context-key {
-            margin: 0 0 4px;
-            color: #64748b;
+            margin: 0 0 5px;
+            color: #6a7a73;
             font-size: 12px;
-            font-weight: 800;
+            font-weight: 850;
         }
 
         .check-context-value {
             margin: 0;
-            color: #172033;
+            color: #17231f;
             font-size: 15px;
-            font-weight: 900;
+            font-weight: 950;
             line-height: 1.45;
         }
 
         .question-card {
+            display: grid;
+            gap: 13px;
             padding: 16px;
+            border-radius: 20px;
         }
 
         .question-head {
             display: flex;
             align-items: flex-start;
-            gap: 10px;
-            margin-bottom: 12px;
+            gap: 11px;
         }
 
         .question-number {
@@ -82,21 +128,66 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 28px;
-            height: 28px;
+            width: 30px;
+            height: 30px;
             border-radius: 999px;
-            background: #172033;
+            background: #17231f;
             color: #ffffff;
             font-size: 13px;
-            font-weight: 900;
+            font-weight: 950;
         }
 
         .question-title {
             margin: 2px 0 0;
-            color: #172033;
-            font-size: 15px;
-            font-weight: 900;
+            color: #17231f;
+            font-size: 16px;
+            font-weight: 950;
             line-height: 1.45;
+        }
+
+        .scenario-box {
+            display: grid;
+            gap: 8px;
+            padding: 12px;
+            border: 1px solid #e5eadf;
+            border-radius: 16px;
+            background:
+                linear-gradient(135deg, rgba(255, 248, 231, 0.88), rgba(246, 251, 247, 0.92));
+        }
+
+        .scenario-label {
+            margin: 0;
+            color: #9a5a17;
+            font-size: 12px;
+            font-weight: 950;
+            letter-spacing: 0.06em;
+        }
+
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .scenario-chip {
+            border-radius: 12px;
+            padding: 9px 10px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(217, 229, 221, 0.9);
+        }
+
+        .scenario-chip b {
+            display: block;
+            margin-bottom: 2px;
+            color: #65756f;
+            font-size: 11px;
+            font-weight: 850;
+        }
+
+        .scenario-chip span {
+            color: #17231f;
+            font-size: 14px;
+            font-weight: 900;
         }
 
         .answer-options {
@@ -106,18 +197,25 @@
 
         .answer-option {
             display: flex;
-            gap: 9px;
+            gap: 10px;
             align-items: flex-start;
-            padding: 10px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: #f8fafc;
-            color: #334155;
+            padding: 11px 12px;
+            border: 1px solid #e2e8e4;
+            border-radius: 14px;
+            background: #f8fbf9;
+            color: #33443e;
             cursor: pointer;
+            transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+
+        .answer-option:hover {
+            transform: translateY(-1px);
+            border-color: #b9d5c4;
+            background: #f2faf5;
         }
 
         .answer-option input {
-            margin-top: 3px;
+            margin-top: 4px;
         }
 
         .answer-option span {
@@ -126,11 +224,11 @@
 
         .answer-feedback {
             display: none;
-            margin: 12px 0 0;
-            padding: 10px 12px;
-            border-radius: 12px;
+            margin: 0;
+            padding: 11px 12px;
+            border-radius: 14px;
             font-size: 13px;
-            line-height: 1.6;
+            line-height: 1.65;
         }
 
         .question-card.is-correct .answer-feedback {
@@ -153,20 +251,24 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 10px;
+            padding: 14px;
+            border: 1px solid #dce7e0;
+            border-radius: 18px;
+            background: #ffffff;
         }
 
         .check-button {
             border: 0;
             border-radius: 12px;
-            background: #172033;
+            background: #17231f;
             color: #ffffff;
             padding: 10px 15px;
-            font-weight: 900;
+            font-weight: 950;
         }
 
         .check-status {
             margin: 0;
-            color: #52657c;
+            color: #5d6d66;
             font-size: 13px;
             line-height: 1.55;
         }
@@ -176,8 +278,16 @@
             opacity: 0.45;
         }
 
+        @media (max-width: 760px) {
+            .check-context,
+            .scenario-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
         @media (max-width: 575px) {
-            .check-context {
+            .check-context,
+            .scenario-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -197,10 +307,11 @@
 {{ block content }}
     <div class="check-shell">
         <section class="check-hero">
-            <p class="check-title">正式开始前，请完成 3 个规则判断</p>
+            <div class="check-kicker">正式实验前确认</div>
+            <p class="check-title">请完成 3 个场景计算题</p>
             <p class="check-note">
-                这个测试只用于帮助你确认规则理解，不计入正式实验结果，也不会进入后台导出数据。
-                点击“检查答案”后会显示解释；阅读后即可进入第 1 轮正式选择。
+                这些题只用于确认你理解成本计算，不计入正式实验结果，也不会进入后台导出。
+                点击“检查答案”后会显示计算过程；无论答对多少题，阅读解释后都可以进入第 1 轮正式选择。
             </p>
         </section>
 
@@ -214,69 +325,112 @@
                 <p class="check-context-value">{{ free_flow_departure_time }}</p>
             </div>
             <div class="check-context-item">
+                <p class="check-context-key">成本率</p>
+                <p class="check-context-value">排队 {{ queue_cost_per_minute }} / 早到 {{ early_cost_per_minute }} / 晚到 {{ late_cost_per_minute }}</p>
+            </div>
+            <div class="check-context-item">
                 <p class="check-context-key">收费处理</p>
                 <p class="check-context-value">{{ coarse_toll_description }}</p>
             </div>
         </section>
 
-        <section class="question-card" data-correct="a">
+        <section class="question-card" data-correct="b">
             <div class="question-head">
                 <span class="question-number">1</span>
-                <p class="question-title">本实验中，最终选择成本主要由哪些部分组成？</p>
+                <p class="question-title">场景一：如果你的排队延误为 {{ example_queue_minutes }} 分钟，排队成本是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>排队延误</b><span>{{ example_queue_minutes }} 分钟</span></div>
+                    <div class="scenario-chip"><b>排队成本率</b><span>{{ queue_cost_per_minute }} 成本分/分钟</span></div>
+                    <div class="scenario-chip"><b>公式</b><span>排队延误 × 成本率</span></div>
+                    <div class="scenario-chip"><b>只问</b><span>排队成本</span></div>
+                </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="q1" value="a">
-                    <span>排队成本、早到/晚到成本，以及可能存在的粗收费。</span>
+                    <span>4 成本分</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q1" value="b">
-                    <span>只由出发时间本身决定，与排队和收费无关。</span>
+                    <span>{{ example_queue_cost }} 成本分</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q1" value="c">
+                    <span>12 成本分</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。最终选择成本会综合排队延误、到达偏差和粗收费。" data-wrong-text="请注意：最终选择成本不是只看出发时间本身，还包括排队成本、早到/晚到成本和粗收费。"></p>
+            <p class="answer-feedback" data-correct-text="正确。排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本分。" data-wrong-text="请重新看计算：排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本分。"></p>
         </section>
 
         <section class="question-card" data-correct="a">
             <div class="question-head">
                 <span class="question-number">2</span>
-                <p class="question-title">如果多人选择同一分钟出发，他们在结果中的排队延误和成本如何处理？</p>
+                <p class="question-title">场景二：如果目标到达是 08:00，你实际 07:57 到达，到达偏差成本是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>目标到达</b><span>08:00</span></div>
+                    <div class="scenario-chip"><b>实际到达</b><span>07:57</span></div>
+                    <div class="scenario-chip"><b>早到成本率</b><span>{{ early_cost_per_minute }} 成本分/分钟</span></div>
+                    <div class="scenario-chip"><b>只问</b><span>早到成本</span></div>
+                </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="q2" value="a">
-                    <span>按该分钟随机通过顺序的平均排队成本计算，因此同一分钟成本相同。</span>
+                    <span>{{ example_early_cost }} 成本分</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q2" value="b">
-                    <span>同一分钟出发的人会因随机顺序不同而显示不同成本。</span>
+                    <span>6 成本分</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q2" value="c">
+                    <span>9 成本分</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。同一分钟使用平均排队成本，所以同一分钟参与者的排队延误、到达时间和成本相同。" data-wrong-text="请注意：同一分钟不会因随机顺序显示不同成本，系统使用该分钟的平均排队成本。"></p>
+            <p class="answer-feedback" data-correct-text="正确。07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本分。" data-wrong-text="请重新看计算：07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本分。"></p>
         </section>
 
-        <section class="question-card" data-correct="a">
+        <section class="question-card" data-correct="c">
             <div class="question-head">
                 <span class="question-number">3</span>
-                <p class="question-title">如果滚轮某个出发时间标注“收费 X 成本分”，这意味着什么？</p>
+                <p class="question-title">场景三：如果你在 {{ example_departure_time }} 出发，前方已有 {{ example_queue_people_ahead }} 人排队，预计到达 B 点的时间是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>出发时间</b><span>{{ example_departure_time }}</span></div>
+                    <div class="scenario-chip"><b>自由流行程</b><span>{{ free_flow_travel_minutes }} 分钟</span></div>
+                    <div class="scenario-chip"><b>前方排队人数</b><span>{{ example_queue_people_ahead }} 人</span></div>
+                    <div class="scenario-chip"><b>瓶颈通过速度</b><span>每人约 {{ example_service_interval_minutes }} 分钟</span></div>
+                </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="q3" value="a">
-                    <span>选择该时间时，最终选择成本会额外加上 X 成本分。</span>
+                    <span>{{ example_arrival_without_queue_time }}（没有计入前方排队）</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q3" value="b">
-                    <span>该标注只是提示，不会进入最终选择成本。</span>
+                    <span>{{ example_arrival_with_two_people_time }}（只按 2 人排队计算）</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q3" value="c">
+                    <span>{{ example_arrival_time }}</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。收费时段的金额会额外计入最终选择成本。" data-wrong-text="请注意：滚轮中标出的收费金额会进入最终选择成本，不只是提示。"></p>
+            <p class="answer-feedback" data-correct-text="正确。等待时间 = {{ example_queue_people_ahead }} 人 × {{ example_service_interval_minutes }} 分钟/人 = {{ example_queue_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_queue_wait_minutes }} = {{ example_arrival_time }}。" data-wrong-text="请重新看计算：等待时间 = {{ example_queue_people_ahead }} 人 × {{ example_service_interval_minutes }} 分钟/人 = {{ example_queue_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_queue_wait_minutes }} = {{ example_arrival_time }}。"></p>
         </section>
 
         <div class="check-actions">
             <button class="check-button" type="button" id="check-answers">检查答案</button>
             <button class="otree-btn-next btn btn-primary comprehension-next" id="comprehension-next" disabled>进入正式实验</button>
-            <p class="check-status" id="check-status">请先作答并点击“检查答案”。</p>
+            <p class="check-status" id="check-status">请先完成 3 个场景计算题，并点击“检查答案”。</p>
         </div>
     </div>
 
@@ -313,7 +467,7 @@
                 });
 
                 nextButton.disabled = false;
-                statusEl.textContent = '你答对 ' + correctCount + ' / ' + cards.length + ' 题。请阅读解释后进入正式实验。';
+                statusEl.textContent = '你答对 ' + correctCount + ' / ' + cards.length + ' 题。请阅读计算过程后进入正式实验。';
             });
         })();
     </script>

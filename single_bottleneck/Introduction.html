@@ -151,9 +151,10 @@
 
         .bottleneck-visual {
             position: relative;
-            min-height: 292px;
             margin: 16px;
-            overflow: hidden;
+            padding: 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
             border: 1px solid rgba(148, 163, 184, 0.28);
             border-radius: 24px;
             background:
@@ -164,208 +165,42 @@
                 linear-gradient(180deg, #fbfdff 0%, #f7fafc 100%);
         }
 
-        .route-label {
-            position: absolute;
-            left: 18px;
-            top: 16px;
-            z-index: 4;
-            padding: 6px 10px;
-            border: 1px solid rgba(23, 32, 51, 0.10);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.88);
-            color: #475569;
+        .intro-route-svg {
+            position: relative;
+            z-index: 2;
+            display: block;
+            width: 100%;
+            height: auto;
+            min-height: 260px;
+        }
+
+        .intro-route-label {
+            font-size: 15px;
+            font-weight: 900;
+            fill: #172033;
+        }
+
+        .intro-route-label-inverse {
+            fill: #ffffff;
+        }
+
+        .intro-route-muted {
+            font-size: 12px;
+            font-weight: 700;
+            fill: #64748b;
+        }
+
+        .intro-route-chip {
             font-size: 12px;
             font-weight: 900;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+            fill: #7c2d12;
         }
 
-        .road-shadow,
-        .road-body,
-        .road-line {
-            position: absolute;
-            left: 54px;
-            right: 54px;
-            top: 124px;
-            transform: translateY(-50%);
-            border-radius: 999px;
-        }
-
-        .road-shadow {
-            height: 78px;
-            background: #e9d5c4;
-            filter: drop-shadow(0 22px 28px rgba(39, 52, 73, 0.20));
-            clip-path: polygon(0 16%, 40% 16%, 47% 35%, 53% 35%, 60% 16%, 100% 16%, 100% 84%, 60% 84%, 53% 65%, 47% 65%, 40% 84%, 0 84%);
-        }
-
-        .road-body {
-            height: 50px;
-            background:
-                linear-gradient(90deg, #273449 0 39%, #111827 45% 55%, #273449 61% 100%);
-            clip-path: polygon(0 12%, 40% 12%, 47% 32%, 53% 32%, 60% 12%, 100% 12%, 100% 88%, 60% 88%, 53% 68%, 47% 68%, 40% 88%, 0 88%);
-        }
-
-        .road-line {
-            height: 4px;
-            background: repeating-linear-gradient(90deg, #fff7ed 0 24px, transparent 24px 39px);
-            filter: drop-shadow(0 0 5px rgba(255, 247, 237, 0.55));
-        }
-
-        .route-arrow {
-            position: absolute;
-            left: 21%;
-            right: 21%;
-            top: 124px;
-            z-index: 2;
-            height: 0;
-            border-top: 2px solid rgba(255, 247, 237, 0.78);
-        }
-
-        .route-arrow::after {
-            content: "";
-            position: absolute;
-            right: -2px;
-            top: -6px;
-            width: 0;
-            height: 0;
-            border-top: 6px solid transparent;
-            border-bottom: 6px solid transparent;
-            border-left: 10px solid rgba(255, 247, 237, 0.92);
-        }
-
-        .route-node {
-            position: absolute;
-            top: 94px;
-            z-index: 5;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 62px;
-            height: 62px;
-            border: 6px solid #ffffff;
-            border-radius: 999px;
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 900;
-            box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
-        }
-
-        .route-node-a {
-            left: 24px;
-            background: linear-gradient(135deg, #1f5fcc, #174f9f);
-        }
-
-        .route-node-b {
-            right: 24px;
-            background: linear-gradient(135deg, #6f8f5f, #2f5131);
-        }
-
-        .bottleneck-gate {
-            position: absolute;
-            left: 50%;
-            top: 58px;
-            z-index: 6;
-            width: 118px;
-            height: 136px;
-            margin-left: -59px;
-            border-radius: 28px;
-            background:
-                linear-gradient(90deg, #9f3a17 0 16px, transparent 16px calc(100% - 16px), #9f3a17 calc(100% - 16px)),
-                linear-gradient(180deg, rgba(255, 247, 237, 0.98), rgba(255, 237, 213, 0.92));
-            box-shadow:
-                0 22px 38px rgba(159, 58, 23, 0.24),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.9);
-        }
-
-        .bottleneck-gate::before {
-            content: "";
-            position: absolute;
-            left: 39px;
-            right: 39px;
-            top: 44px;
-            bottom: 44px;
-            border-radius: 999px;
-            background: repeating-linear-gradient(45deg, #172033 0 7px, #314159 7px 14px);
-            box-shadow: inset 0 0 0 4px #fff7ed, 0 0 0 9px rgba(23, 32, 51, 0.08);
-        }
-
-        .bottleneck-gate::after {
-            content: "瓶颈";
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 12px;
-            color: #7c2d12;
-            font-size: 14px;
-            font-weight: 900;
-            text-align: center;
-        }
-
-        .queue-row {
-            position: absolute;
-            left: 122px;
-            top: 178px;
-            z-index: 5;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .queue-dot {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            border: 4px solid #ffffff;
-            border-radius: 999px;
-            color: #ffffff;
+        .intro-route-small {
             font-size: 11px;
             font-weight: 900;
-            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.16);
-        }
-
-        .queue-dot-self {
-            background: #1f5fcc;
-        }
-
-        .queue-dot-other {
-            background: linear-gradient(135deg, #f7b267, #c8551f);
-        }
-
-        .visual-caption,
-        .capacity-chip,
-        .cost-chip {
-            position: absolute;
-            z-index: 7;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 900;
-            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
-        }
-
-        .visual-caption {
-            left: 116px;
-            bottom: 34px;
-            padding: 7px 10px;
-            background: #fff7ed;
-            color: #7c2d12;
-        }
-
-        .capacity-chip {
-            right: 18px;
-            bottom: 18px;
-            padding: 7px 10px;
-            background: #172033;
-            color: #ffffff;
-        }
-
-        .cost-chip {
-            left: 50%;
-            bottom: 18px;
-            transform: translateX(-50%);
-            padding: 7px 11px;
-            background: #eef6ff;
-            color: #174f9f;
+            letter-spacing: 0.05em;
+            fill: #64748b;
         }
 
         .intro-facts {
@@ -453,58 +288,12 @@
             }
 
             .bottleneck-visual {
-                min-height: 316px;
                 margin: 12px;
+                padding: 8px;
             }
 
-            .road-shadow,
-            .road-body,
-            .road-line {
-                left: 36px;
-                right: 36px;
-            }
-
-            .route-node {
-                width: 50px;
-                height: 50px;
-                font-size: 17px;
-            }
-
-            .route-node-a {
-                left: 10px;
-            }
-
-            .route-node-b {
-                right: 10px;
-            }
-
-            .bottleneck-gate {
-                width: 88px;
-                height: 116px;
-                margin-left: -44px;
-            }
-
-            .bottleneck-gate::before {
-                left: 29px;
-                right: 29px;
-            }
-
-            .queue-row {
-                left: 56px;
-                top: 190px;
-            }
-
-            .visual-caption {
-                left: 14px;
-                right: 14px;
-                bottom: 58px;
-                text-align: center;
-            }
-
-            .cost-chip {
-                left: 14px;
-                bottom: 16px;
-                transform: none;
+            .intro-route-svg {
+                min-width: 620px;
             }
         }
     </style>
@@ -543,30 +332,112 @@
         <section class="route-demo-card" aria-label="单瓶颈路径演示">
             <div class="route-demo-head">
                 <div>
-                    <p class="route-demo-title">单瓶颈路径示意</p>
-                    <p class="route-demo-note">从 A 点出发到 B 点，途中只有一个瓶颈。越多人集中在相近时间出发，越可能形成等待。</p>
+                    <p class="route-demo-title">真实车道收窄示意</p>
+                    <p class="route-demo-note">从 A 点出发到 B 点，双车道汇入单车道后通过中途瓶颈。越多人集中在相近时间出发，越可能形成等待。</p>
                 </div>
-                <span class="route-demo-pill">A → 瓶颈 → B</span>
+                <span class="route-demo-pill">双车道 → 单车道</span>
             </div>
 
-            <div class="bottleneck-visual" aria-hidden="true">
-                <div class="route-label">单一路径</div>
-                <div class="road-shadow"></div>
-                <div class="road-body"></div>
-                <div class="road-line"></div>
-                <div class="route-arrow"></div>
-                <div class="route-node route-node-a">A</div>
-                <div class="route-node route-node-b">B</div>
-                <div class="bottleneck-gate"></div>
-                <div class="queue-row">
-                    <span class="queue-dot queue-dot-self">你</span>
-                    <span class="queue-dot queue-dot-other">等</span>
-                    <span class="queue-dot queue-dot-other">等</span>
-                    <span class="queue-dot queue-dot-other">等</span>
-                </div>
-                <div class="visual-caption">同一时段集中出发会形成等待队列</div>
-                <div class="cost-chip">等待与早到/晚到都会转化为成本</div>
-                <div class="capacity-chip">容量 {{ capacity_per_slot }} 人/时点</div>
+            <div class="bottleneck-visual">
+                <svg class="intro-route-svg" viewBox="0 0 760 300" role="img" aria-label="真实车道收窄示意：A 点出发，双车道汇入单车道，通过瓶颈后到达 B 点">
+                    <defs>
+                        <linearGradient id="introRoadGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+                            <stop offset="0%" stop-color="#2c3444" />
+                            <stop offset="48%" stop-color="#151b27" />
+                            <stop offset="100%" stop-color="#303b4c" />
+                        </linearGradient>
+                        <linearGradient id="introGrassGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                            <stop offset="0%" stop-color="#e9f2de" />
+                            <stop offset="100%" stop-color="#c7ddba" />
+                        </linearGradient>
+                        <linearGradient id="introStartGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                            <stop offset="0%" stop-color="#2c7be5" />
+                            <stop offset="100%" stop-color="#174f9f" />
+                        </linearGradient>
+                        <linearGradient id="introEndGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                            <stop offset="0%" stop-color="#6f8f5f" />
+                            <stop offset="100%" stop-color="#2f5131" />
+                        </linearGradient>
+                        <linearGradient id="introCarSelfGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                            <stop offset="0%" stop-color="#4f8fe8" />
+                            <stop offset="100%" stop-color="#1f5fcc" />
+                        </linearGradient>
+                        <linearGradient id="introCarOtherGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                            <stop offset="0%" stop-color="#f9b46a" />
+                            <stop offset="100%" stop-color="#c8551f" />
+                        </linearGradient>
+                        <pattern id="introAsphaltTexture" width="16" height="16" patternUnits="userSpaceOnUse">
+                            <rect width="16" height="16" fill="#273142" />
+                            <circle cx="3" cy="5" r="0.9" fill="#475569" opacity="0.55" />
+                            <circle cx="11" cy="12" r="0.8" fill="#111827" opacity="0.45" />
+                            <circle cx="14" cy="4" r="0.6" fill="#64748b" opacity="0.35" />
+                        </pattern>
+                        <filter id="introRouteShadow" x="-20%" y="-30%" width="140%" height="170%">
+                            <feDropShadow dx="0" dy="14" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.18" />
+                        </filter>
+                        <marker id="introRouteArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                            <path d="M0 0 L10 5 L0 10 Z" fill="#f8fafc" />
+                        </marker>
+                    </defs>
+
+                    <path d="M30 214 C162 270 308 236 418 266 S612 264 730 214 V300 H30Z" fill="url(#introGrassGradient)" opacity="0.82" />
+                    <path d="M36 72 C170 38 286 76 392 48 S610 40 724 70 V0 H36Z" fill="url(#introGrassGradient)" opacity="0.56" />
+
+                    <path d="M70 98 H292 L350 132 H432 L488 98 H690 V202 H488 L432 182 H350 L292 202 H70Z" fill="#0f172a" opacity="0.16" filter="url(#introRouteShadow)" />
+                    <path d="M70 92 H292 L350 126 H432 L488 92 H690 V196 H488 L432 176 H350 L292 196 H70Z" fill="url(#introRoadGradient)" stroke="#f8fafc" stroke-width="4" />
+                    <path d="M78 98 H287 L346 130 H434 L493 98 H682 V190 H493 L434 172 H346 L287 190 H78Z" fill="url(#introAsphaltTexture)" opacity="0.52" />
+
+                    <path d="M90 144 H286" fill="none" stroke="#f8fafc" stroke-width="4" stroke-dasharray="22 16" opacity="0.92" />
+                    <path d="M494 144 H668" fill="none" stroke="#f8fafc" stroke-width="4" stroke-dasharray="22 16" opacity="0.84" />
+                    <path d="M124 121 H274 L350 140" fill="none" stroke="#facc15" stroke-width="3" stroke-linecap="round" stroke-dasharray="18 13" opacity="0.95" />
+                    <path d="M124 169 H274 L350 158" fill="none" stroke="#facc15" stroke-width="3" stroke-linecap="round" stroke-dasharray="18 13" opacity="0.95" />
+                    <path d="M440 148 H648" fill="none" stroke="#f8fafc" stroke-width="5" stroke-linecap="round" stroke-dasharray="24 18" marker-end="url(#introRouteArrow)" />
+
+                    <rect x="318" y="74" width="124" height="28" rx="14" fill="#fff7ed" stroke="#fed7aa" stroke-width="2" />
+                    <text x="380" y="93" text-anchor="middle" class="intro-route-chip">瓶颈收窄路段</text>
+
+                    <g opacity="0.95">
+                        <rect x="304" y="98" width="14" height="28" rx="5" fill="#f97316" stroke="#ffffff" stroke-width="2" />
+                        <rect x="442" y="98" width="14" height="28" rx="5" fill="#f97316" stroke="#ffffff" stroke-width="2" />
+                        <path d="M350 140 H410" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.94" />
+                        <path d="M350 140 H410" stroke="#c8551f" stroke-width="4" stroke-linecap="round" />
+                    </g>
+
+                    <g filter="url(#introRouteShadow)" aria-label="排队小汽车">
+                        <circle cx="88" cy="144" r="32" fill="url(#introStartGradient)" stroke="#ffffff" stroke-width="7" />
+                        <circle cx="672" cy="144" r="32" fill="url(#introEndGradient)" stroke="#ffffff" stroke-width="7" />
+
+                        <g transform="translate(203 104)">
+                            <path d="M4 18 L11 8 H34 L42 18 Q46 20 46 25 V29 H0 V24 Q0 20 4 18Z" fill="url(#introCarSelfGradient)" stroke="#ffffff" stroke-width="3" />
+                            <path d="M14 11 H31 L36 18 H9Z" fill="#dbeafe" opacity="0.9" />
+                            <circle cx="11" cy="29" r="4" fill="#172033" />
+                            <circle cx="35" cy="29" r="4" fill="#172033" />
+                        </g>
+                        <g transform="translate(164 155)">
+                            <path d="M4 18 L11 8 H34 L42 18 Q46 20 46 25 V29 H0 V24 Q0 20 4 18Z" fill="url(#introCarOtherGradient)" stroke="#ffffff" stroke-width="3" />
+                            <path d="M14 11 H31 L36 18 H9Z" fill="#ffedd5" opacity="0.9" />
+                            <circle cx="11" cy="29" r="4" fill="#172033" />
+                            <circle cx="35" cy="29" r="4" fill="#172033" />
+                        </g>
+                        <g transform="translate(222 155)">
+                            <path d="M4 18 L11 8 H34 L42 18 Q46 20 46 25 V29 H0 V24 Q0 20 4 18Z" fill="url(#introCarOtherGradient)" stroke="#ffffff" stroke-width="3" />
+                            <path d="M14 11 H31 L36 18 H9Z" fill="#ffedd5" opacity="0.9" />
+                            <circle cx="11" cy="29" r="4" fill="#172033" />
+                            <circle cx="35" cy="29" r="4" fill="#172033" />
+                        </g>
+                        <g transform="translate(266 107)">
+                            <path d="M4 18 L11 8 H32 L40 18 Q44 20 44 25 V29 H0 V24 Q0 20 4 18Z" fill="#94a3b8" stroke="#ffffff" stroke-width="3" />
+                            <path d="M13 11 H30 L35 18 H9Z" fill="#e2e8f0" opacity="0.9" />
+                            <circle cx="10" cy="29" r="4" fill="#172033" />
+                            <circle cx="34" cy="29" r="4" fill="#172033" />
+                        </g>
+                    </g>
+                    <text x="88" y="152" text-anchor="middle" class="intro-route-label intro-route-label-inverse">A</text>
+                    <text x="672" y="152" text-anchor="middle" class="intro-route-label intro-route-label-inverse">B</text>
+                    <text x="88" y="214" text-anchor="middle" class="intro-route-label">出发点</text>
+                    <text x="672" y="214" text-anchor="middle" class="intro-route-label">到达点</text>
+                    <text x="229" y="101" text-anchor="middle" class="intro-route-small">你</text>
+                </svg>
             </div>
 
             <div class="intro-facts" aria-label="正式选择前核心信息">

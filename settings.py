@@ -161,7 +161,7 @@ USE_POINTS = True
 ROOMS = [
     dict(
         name='prod_room',
-        display_name='正式房间（标签登录，P001-P050）',
+        display_name='正式房间(标签登录,P001-P050)',
         participant_label_file='_rooms/econ101.txt',
         use_secure_urls=True,
     ),

@@ -117,7 +117,7 @@
         .time-wheel-option {
             position: relative;
             display: grid;
-            grid-template-columns: 82px 1fr auto;
+            grid-template-columns: minmax(88px, 1fr) auto;
             gap: 10px;
             align-items: center;
             width: 100%;
@@ -168,17 +168,6 @@
             font-size: 22px;
             font-weight: 900;
             color: #0f172a;
-        }
-
-        .time-wheel-relation {
-            color: inherit;
-            font-size: 12px;
-            font-weight: 600;
-            line-height: 1.35;
-        }
-
-        .is-selected .time-wheel-relation {
-            color: #334155;
         }
 
         .time-wheel-tag {
@@ -250,7 +239,7 @@
 
         .selected-detail-grid {
             display: grid;
-            grid-template-columns: 2fr repeat(2, minmax(120px, 1fr));
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
             gap: 10px;
             margin-top: 16px;
         }
@@ -372,10 +361,6 @@
                 <p class="decision-summary-value">{{ preferred_arrival_time }}</p>
             </div>
             <div class="decision-summary-item">
-                <p class="decision-summary-key">无排队基准出发时间</p>
-                <p class="decision-summary-value">{{ free_flow_departure_time }}</p>
-            </div>
-            <div class="decision-summary-item">
                 <p class="decision-summary-key">选择精度</p>
                 <p class="decision-summary-value">{{ departure_time_step_minutes }} 分钟</p>
             </div>
@@ -384,10 +369,6 @@
                 <p class="decision-summary-value">{{ departure_time_min_label }}-{{ departure_time_max_label }}</p>
             </div>
         </div>
-    </div>
-
-    <div class="hint-lite">
-        <p style="margin: 0;">{{ coarse_toll_description }}</p>
     </div>
 
     <div class="slider-card">
@@ -417,8 +398,7 @@
                             aria-selected="false"
                         >
                             <span class="time-wheel-time">{{ item.departure_time }}</span>
-                            <span class="time-wheel-relation">{{ item.departure_relation }}</span>
-                            <span class="time-wheel-tag">{{ if item.toll_active }}收费 {{ item.toll_charge_label }} 成本分{{ else }}无收费{{ endif }}</span>
+                            <span class="time-wheel-tag">{{ if item.toll_active }}收费 {{ item.toll_charge_label }} 成本{{ else }}无收费{{ endif }}</span>
                         </button>
                     {{ endfor }}
                 </div>
@@ -428,10 +408,6 @@
         </div>
 
         <div class="selected-detail-grid">
-            <div class="selected-detail">
-                <span class="selected-detail-key">相对基准说明</span>
-                <span class="selected-detail-value" id="selected-relation">{{ default_departure_relation }}</span>
-            </div>
             <div class="selected-detail">
                 <span class="selected-detail-key">收费</span>
                 <span class="selected-detail-value">
@@ -455,7 +431,6 @@
             var previousButton = document.getElementById('time-prev');
             var nextButton = document.getElementById('time-next');
             var timeEl = document.getElementById('selected-time');
-            var relationEl = document.getElementById('selected-relation');
             var tollEl = document.getElementById('selected-toll');
             var rewardEl = document.getElementById('selected-reward');
             var dataEl = document.getElementById('choice-preview-data');
@@ -541,7 +516,6 @@
                 hiddenInput.value = String(optionMinute(option));
                 selectedIndex = options.indexOf(option);
                 timeEl.textContent = item.time;
-                relationEl.textContent = item.relation;
                 setBadge(tollEl, item.toll_label, 'choice-badge-toll', item.toll_active);
                 setBadge(rewardEl, item.reward_label, 'choice-badge-reward', item.reward_active);
                 previousButton.disabled = selectedIndex <= 0;

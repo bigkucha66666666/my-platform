@@ -78,7 +78,7 @@
 
         .check-context {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
         }
 
@@ -108,6 +108,10 @@
             font-size: 15px;
             font-weight: 950;
             line-height: 1.45;
+        }
+
+        .check-context-cost-line {
+            display: block;
         }
 
         .question-card {
@@ -321,110 +325,114 @@
                 <p class="check-context-value">{{ preferred_arrival_time }}</p>
             </div>
             <div class="check-context-item">
-                <p class="check-context-key">无排队基准</p>
-                <p class="check-context-value">{{ free_flow_departure_time }}</p>
-            </div>
-            <div class="check-context-item">
-                <p class="check-context-key">成本率</p>
-                <p class="check-context-value">排队 {{ queue_cost_per_minute }} / 早到 {{ early_cost_per_minute }} / 晚到 {{ late_cost_per_minute }}</p>
+                <p class="check-context-key">每增加 1 分钟产生的成本</p>
+                <p class="check-context-value">
+                    <span class="check-context-cost-line">排队：{{ queue_cost_per_minute }} 成本</span>
+                    <span class="check-context-cost-line">早到：{{ early_cost_per_minute }} 成本</span>
+                    <span class="check-context-cost-line">晚到：{{ late_cost_per_minute }} 成本</span>
+                </p>
             </div>
             <div class="check-context-item">
                 <p class="check-context-key">收费处理</p>
                 <p class="check-context-value">{{ coarse_toll_description }}</p>
+            </div>
+            <div class="check-context-item">
+                <p class="check-context-key">点瓶颈排队</p>
+                <p class="check-context-value">排队时间 = 队列长度 ÷ 瓶颈服务率</p>
             </div>
         </section>
 
         <section class="question-card" data-correct="b">
             <div class="question-head">
                 <span class="question-number">1</span>
-                <p class="question-title">场景一：如果你的排队延误为 {{ example_queue_minutes }} 分钟，排队成本是多少？</p>
+                <p class="question-title">场景一：如果你的排队时间为 {{ example_queue_minutes }} 分钟，出行时间成本是多少？</p>
             </div>
             <div class="scenario-box">
                 <p class="scenario-label">已知条件</p>
                 <div class="scenario-grid">
-                    <div class="scenario-chip"><b>排队延误</b><span>{{ example_queue_minutes }} 分钟</span></div>
-                    <div class="scenario-chip"><b>排队成本率</b><span>{{ queue_cost_per_minute }} 成本分/分钟</span></div>
-                    <div class="scenario-chip"><b>公式</b><span>排队延误 × 成本率</span></div>
-                    <div class="scenario-chip"><b>只问</b><span>排队成本</span></div>
+                    <div class="scenario-chip"><b>排队时间</b><span>{{ example_queue_minutes }} 分钟</span></div>
+                    <div class="scenario-chip"><b>排队每增加 1 分钟</b><span>{{ queue_cost_per_minute }} 成本</span></div>
+                    <div class="scenario-chip"><b>公式</b><span>排队时间 ✖️ 单位排队时间成本</span></div>
+                    <div class="scenario-chip"><b>只问</b><span>出行时间成本</span></div>
                 </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="q1" value="a">
-                    <span>4 成本分</span>
+                    <span>4 成本</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q1" value="b">
-                    <span>{{ example_queue_cost }} 成本分</span>
+                    <span>{{ example_queue_cost }} 成本</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q1" value="c">
-                    <span>12 成本分</span>
+                    <span>12 成本</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本分。" data-wrong-text="请重新看计算：排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本分。"></p>
+            <p class="answer-feedback" data-correct-text="正确。排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本。" data-wrong-text="请重新看计算：排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本。"></p>
         </section>
 
         <section class="question-card" data-correct="a">
             <div class="question-head">
                 <span class="question-number">2</span>
-                <p class="question-title">场景二：如果目标到达是 08:00，你实际 07:57 到达，到达偏差成本是多少？</p>
+                <p class="question-title">场景二：如果目标到达时间是 08:00,你实际 07:57 到达，早到成本是多少？</p>
             </div>
             <div class="scenario-box">
                 <p class="scenario-label">已知条件</p>
                 <div class="scenario-grid">
                     <div class="scenario-chip"><b>目标到达</b><span>08:00</span></div>
                     <div class="scenario-chip"><b>实际到达</b><span>07:57</span></div>
-                    <div class="scenario-chip"><b>早到成本率</b><span>{{ early_cost_per_minute }} 成本分/分钟</span></div>
+                    <div class="scenario-chip"><b>每早到 1 分钟增加</b><span>{{ early_cost_per_minute }} 成本</span></div>
                     <div class="scenario-chip"><b>只问</b><span>早到成本</span></div>
                 </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="q2" value="a">
-                    <span>{{ example_early_cost }} 成本分</span>
+                    <span>{{ example_early_cost }} 成本</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q2" value="b">
-                    <span>6 成本分</span>
+                    <span>6 成本</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q2" value="c">
-                    <span>9 成本分</span>
+                    <span>9 成本</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本分。" data-wrong-text="请重新看计算：07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本分。"></p>
+            <p class="answer-feedback" data-correct-text="正确。07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本。" data-wrong-text="请重新看计算：07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本。"></p>
         </section>
 
         <section class="question-card" data-correct="c">
             <div class="question-head">
                 <span class="question-number">3</span>
-                <p class="question-title">场景三：如果你在 {{ example_departure_time }} 出发，前方已有 {{ example_queue_people_ahead }} 人排队，预计到达 B 点的时间是多少？</p>
+                <p class="question-title">场景三：如果你在 {{ example_departure_time }} 出发并进入瓶颈队尾，前方已有 {{ example_queue_people_ahead }} 人排队，预计到达 B 点的时间是多少？</p>
             </div>
             <div class="scenario-box">
                 <p class="scenario-label">已知条件</p>
                 <div class="scenario-grid">
                     <div class="scenario-chip"><b>出发时间</b><span>{{ example_departure_time }}</span></div>
                     <div class="scenario-chip"><b>自由流行程</b><span>{{ free_flow_travel_minutes }} 分钟</span></div>
-                    <div class="scenario-chip"><b>前方排队人数</b><span>{{ example_queue_people_ahead }} 人</span></div>
-                    <div class="scenario-chip"><b>瓶颈通过速度</b><span>每人约 {{ example_service_interval_minutes }} 分钟</span></div>
+                    <div class="scenario-chip"><b>队列长度</b><span>{{ example_queue_people_ahead }} 人</span></div>
+                    <div class="scenario-chip"><b>瓶颈服务率</b><span>{{ example_service_rate_per_minute }} 人/分钟</span></div>
                 </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="q3" value="a">
-                    <span>{{ example_arrival_without_queue_time }}（没有计入前方排队）</span>
+                    <span>{{ example_arrival_without_queue_time }}</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q3" value="b">
-                    <span>{{ example_arrival_with_two_people_time }}（只按 2 人排队计算）</span>
+                    <span>{{ example_arrival_with_one_person_time }}</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="q3" value="c">
                     <span>{{ example_arrival_time }}</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。等待时间 = {{ example_queue_people_ahead }} 人 × {{ example_service_interval_minutes }} 分钟/人 = {{ example_queue_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_queue_wait_minutes }} = {{ example_arrival_time }}。" data-wrong-text="请重新看计算：等待时间 = {{ example_queue_people_ahead }} 人 × {{ example_service_interval_minutes }} 分钟/人 = {{ example_queue_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_queue_wait_minutes }} = {{ example_arrival_time }}。"></p>
+            <p class="answer-feedback" data-correct-text="正确。排队时间 = 队列长度 ÷ 瓶颈服务率 = {{ example_queue_people_ahead }} ÷ {{ example_service_rate_per_minute }} = {{ example_queue_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_queue_wait_minutes }} = {{ example_arrival_time }}。" data-wrong-text="请重新看计算：排队时间 = 队列长度 ÷ 瓶颈服务率 = {{ example_queue_people_ahead }} ÷ {{ example_service_rate_per_minute }} = {{ example_queue_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_queue_wait_minutes }} = {{ example_arrival_time }}。"></p>
         </section>
 
         <div class="check-actions">

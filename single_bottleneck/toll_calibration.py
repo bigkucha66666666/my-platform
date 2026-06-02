@@ -171,7 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
         '--min-slots-each-side',
         type=parse_positive_int,
         default=default_slots_each_side(),
-        help='按人数动态生成出发窗口时，无排队基准两侧至少保留的 2 分钟时点数。',
+        help='按人数动态生成出发窗口时，中心时点两侧至少保留的 2 分钟时点数。',
     )
     parser.add_argument(
         '--static-schedule',

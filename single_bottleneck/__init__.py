@@ -153,24 +153,6 @@ def free_flow_departure_minute():
     return C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES
 
 
-def departure_offset_from_free_flow(slot: int, schedule=None):
-    return int(round(departure_minute_for_slot(slot, schedule) - free_flow_departure_minute()))
-
-
-def departure_relation_for_slot(slot: int, schedule=None):
-    offset = departure_offset_from_free_flow(slot, schedule)
-    if offset == 0:
-        return '等于准时到达且无排队延误时所需出发时间'
-    if offset < 0:
-        return f'相对于准时到达且无排队延误时所需出发时间，提前 {abs(offset)} 分钟'
-    return f'相对于准时到达且无排队延误时所需出发时间，延后 {offset} 分钟'
-
-
-def departure_label_for_slot(slot: int, schedule=None):
-    departure_time = minute_to_clock(departure_minute_for_slot(slot, schedule))
-    return f'{departure_time}（{departure_relation_for_slot(slot, schedule)}）'
-
-
 def departure_slot_for_minute(departure_minute, schedule):
     try:
         minute = float(departure_minute)
@@ -967,7 +949,7 @@ def coarse_toll_description_for_player(player: Player):
     prefix = '粗收费已自动校准' if coarse_toll_source_for_player(player) == COARSE_TOLL_SOURCE_AUTO else '粗收费已开启'
     return (
         f'{prefix}：若选择 {time_labels} 出发，每轮需支付 '
-        f'{point_value_display(coarse_toll_points_for_player(player))} 成本分。'
+        f'{point_value_display(coarse_toll_points_for_player(player))} 成本。'
     )
 
 
@@ -983,8 +965,6 @@ def slot_preview_for_player(player: Player):
         preview.append(
             dict(
                 slot=slot,
-                departure_label=departure_label_for_slot(slot, schedule),
-                departure_relation=departure_relation_for_slot(slot, schedule),
                 departure_minute=round(departure_minute, 2),
                 departure_time=minute_to_clock(departure_minute),
                 reward_active=slot in rewarded_slots and reward_treatment_enabled(player.session),
@@ -1504,23 +1484,21 @@ def set_results(group: Group):
 
     for departure_minute in sorted(players_by_departure_minute):
         same_time_players = players_by_departure_minute[departure_minute]
+        random.shuffle(same_time_players)
         slot_load = len(same_time_players)
         first_service_start_minute = max(departure_minute, next_available_bottleneck_minute)
-        expected_service_start_minute = (
-            first_service_start_minute
-            + ((slot_load - 1) / 2) * slot_service_interval
-        )
-        queue_delay = max(0, expected_service_start_minute - departure_minute)
-        arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
-        early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
-        late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
-        generalized_cost = (
-            C.QUEUE_COST_PER_MINUTE * queue_delay
-            + C.EARLY_COST_PER_MINUTE * early_minutes
-            + C.LATE_COST_PER_MINUTE * late_minutes
-        )
 
-        for player in same_time_players:
+        for position, player in enumerate(same_time_players):
+            service_start_minute = first_service_start_minute + position * slot_service_interval
+            queue_delay = max(0, service_start_minute - departure_minute)
+            arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
+            early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
+            late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
+            generalized_cost = (
+                C.QUEUE_COST_PER_MINUTE * queue_delay
+                + C.EARLY_COST_PER_MINUTE * early_minutes
+                + C.LATE_COST_PER_MINUTE * late_minutes
+            )
             slot = player_departure_slot(player)
             reward_bonus = reward_bonus_for_player_slot(player, slot)
             coarse_toll_charge = coarse_toll_for_player_slot(player, slot)
@@ -1795,43 +1773,6 @@ def access_allowed(player: Player):
     return bool(player.participant.vars.get('access_granted', False))
 
 
-def result_slot_summaries(player: Player, current_slot: int):
-    group = player.group
-    rewarded_slots = rewarded_slots_for_player(player)
-    tolled_slots = coarse_toll_slots_for_player(player) if coarse_toll_enabled_for_player(player) else set()
-    schedule = departure_schedule_for_player(player)
-    summaries = []
-    for slot in departure_slots_from_schedule(schedule):
-        count = sum(1 for round_player in group.get_players() if player_departure_slot(round_player) == slot)
-        summaries.append(
-            dict(
-                slot=slot,
-                departure_time=minute_to_clock(departure_minute_for_slot(slot, schedule)),
-                count=count,
-                is_current=slot == current_slot,
-                is_rewarded=reward_treatment_enabled(group.session) and slot in rewarded_slots,
-                is_tolled=coarse_toll_enabled_for_player(player) and slot in tolled_slots,
-            )
-        )
-
-    max_count = max([item['count'] for item in summaries] or [0])
-    for item in summaries:
-        item['bar_height_pct'] = bounded_percent(item['count'], max_count) if max_count else 0
-        if item['count'] <= 0 or max_count <= 0:
-            item['bar_level'] = 'zero'
-            continue
-        ratio = item['count'] / max_count
-        if ratio <= 0.33:
-            item['bar_level'] = 'low'
-        elif ratio <= 0.66:
-            item['bar_level'] = 'medium'
-        elif ratio < 1:
-            item['bar_level'] = 'high'
-        else:
-            item['bar_level'] = 'peak'
-    return summaries
-
-
 def choice_cost_components_for_player(player: Player):
     selected_slot = player_departure_slot(player)
     queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(player, 'queue_delay_minutes', 0), 2)
@@ -1850,70 +1791,48 @@ def choice_cost_components_for_player(player: Player):
 
 
 def result_current_round_cost_snapshot(player: Player):
-    chart_left = 42
-    chart_right = 596
-    chart_top = 24
-    chart_bottom = 174
-    plot_width = chart_right - chart_left
-    plot_height = chart_bottom - chart_top
-
+    schedule = departure_schedule_for_player(player)
+    slots = departure_slots_from_schedule(schedule)
+    current_slot = player_departure_slot(player)
     round_players = [
         round_player
         for round_player in player.group.get_players()
         if player_has_departure_slot(round_player)
     ]
-    if not round_players:
-        return dict(
-            points=[],
-            average_cost_label='0',
-            average_line_y=chart_bottom,
-            axis_max_label='0',
-        )
-
-    cost_rows = []
-    for member_index, round_player in enumerate(round_players):
+    costs_by_slot = {slot: [] for slot in slots}
+    all_costs = []
+    for round_player in round_players:
         components = choice_cost_components_for_player(round_player)
         cost = components['total_choice_cost']
-        cost_rows.append(
-            dict(
-                member_index=member_index,
-                member_count=len(round_players),
-                cost=cost,
-                cost_label=minute_value_display(cost),
-                is_current_player=round_player.participant == player.participant,
-            )
-        )
+        slot = player_departure_slot(round_player)
+        if slot in costs_by_slot:
+            costs_by_slot[slot].append(cost)
+        all_costs.append(cost)
 
-    average_cost = round(sum(row['cost'] for row in cost_rows) / len(cost_rows), 2)
-    max_cost = max(max(row['cost'] for row in cost_rows), average_cost)
+    average_cost = round(sum(all_costs) / len(all_costs), 2) if all_costs else 0
+    max_cost = max(all_costs or [0])
     axis_max = max(5, int(ceil(max_cost / 5) * 5))
 
-    def x_for_member(member_index):
-        if len(cost_rows) == 1:
-            return chart_left + plot_width / 2
-        return chart_left + member_index * (plot_width / (len(cost_rows) - 1))
-
-    points = []
-    for row in cost_rows:
-        x = x_for_member(row['member_index'])
-        y = chart_bottom - (row['cost'] / axis_max * plot_height if axis_max else 0)
-        points.append(
+    bars = []
+    for slot in slots:
+        slot_costs = costs_by_slot[slot]
+        slot_average_cost = round(sum(slot_costs) / len(slot_costs), 2) if slot_costs else 0
+        bars.append(
             dict(
-                cost=row['cost'],
-                cost_label=row['cost_label'],
-                is_current_player=row['is_current_player'],
-                member_label='你' if row['is_current_player'] else '同组成员',
-                x=round(x, 2),
-                y=round(y, 2),
+                slot=slot,
+                departure_time=minute_to_clock(departure_minute_for_slot(slot, schedule)),
+                participant_count=len(slot_costs),
+                has_participants=bool(slot_costs),
+                average_cost_label=minute_value_display(slot_average_cost) if slot_costs else '-',
+                bar_height_pct=bounded_percent(slot_average_cost, axis_max) if slot_costs else 0,
+                is_current=slot == current_slot,
             )
         )
 
-    average_line_y = chart_bottom - (average_cost / axis_max * plot_height if axis_max else 0)
-
     return dict(
-        points=points,
+        bars=bars,
         average_cost_label=minute_value_display(average_cost),
-        average_line_y=round(average_line_y, 2),
+        average_line_bottom_px=round(34 + bounded_percent(average_cost, axis_max) * 1.74, 2),
         axis_max_label=minute_value_display(axis_max),
     )
 
@@ -1927,7 +1846,6 @@ class Introduction(Page):
     def vars_for_template(player: Player):
         return dict(
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
-            free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
             free_flow_travel_minutes=minute_value_display(C.FREE_FLOW_TRAVEL_MINUTES),
             queue_cost_per_minute=C.QUEUE_COST_PER_MINUTE,
             early_cost_per_minute=C.EARLY_COST_PER_MINUTE,
@@ -1937,6 +1855,7 @@ class Introduction(Page):
             coarse_toll_description=coarse_toll_description_for_player(player),
             slot_preview=slot_preview_for_player(player),
             capacity_per_slot=bottleneck_capacity_per_slot(player.session),
+            capacity_window_minutes=minute_value_display(C.SLOT_SIZE_MINUTES),
             total_rounds=C.NUM_ROUNDS,
         )
 
@@ -1954,18 +1873,20 @@ class ComprehensionCheck(Page):
         example_early_cost = example_early_minutes * C.EARLY_COST_PER_MINUTE
         example_queue_people_ahead = 3
         example_service_interval_minutes = service_interval_minutes(player.session)
+        example_service_rate_per_minute = 1 / example_service_interval_minutes
         example_departure_minute = free_flow_departure_minute()
-        example_queue_wait_minutes = example_queue_people_ahead * example_service_interval_minutes
+        example_queue_wait_minutes = example_queue_people_ahead / example_service_rate_per_minute
         example_arrival_without_queue_minute = (
             example_departure_minute + C.FREE_FLOW_TRAVEL_MINUTES
         )
-        example_arrival_with_two_people_minute = (
-            example_arrival_without_queue_minute + 2 * example_service_interval_minutes
+        example_arrival_with_one_person_minute = (
+            example_arrival_without_queue_minute + example_service_interval_minutes
         )
-        example_arrival_minute = example_arrival_without_queue_minute + example_queue_wait_minutes
+        example_arrival_minute = (
+            example_arrival_without_queue_minute + example_queue_wait_minutes
+        )
         return dict(
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
-            free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
             coarse_toll_description=coarse_toll_description_for_player(player),
             free_flow_travel_minutes=minute_value_display(C.FREE_FLOW_TRAVEL_MINUTES),
             queue_cost_per_minute=C.QUEUE_COST_PER_MINUTE,
@@ -1977,11 +1898,12 @@ class ComprehensionCheck(Page):
             example_early_cost=point_value_display(example_early_cost),
             example_queue_people_ahead=example_queue_people_ahead,
             example_service_interval_minutes=minute_value_display(example_service_interval_minutes),
+            example_service_rate_per_minute=minute_value_display(example_service_rate_per_minute),
             example_departure_time=minute_to_clock(example_departure_minute),
             example_queue_wait_minutes=minute_value_display(example_queue_wait_minutes),
             example_arrival_without_queue_time=minute_to_clock(example_arrival_without_queue_minute),
-            example_arrival_with_two_people_time=minute_to_clock(
-                example_arrival_with_two_people_minute
+            example_arrival_with_one_person_time=minute_to_clock(
+                example_arrival_with_one_person_minute
             ),
             example_arrival_time=minute_to_clock(example_arrival_minute),
         )
@@ -2028,9 +1950,8 @@ class Decision(Page):
         choice_preview = {
             str(int(round(item['departure_minute']))): dict(
                 time=item['departure_time'],
-                relation=item['departure_relation'],
                 toll_active=item['toll_active'],
-                toll_label=f"收费 {item['toll_charge_label']} 成本分" if item['toll_active'] else '无收费',
+                toll_label=f"收费 {item['toll_charge_label']} 成本" if item['toll_active'] else '无收费',
                 reward_active=item['reward_active'],
                 reward_label=f"+{item['reward_bonus']}" if item['reward_active'] else '无奖励',
             )
@@ -2039,7 +1960,6 @@ class Decision(Page):
         return dict(
             auto_advance_seconds=Decision.get_timeout_seconds(player),
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
-            free_flow_departure_time=minute_to_clock(free_flow_departure_minute()),
             coarse_toll_description=coarse_toll_description_for_player(player),
             slot_preview=preview,
             departure_time_min_label=minute_to_clock(min_minute),
@@ -2047,10 +1967,6 @@ class Decision(Page):
             departure_time_step_minutes=minute_value_display(departure_choice_step_minutes(schedule)),
             default_departure_minute=minute_value_display(default_minute),
             default_departure_time=minute_to_clock(default_minute),
-            default_departure_relation=departure_relation_for_slot(
-                departure_slot_for_minute(default_minute, schedule),
-                schedule,
-            ),
             choice_preview_json=json.dumps(choice_preview, ensure_ascii=False),
         )
 
@@ -2134,7 +2050,6 @@ class Results(Page):
         cost_bar_min_width_px = 18 if total_choice_cost_points > 0 else 0
         free_flow_time_pct = bounded_percent(C.FREE_FLOW_TRAVEL_MINUTES, travel_time)
         queue_time_pct = bounded_percent(queue_delay, travel_time)
-        slot_summaries = result_slot_summaries(player, current_slot)
         cost_snapshot = result_current_round_cost_snapshot(player)
 
         return dict(
@@ -2152,6 +2067,8 @@ class Results(Page):
             current_slot=current_slot,
             current_slot_time=minute_to_clock(departure_minute_for_slot(current_slot, schedule)),
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
+            capacity_per_slot=bottleneck_capacity_per_slot(player.session),
+            capacity_window_minutes=minute_value_display(C.SLOT_SIZE_MINUTES),
             queue_cost_points=minute_value_display(queue_cost_points),
             early_cost_points=minute_value_display(early_cost_points),
             late_cost_points=minute_value_display(late_cost_points),
@@ -2165,10 +2082,9 @@ class Results(Page):
             toll_cost_pct=toll_cost_pct,
             cost_bar_min_width_px=cost_bar_min_width_px,
             coarse_toll_description=coarse_toll_description_for_player(player),
-            slot_summaries=slot_summaries,
-            cost_snapshot_points=cost_snapshot['points'],
+            cost_snapshot_bars=cost_snapshot['bars'],
             cost_snapshot_average_cost_label=cost_snapshot['average_cost_label'],
-            cost_snapshot_average_line_y=cost_snapshot['average_line_y'],
+            cost_snapshot_average_line_bottom_px=cost_snapshot['average_line_bottom_px'],
             cost_snapshot_axis_max_label=cost_snapshot['axis_max_label'],
             auto_advance_seconds=Results.get_timeout_seconds(player),
         )

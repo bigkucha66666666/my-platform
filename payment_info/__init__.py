@@ -12,7 +12,7 @@ class C(BaseConstants):
     NAME_IN_URL = 'payment_info'
     PLAYERS_PER_GROUP = None
     NUM_ROUNDS = 1
-    PAYMENT_TIMEOUT_SECONDS = 30
+    PAYMENT_TIMEOUT_SECONDS = 60
     DROPOUT_TIMEOUT_SECONDS = 1
 
 

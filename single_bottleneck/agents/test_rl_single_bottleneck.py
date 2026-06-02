@@ -17,7 +17,7 @@ from rl_single_bottleneck import (
 
 
 class SingleBottleneckRlTests(unittest.TestCase):
-    def test_same_departure_time_uses_expected_queue_position(self):
+    def test_same_departure_time_uses_fifo_queue_positions(self):
         params = SingleBottleneckParams()
         free_flow_departure = params.preferred_arrival_minute - params.free_flow_travel_minutes
         actors = [
@@ -28,12 +28,11 @@ class SingleBottleneckRlTests(unittest.TestCase):
 
         outcomes = settle_bottleneck_round(actors, params)
 
-        for outcome in outcomes:
+        for index, outcome in enumerate(outcomes):
             self.assertEqual(outcome.slot_load, 3)
-            self.assertEqual(outcome.queue_delay_minutes, 2.0)
-            self.assertEqual(outcome.arrival_minute, params.preferred_arrival_minute + 2.0)
-            self.assertEqual(outcome.schedule_late_minutes, 2.0)
-            self.assertEqual(outcome.payoff, 130.0)
+            self.assertEqual(outcome.queue_delay_minutes, index * 2.0)
+            self.assertEqual(outcome.arrival_minute, params.preferred_arrival_minute + index * 2.0)
+        self.assertEqual([outcome.payoff for outcome in outcomes], [140.0, 130.0, 120.0])
 
     def test_q_learning_updates_q_values(self):
         params = SingleBottleneckParams(

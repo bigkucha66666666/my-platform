@@ -2,156 +2,186 @@
 {{ block content }}
 
     <style>
-        .payment-wrap {
-            --pay-ink: #20312b;
-            --pay-muted: #607069;
-            --pay-line: #d9e7df;
-            --pay-paper: #fbf7ed;
-            --pay-green: #207a5a;
-            --pay-amber: #bd6b18;
-            max-width: 860px;
+        .payment-page {
+            --pay-ink: #252a31;
+            --pay-muted: #6f756f;
+            --pay-panel: #fffaf0;
+            --pay-panel-strong: #fff4dc;
+            --pay-paper: #fffdf8;
+            --pay-line: #d4c8b8;
+            --pay-line-strong: #b9aa96;
+            --pay-road: #263644;
+            --pay-rust: #a94e2b;
+            --pay-rust-dark: #7f321a;
+            --pay-sage: #627159;
+            max-width: 900px;
             margin: 0 auto;
+            color: var(--pay-ink);
         }
 
-        .payment-hero {
+        .payment-receipt,
+        .payment-panel {
+            border: 1px solid var(--pay-line-strong);
+            border-radius: 8px;
+            background: var(--pay-panel);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+        }
+
+        .payment-receipt {
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(32, 122, 90, 0.18);
-            border-radius: 28px;
-            padding: 30px;
+            padding: 24px;
             background:
-                radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.86) 0 90px, transparent 91px),
-                linear-gradient(135deg, #fffaf0 0%, #eef7ef 52%, #e6f1ec 100%);
-            box-shadow: 0 20px 50px rgba(32, 49, 43, 0.1);
+                linear-gradient(90deg, rgba(38, 54, 68, 0.055) 1px, transparent 1px) 0 0 / 30px 30px,
+                linear-gradient(180deg, #fffaf0 0%, #f3eadc 100%);
         }
 
-        .payment-hero::after {
+        .payment-receipt::before {
             content: "";
             position: absolute;
-            right: -56px;
-            top: -56px;
-            width: 180px;
-            height: 180px;
-            border: 24px solid rgba(32, 122, 90, 0.1);
-            border-radius: 50%;
+            inset: 0 auto 0 0;
+            width: 5px;
+            background: var(--pay-rust);
+        }
+
+        .payment-header,
+        .payment-total,
+        .payment-grid,
+        .payment-panel {
+            position: relative;
+            z-index: 1;
+        }
+
+        .payment-header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 18px;
+            align-items: start;
         }
 
         .payment-kicker {
-            position: relative;
-            z-index: 1;
             display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            padding: 7px 12px;
-            border-radius: 999px;
-            background: rgba(32, 122, 90, 0.11);
-            color: var(--pay-green);
-            font-size: 13px;
+            margin-bottom: 9px;
+            padding: 5px 8px;
+            border: 1px solid var(--pay-line);
+            border-radius: 4px;
+            background: var(--pay-paper);
+            color: var(--pay-muted);
+            font-size: 12px;
             font-weight: 800;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.12em;
         }
 
-        .payment-kicker-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--pay-green);
-            box-shadow: 0 0 0 5px rgba(32, 122, 90, 0.14);
-        }
-
-        .payment-hero-title {
-            position: relative;
-            z-index: 1;
+        .payment-title {
             margin: 0;
             color: var(--pay-ink);
-            font-size: clamp(28px, 5vw, 48px);
+            font-size: clamp(26px, 5vw, 42px);
             line-height: 1.08;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+        }
+
+        .payment-subtitle {
+            max-width: 620px;
+            margin: 12px 0 0;
+            color: var(--pay-muted);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .payment-status {
+            justify-self: end;
+            padding: 8px 10px;
+            border: 1px solid rgba(98, 113, 89, 0.44);
+            border-radius: 4px;
+            background: #f4f8ef;
+            color: #46583e;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+        }
+
+        .payment-total {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(220px, 0.52fr);
+            gap: 14px;
+            margin-top: 22px;
+        }
+
+        .payment-total-main,
+        .payment-code-card {
+            padding: 18px;
+            border: 1px solid var(--pay-line);
+            border-radius: 6px;
+            background: rgba(255, 253, 248, 0.86);
+        }
+
+        .payment-total-label,
+        .payment-code-label,
+        .payment-summary-key {
+            display: block;
+            margin: 0 0 6px;
+            color: var(--pay-muted);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .payment-total-value {
+            margin: 0;
+            color: var(--pay-rust-dark);
+            font-size: clamp(38px, 8vw, 68px);
+            line-height: 0.95;
             font-weight: 900;
             letter-spacing: -0.04em;
         }
 
-        .payment-hero-sub {
-            position: relative;
-            z-index: 1;
-            max-width: 620px;
-            margin: 14px 0 0;
+        .payment-total-unit {
+            display: block;
+            margin-top: 8px;
             color: var(--pay-muted);
-            font-size: 16px;
-            line-height: 1.65;
-        }
-
-        .payment-score-card {
-            position: relative;
-            z-index: 1;
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 18px;
-            align-items: end;
-            margin-top: 24px;
-            padding: 20px;
-            border: 1px solid rgba(32, 122, 90, 0.16);
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.72);
-            backdrop-filter: blur(8px);
-        }
-
-        .payment-score-label {
-            margin: 0 0 6px;
-            color: var(--pay-muted);
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .payment-score-value {
-            margin: 0;
-            color: var(--pay-green);
-            font-size: clamp(34px, 7vw, 64px);
-            line-height: 0.95;
-            font-weight: 950;
-            letter-spacing: -0.05em;
-        }
-
-        .payment-score-unit {
-            color: var(--pay-muted);
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 800;
         }
 
-        .payment-stamp {
-            justify-self: end;
-            transform: rotate(-5deg);
-            border: 2px solid rgba(189, 107, 24, 0.5);
-            border-radius: 14px;
-            padding: 10px 14px;
-            color: var(--pay-amber);
-            font-size: 15px;
+        .payment-code-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: var(--pay-road);
+            color: #ffffff;
+        }
+
+        .payment-code-label {
+            color: rgba(255, 255, 255, 0.68);
+        }
+
+        .payment-code-value {
+            margin: 0;
+            overflow-wrap: anywhere;
+            color: #ffffff;
+            font-size: clamp(22px, 4.5vw, 34px);
+            line-height: 1.1;
             font-weight: 900;
-            letter-spacing: 0.12em;
-            text-align: center;
-            background: rgba(255, 248, 231, 0.75);
+            letter-spacing: 0.02em;
         }
 
         .payment-grid {
             display: grid;
-            grid-template-columns: 1.15fr 0.85fr;
+            grid-template-columns: 1.1fr 0.9fr;
             gap: 16px;
-            margin-top: 18px;
+            margin-top: 16px;
         }
 
         .payment-panel {
-            border: 1px solid var(--pay-line);
-            border-radius: 22px;
             padding: 18px;
-            background: #ffffff;
-            box-shadow: 0 12px 30px rgba(32, 49, 43, 0.06);
+            background: var(--pay-panel);
         }
 
         .payment-panel-title {
             margin: 0 0 12px;
             color: var(--pay-ink);
-            font-size: 17px;
-            font-weight: 850;
+            font-size: 16px;
+            font-weight: 900;
         }
 
         .payment-summary {
@@ -161,57 +191,19 @@
         }
 
         .payment-summary-item {
-            min-height: 92px;
-            border-radius: 18px;
-            padding: 14px;
-            background: #f7fbf8;
-            border: 1px solid #e3eee7;
-        }
-
-        .payment-summary-key {
-            margin: 0 0 8px;
-            color: var(--pay-muted);
-            font-size: 12px;
-            font-weight: 800;
+            min-height: 88px;
+            padding: 12px;
+            border: 1px solid var(--pay-line);
+            border-radius: 6px;
+            background: var(--pay-paper);
         }
 
         .payment-summary-value {
             margin: 0;
             color: var(--pay-ink);
-            font-size: 18px;
+            font-size: 17px;
             line-height: 1.25;
-            font-weight: 850;
-        }
-
-        .payment-code {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 142px;
-            border-radius: 20px;
-            padding: 18px;
-            color: #fff;
-            background:
-                linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 42%),
-                linear-gradient(135deg, #1e7657 0%, #123f33 100%);
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
-        }
-
-        .payment-code-label {
-            margin: 0 0 8px;
-            color: rgba(255, 255, 255, 0.72);
-            font-size: 13px;
-            font-weight: 800;
-        }
-
-        .payment-code-value {
-            margin: 0;
-            overflow-wrap: anywhere;
-            color: #fff;
-            font-size: clamp(24px, 5vw, 38px);
-            line-height: 1.05;
-            font-weight: 950;
-            letter-spacing: 0.02em;
+            font-weight: 900;
         }
 
         .payment-steps {
@@ -229,7 +221,7 @@
             align-items: start;
             color: var(--pay-muted);
             font-size: 14px;
-            line-height: 1.55;
+            line-height: 1.6;
         }
 
         .payment-step-index {
@@ -238,87 +230,106 @@
             justify-content: center;
             width: 30px;
             height: 30px;
-            border-radius: 999px;
-            background: #edf7f1;
-            color: var(--pay-green);
+            border: 1px solid var(--pay-line);
+            border-radius: 4px;
+            background: var(--pay-paper);
+            color: var(--pay-rust-dark);
             font-size: 13px;
             font-weight: 900;
         }
 
         .payment-progress {
-            margin-top: 16px;
-            padding: 14px;
-            border-radius: 18px;
-            background: #fff8e9;
-            border: 1px solid #f1dfbf;
+            margin-top: 14px;
+            padding: 12px;
+            border: 1px solid #dcc2ac;
+            border-radius: 6px;
+            background: var(--pay-panel-strong);
         }
 
         .payment-progress-head {
             display: flex;
             justify-content: space-between;
-            gap: 14px;
-            color: #80612d;
+            gap: 12px;
+            color: #6b4a35;
             font-size: 13px;
             font-weight: 800;
         }
 
         .payment-progress-track {
             overflow: hidden;
-            height: 8px;
+            height: 10px;
             margin-top: 10px;
-            border-radius: 999px;
-            background: rgba(189, 107, 24, 0.17);
+            border: 1px solid #dfc3a9;
+            border-radius: 3px;
+            background: #ead8c5;
         }
 
         .payment-progress-fill {
             width: 100%;
             height: 100%;
-            border-radius: inherit;
-            background: linear-gradient(90deg, #d77e2a 0%, #207a5a 100%);
-            animation: payment-countdown var(--auto-duration, 30s) linear forwards;
+            border-radius: 2px;
+            background: linear-gradient(90deg, var(--pay-rust) 0%, var(--pay-sage) 100%);
+            animation: payment-countdown var(--auto-duration, 60s) linear forwards;
+        }
+
+        .payment-page .text-sub {
+            color: var(--pay-muted);
+            font-size: 13px;
+            line-height: 1.65;
         }
 
         @keyframes payment-countdown {
-            from { width: 100%; }
-            to { width: 0%; }
+            from {
+                width: 100%;
+            }
+
+            to {
+                width: 0%;
+            }
         }
 
         @media (max-width: 760px) {
-            .payment-hero {
-                padding: 22px;
-                border-radius: 22px;
+            .payment-receipt {
+                padding: 18px;
             }
 
-            .payment-score-card,
+            .payment-header,
+            .payment-total,
             .payment-grid,
             .payment-summary {
                 grid-template-columns: 1fr;
             }
 
-            .payment-stamp {
+            .payment-status {
                 justify-self: start;
             }
         }
     </style>
 
-    <div class="payment-wrap">
-        <section class="payment-hero">
-            <div class="payment-kicker">
-                <span class="payment-kicker-dot"></span>
-                实验已完成
-            </div>
-            <h2 class="payment-hero-title">请核对你的最终奖励信息</h2>
-            <p class="payment-hero-sub">
-                你已经完成 {{ payoff_rounds }} 轮{{ experiment_label }}。页面下方的兑换编号用于管理员核对身份和发放奖励。
-            </p>
-
-            <div class="payment-score-card">
+    <div class="payment-page">
+        <section class="payment-receipt" aria-label="最终奖励确认">
+            <div class="payment-header">
                 <div>
-                    <p class="payment-score-label">最终累计奖励</p>
-                    <p class="payment-score-value">{{ total_payoff }}</p>
-                    <span class="payment-score-unit">{{ experiment_label }} points</span>
+                    <span class="payment-kicker">PAYMENT RECORD</span>
+                    <h2 class="payment-title">最终奖励确认</h2>
+                    <p class="payment-subtitle">
+                        你已完成 {{ payoff_rounds }} 轮{{ experiment_label }}。请核对下方奖励信息，并保留兑换编号用于后续核验。
+                    </p>
                 </div>
-                <div class="payment-stamp">已结算</div>
+                <div class="payment-status">结算完成</div>
+            </div>
+
+            <div class="payment-total">
+                <div class="payment-total-main">
+                    <span class="payment-total-label">最终累计奖励</span>
+                    <p class="payment-total-value">{{ total_payoff }}</p>
+                    <span class="payment-total-unit">{{ experiment_label }} 积分</span>
+                </div>
+
+                <div class="payment-code-card">
+                    <span class="payment-code-label">兑换编号</span>
+                    <p class="payment-code-value">{{ redemption_code }}</p>
+                </div>
             </div>
         </section>
 
@@ -327,60 +338,57 @@
                 <h3 class="payment-panel-title">结算摘要</h3>
                 <div class="payment-summary">
                     <div class="payment-summary-item">
-                        <p class="payment-summary-key">完成轮数</p>
+                        <span class="payment-summary-key">完成轮数</span>
                         <p class="payment-summary-value">{{ payoff_rounds }} 轮</p>
                     </div>
                     <div class="payment-summary-item">
-                        <p class="payment-summary-key">实验项目</p>
+                        <span class="payment-summary-key">实验项目</span>
                         <p class="payment-summary-value">{{ experiment_label }}</p>
                     </div>
                     <div class="payment-summary-item">
-                        <p class="payment-summary-key">奖励来源</p>
+                        <span class="payment-summary-key">奖励来源</span>
                         <p class="payment-summary-value">{{ payoff_source_label }}</p>
                     </div>
                 </div>
             </div>
 
             <div class="payment-panel">
-                <h3 class="payment-panel-title">兑换编号</h3>
-                <div class="payment-code">
-                    <p class="payment-code-label">请记录或截图保存</p>
-                    <p class="payment-code-value">{{ redemption_code }}</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="payment-grid">
-            <div class="payment-panel">
-                <h3 class="payment-panel-title">接下来请这样做</h3>
-                <ol class="payment-steps">
-                    <li class="payment-step">
-                        <span class="payment-step-index">1</span>
-                        <span>保留本页显示的兑换编号，后续发放奖励时会用它进行核验。</span>
-                    </li>
-                    <li class="payment-step">
-                        <span class="payment-step-index">2</span>
-                        <span>不要重复进入实验链接，等待管理员确认记录并完成发放。</span>
-                    </li>
-                    <li class="payment-step">
-                        <span class="payment-step-index">3</span>
-                        <span>页面自动提交前不要关闭浏览器；提交完成后实验流程即结束。</span>
-                    </li>
-                </ol>
-            </div>
-
-            <div class="payment-panel">
-                <h3 class="payment-panel-title">自动提交</h3>
-                <p class="text-sub">该页面会在 {{ auto_advance_seconds }} 秒后自动提交完成。</p>
+                <h3 class="payment-panel-title">页面状态</h3>
+                <p class="text-sub">该页面会在 {{ auto_advance_seconds }} 秒后自动提交完成。请在提交前确认兑换编号已经记录。</p>
                 <div class="payment-progress" style="--auto-duration: {{ auto_advance_seconds }}s;">
                     <div class="payment-progress-head">
-                        <span>正在等待系统记录完成状态</span>
+                        <span>等待系统记录完成状态</span>
                         <span>{{ auto_advance_seconds }} 秒</span>
                     </div>
                     <div class="payment-progress-track">
                         <div class="payment-progress-fill"></div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section class="payment-grid">
+            <div class="payment-panel">
+                <h3 class="payment-panel-title">后续说明</h3>
+                <ol class="payment-steps">
+                    <li class="payment-step">
+                        <span class="payment-step-index">1</span>
+                        <span>保留本页显示的兑换编号，奖励发放时会用它进行核验。</span>
+                    </li>
+                    <li class="payment-step">
+                        <span class="payment-step-index">2</span>
+                        <span>不要重复进入实验链接；等待管理员确认记录并完成发放。</span>
+                    </li>
+                    <li class="payment-step">
+                        <span class="payment-step-index">3</span>
+                        <span>自动提交完成后，实验流程即结束。</span>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="payment-panel">
+                <h3 class="payment-panel-title">核对重点</h3>
+                <p class="text-sub">重点核对两项信息：最终累计奖励和兑换编号。若现场实验要求截图或登记，请以本页显示内容为准。</p>
             </div>
         </section>
     </div>

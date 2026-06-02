@@ -110,7 +110,7 @@ def settle_bottleneck_round(
     actors: Sequence[Mapping[str, object]],
     params: SingleBottleneckParams,
 ) -> List[BottleneckOutcome]:
-    """Settle one round using the experiment's expected-position FIFO rule."""
+    """Settle one round using the point-bottleneck FIFO queue rule."""
     actors_by_minute: Dict[float, List[Mapping[str, object]]] = {}
     for actor in actors:
         departure_minute = float(_actor_value(actor, "departure_minute"))
@@ -125,18 +125,18 @@ def settle_bottleneck_round(
         same_time_actors = actors_by_minute[departure_minute]
         slot_load = len(same_time_actors)
         first_service_start = max(departure_minute, next_available_minute)
-        expected_service_start = first_service_start + ((slot_load - 1) / 2) * service_interval
-        queue_delay = max(0.0, expected_service_start - departure_minute)
-        arrival_minute = departure_minute + params.free_flow_travel_minutes + queue_delay
-        early_minutes = max(0.0, params.preferred_arrival_minute - arrival_minute)
-        late_minutes = max(0.0, arrival_minute - params.preferred_arrival_minute)
-        generalized_cost = (
-            params.queue_cost_per_minute * queue_delay
-            + params.early_cost_per_minute * early_minutes
-            + params.late_cost_per_minute * late_minutes
-        )
 
-        for actor in same_time_actors:
+        for position, actor in enumerate(same_time_actors):
+            service_start = first_service_start + position * service_interval
+            queue_delay = max(0.0, service_start - departure_minute)
+            arrival_minute = departure_minute + params.free_flow_travel_minutes + queue_delay
+            early_minutes = max(0.0, params.preferred_arrival_minute - arrival_minute)
+            late_minutes = max(0.0, arrival_minute - params.preferred_arrival_minute)
+            generalized_cost = (
+                params.queue_cost_per_minute * queue_delay
+                + params.early_cost_per_minute * early_minutes
+                + params.late_cost_per_minute * late_minutes
+            )
             actor_id = str(_actor_value(actor, "actor_id"))
             departure_slot = int(_actor_value(actor, "departure_slot"))
             toll_charge = float(params.toll_by_slot.get(departure_slot, 0))

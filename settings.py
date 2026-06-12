@@ -25,6 +25,7 @@ load_local_env()
 DEBUG = environ.get('OTREE_PRODUCTION') in [None, '', '0']
 
 PROD_PARTICIPANT_PASSWORD = environ.get('OTREE_PROD_PARTICIPANT_PASSWORD')
+BROWSER_COMMAND = environ.get('BROWSER_COMMAND')
 
 SESSION_CONFIGS = [
     dict(
@@ -81,7 +82,7 @@ SESSION_CONFIGS = [
         coarse_toll_slot_spec='4-8',
         coarse_toll_time_window_spec='',
         coarse_toll_points=8,
-        bottleneck_capacity_per_slot=1,
+        bottleneck_capacity_per_slot=3,
         payoff_source_var='single_bottleneck_total_payoff',
         final_payoff_label='单瓶颈出发时间实验',
         payoff_source_label='single_bottleneck 全 10 轮累计结果',
@@ -115,7 +116,7 @@ SESSION_CONFIGS = [
         coarse_toll_slot_spec='4-8',
         coarse_toll_time_window_spec='',
         coarse_toll_points=8,
-        bottleneck_capacity_per_slot=1,
+        bottleneck_capacity_per_slot=3,
         payoff_source_var='single_bottleneck_total_payoff',
         final_payoff_label='单瓶颈出发时间实验',
         payoff_source_label='single_bottleneck 全 10 轮累计结果',

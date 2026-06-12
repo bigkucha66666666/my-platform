@@ -9,6 +9,7 @@ from . import (
     Introduction,
     Results,
     ResultsSync,
+    choice_cost_components_for_player,
     departure_minute_for_player_slot,
     departure_slots_for_player,
     player_departure_minute,
@@ -32,8 +33,10 @@ class PlayerBot(Bot):
             yield Submission(Introduction, check_html=False)
             expect('场景计算题', 'in', self.html)
             expect('排队成本 = 4 分钟 × 2 = 8 成本', 'in', self.html)
-            expect('排队时间 = 队列长度 ÷ 瓶颈服务率', 'in', self.html)
-            expect('预计到达 = 07:54 + 6 + 6 = 08:06', 'in', self.html)
+            expect('同一出发时间的等待时间', 'in', self.html)
+            expect('预计到达 = 07:54 + 6 + 2.7 = 08:02:40', 'in', self.html)
+            expect('排队时间 = 队列长度 ÷ 瓶颈服务率', 'not in', self.html)
+            expect('随机通过顺序的平均', 'not in', self.html)
             expect('最大排队时间的一半', 'not in', self.html)
             expect('收费不是提示文字，会计入最终选择成本', 'not in', self.html)
             expect('无排队基准', 'not in', self.html)
@@ -65,8 +68,12 @@ class PlayerBot(Bot):
 
         yield Submission(ResultsSync, check_html=False)
         expect('你的本轮用时', 'in', self.html)
-        expect('自由流行程', 'in', self.html)
-        expect('本轮成本概览', 'in', self.html)
+        expect('固定行驶时间', 'in', self.html)
+        expect('固定行驶时间成本', 'in', self.html)
+        expect('排队延误成本', 'in', self.html)
+        expect('本轮成本与用时', 'in', self.html)
+        expect('result-overview-time', 'in', self.html)
+        expect('time-spent-card', 'not in', self.html)
         expect('A 出发', 'in', self.html)
         expect('B 到达', 'in', self.html)
         expect('出发时间：', 'not in', self.html)
@@ -84,12 +91,13 @@ class PlayerBot(Bot):
         expect('个人成本变化', 'not in', self.html)
         expect('>R1<', 'not in', self.html)
         expect('>R2<', 'not in', self.html)
-        expect('论文式单瓶颈路径', 'in', self.html)
-        expect('单瓶颈闸口', 'in', self.html)
-        expect('固定服务率：单位时间限量通行', 'in', self.html)
+        expect('论文式单瓶颈路径', 'not in', self.html)
+        expect('单瓶颈闸口', 'not in', self.html)
+        expect('固定服务率：单位时间限量通行', 'not in', self.html)
+        expect('bottleneck-route-visual', 'not in', self.html)
         expect('双车道汇入单车道', 'not in', self.html)
         expect('真实车道收窄示意', 'not in', self.html)
-        expect('排队小汽车', 'in', self.html)
+        expect('排队小汽车', 'not in', self.html)
         expect('同组车辆排队等待通过', 'not in', self.html)
         expect('收窄产生排队成本', 'not in', self.html)
         expect('轮已完成，看看你这轮选择带来的成本', 'not in', self.html)
@@ -104,6 +112,12 @@ class PlayerBot(Bot):
         expect(self.player.departure_slot, 'in', available_slots)
         expect(player_departure_minute(self.player), '==', chosen_minute)
         expect(float(self.player.payoff), '>=', 0)
+        components = choice_cost_components_for_player(self.player)
+        fixed_time_cost = C.FIXED_TRAVEL_TIME_COST
+        queue_delay_cost = round(self.player.queue_delay_minutes * C.QUEUE_COST_PER_MINUTE, 2)
+        expect(components['fixed_time_cost'], '==', fixed_time_cost)
+        expect(components['queue_cost'], '==', queue_delay_cost)
+        expect(components['travel_time_cost'], '==', round(fixed_time_cost + queue_delay_cost, 2))
 
         if self.case == 'same_time':
             group_players = self.group.get_players()
@@ -111,9 +125,14 @@ class PlayerBot(Bot):
                 'bottleneck_capacity_per_slot',
                 C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT,
             )
-            expected_delays = [round(index * interval, 2) for index in range(len(group_players))]
-            actual_delays = sorted(round(player.queue_delay_minutes, 2) for player in group_players)
-            expect(actual_delays, '==', expected_delays)
+            expected_delay = round((len(group_players) - 1) * interval, 2)
+            for group_player in group_players:
+                expect(round(group_player.queue_delay_minutes, 2), '==', expected_delay)
+                expect(group_player.arrival_time_label, '==', self.player.arrival_time_label)
+                expect(round(group_player.travel_time_minutes, 2), '==', round(self.player.travel_time_minutes, 2))
+                expect(round(group_player.schedule_early_minutes, 2), '==', round(self.player.schedule_early_minutes, 2))
+                expect(round(group_player.schedule_late_minutes, 2), '==', round(self.player.schedule_late_minutes, 2))
+                expect(group_player.payoff, '==', self.player.payoff)
 
         if self.round_number == C.NUM_ROUNDS:
             expect('single_bottleneck_total_payoff', 'in', self.participant.vars)

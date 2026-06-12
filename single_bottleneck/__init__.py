@@ -5,6 +5,7 @@ import random
 import time
 
 from otree.api import *
+from participant_link_export import build_participant_link_rows, find_room_config, read_participant_labels
 
 
 doc = """
@@ -31,6 +32,7 @@ COARSE_TOLL_CALIBRATION_SOURCE_COMPUTED = 'computed'
 COARSE_TOLL_CALIBRATION_CACHE_FILE = 'toll_calibration_cache.json'
 COARSE_TOLL_CALIBRATION_CACHE = None
 COMPREHENSION_SEEN_VAR = 'single_bottleneck_comprehension_seen'
+SAME_TIME_QUEUE_RULE = 'batch_max_wait'
 
 DEPARTURE_SCHEDULE_SOURCE_STATIC = 'static'
 DEPARTURE_SCHEDULE_SOURCE_AUTO = 'auto'
@@ -60,9 +62,10 @@ class C(BaseConstants):
         - FREE_FLOW_TRAVEL_MINUTES
         - SLOT_SIZE_MINUTES * 5
     )
-    DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT = 1
+    DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT = 3
 
     BASE_POINTS = 140
+    FIXED_TRAVEL_TIME_COST = 12
     QUEUE_COST_PER_MINUTE = 2
     EARLY_COST_PER_MINUTE = 1
     LATE_COST_PER_MINUTE = 3
@@ -1064,6 +1067,7 @@ def cached_toll_assumptions_match(
         and numeric_values_equal(assumptions.get('toll_step'), toll_step)
         and assumptions.get('first_departure_time') == schedule.get('first_departure_time')
         and assumptions.get('last_departure_time') == schedule.get('last_departure_time')
+        and assumptions.get('same_time_queue_rule') == SAME_TIME_QUEUE_RULE
     )
 
 
@@ -1484,21 +1488,24 @@ def set_results(group: Group):
 
     for departure_minute in sorted(players_by_departure_minute):
         same_time_players = players_by_departure_minute[departure_minute]
-        random.shuffle(same_time_players)
         slot_load = len(same_time_players)
         first_service_start_minute = max(departure_minute, next_available_bottleneck_minute)
+        queue_delay = max(
+            0,
+            first_service_start_minute + (slot_load - 1) * slot_service_interval - departure_minute,
+        )
+        arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
+        early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
+        late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
+        fixed_time_cost = C.FIXED_TRAVEL_TIME_COST
+        generalized_cost = (
+            fixed_time_cost
+            + C.QUEUE_COST_PER_MINUTE * queue_delay
+            + C.EARLY_COST_PER_MINUTE * early_minutes
+            + C.LATE_COST_PER_MINUTE * late_minutes
+        )
 
-        for position, player in enumerate(same_time_players):
-            service_start_minute = first_service_start_minute + position * slot_service_interval
-            queue_delay = max(0, service_start_minute - departure_minute)
-            arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
-            early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
-            late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
-            generalized_cost = (
-                C.QUEUE_COST_PER_MINUTE * queue_delay
-                + C.EARLY_COST_PER_MINUTE * early_minutes
-                + C.LATE_COST_PER_MINUTE * late_minutes
-            )
+        for player in same_time_players:
             slot = player_departure_slot(player)
             reward_bonus = reward_bonus_for_player_slot(player, slot)
             coarse_toll_charge = coarse_toll_for_player_slot(player, slot)
@@ -1575,10 +1582,11 @@ def export_row_for_player(player: Player):
     )
     selected_slot = player_departure_slot(player)
     coarse_toll_charge = coarse_toll_for_player_slot(player, selected_slot) if selected_slot else cu(0)
+    fixed_time_cost = round(C.FIXED_TRAVEL_TIME_COST, 2)
     queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(player, 'queue_delay_minutes', 0), 2)
     early_cost = round(C.EARLY_COST_PER_MINUTE * safe_model_field(player, 'schedule_early_minutes', 0), 2)
     late_cost = round(C.LATE_COST_PER_MINUTE * safe_model_field(player, 'schedule_late_minutes', 0), 2)
-    travel_cost_without_toll = round(queue_cost + early_cost + late_cost, 2)
+    travel_cost_without_toll = round(fixed_time_cost + queue_cost + early_cost + late_cost, 2)
     choice_cost_with_toll = round(travel_cost_without_toll + float(coarse_toll_charge), 2)
 
     if session_config_name == 'single_bottleneck_prod':
@@ -1739,12 +1747,22 @@ def build_session_reports(players):
     return session_reports
 
 
+def admin_participant_link_rows(room_name='prod_room'):
+    try:
+        room_config = find_room_config(room_name)
+        labels = read_participant_labels(room_config)
+        return build_participant_link_rows(room_config, labels=labels, base_url='')
+    except Exception:
+        return []
+
+
 def vars_for_admin_report(subsession: Subsession):
     players = []
     for round_subsession in subsession.in_all_rounds():
         players.extend(round_subsession.get_players())
 
     session_reports = build_session_reports(players)
+    participant_link_rows = admin_participant_link_rows()
     default_session_code = ''
     current_session_code = subsession.session.code
     available_session_codes = [report['session_code'] for report in session_reports]
@@ -1764,6 +1782,7 @@ def vars_for_admin_report(subsession: Subsession):
         default_session_code=default_session_code,
         current_session_code=current_session_code,
         session_reports_json=json.dumps(session_reports, ensure_ascii=False),
+        participant_link_rows_json=json.dumps(participant_link_rows, ensure_ascii=False),
     )
 
 
@@ -1775,13 +1794,17 @@ def access_allowed(player: Player):
 
 def choice_cost_components_for_player(player: Player):
     selected_slot = player_departure_slot(player)
+    fixed_time_cost = round(C.FIXED_TRAVEL_TIME_COST, 2)
     queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(player, 'queue_delay_minutes', 0), 2)
     early_cost = round(C.EARLY_COST_PER_MINUTE * safe_model_field(player, 'schedule_early_minutes', 0), 2)
     late_cost = round(C.LATE_COST_PER_MINUTE * safe_model_field(player, 'schedule_late_minutes', 0), 2)
-    travel_cost = round(queue_cost + early_cost + late_cost, 2)
+    travel_time_cost = round(fixed_time_cost + queue_cost, 2)
+    travel_cost = round(travel_time_cost + early_cost + late_cost, 2)
     toll_cost = round(float(coarse_toll_for_player_slot(player, selected_slot)), 2) if selected_slot else 0
     return dict(
+        fixed_time_cost=fixed_time_cost,
         queue_cost=queue_cost,
+        travel_time_cost=travel_time_cost,
         early_cost=early_cost,
         late_cost=late_cost,
         travel_cost=travel_cost,
@@ -1871,11 +1894,12 @@ class ComprehensionCheck(Page):
         example_queue_cost = example_queue_minutes * C.QUEUE_COST_PER_MINUTE
         example_early_minutes = 3
         example_early_cost = example_early_minutes * C.EARLY_COST_PER_MINUTE
-        example_queue_people_ahead = 3
+        example_same_departure_people = 5
         example_service_interval_minutes = service_interval_minutes(player.session)
-        example_service_rate_per_minute = 1 / example_service_interval_minutes
         example_departure_minute = free_flow_departure_minute()
-        example_queue_wait_minutes = example_queue_people_ahead / example_service_rate_per_minute
+        example_same_departure_wait_minutes = (
+            example_same_departure_people - 1
+        ) * example_service_interval_minutes
         example_arrival_without_queue_minute = (
             example_departure_minute + C.FREE_FLOW_TRAVEL_MINUTES
         )
@@ -1883,7 +1907,7 @@ class ComprehensionCheck(Page):
             example_arrival_without_queue_minute + example_service_interval_minutes
         )
         example_arrival_minute = (
-            example_arrival_without_queue_minute + example_queue_wait_minutes
+            example_arrival_without_queue_minute + example_same_departure_wait_minutes
         )
         return dict(
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
@@ -1896,11 +1920,10 @@ class ComprehensionCheck(Page):
             example_queue_cost=point_value_display(example_queue_cost),
             example_early_minutes=minute_value_display(example_early_minutes),
             example_early_cost=point_value_display(example_early_cost),
-            example_queue_people_ahead=example_queue_people_ahead,
+            example_same_departure_people=example_same_departure_people,
             example_service_interval_minutes=minute_value_display(example_service_interval_minutes),
-            example_service_rate_per_minute=minute_value_display(example_service_rate_per_minute),
             example_departure_time=minute_to_clock(example_departure_minute),
-            example_queue_wait_minutes=minute_value_display(example_queue_wait_minutes),
+            example_same_departure_wait_minutes=minute_value_display(example_same_departure_wait_minutes),
             example_arrival_without_queue_time=minute_to_clock(example_arrival_without_queue_minute),
             example_arrival_with_one_person_time=minute_to_clock(
                 example_arrival_with_one_person_minute
@@ -2036,13 +2059,16 @@ class Results(Page):
         early_minutes = safe_model_field(player, 'schedule_early_minutes', 0)
         late_minutes = safe_model_field(player, 'schedule_late_minutes', 0)
         travel_time = safe_model_field(player, 'travel_time_minutes', C.FREE_FLOW_TRAVEL_MINUTES + queue_delay)
+        fixed_time_cost_points = round(C.FIXED_TRAVEL_TIME_COST, 2)
         queue_cost_points = round(C.QUEUE_COST_PER_MINUTE * queue_delay, 2)
+        travel_time_cost_points = round(fixed_time_cost_points + queue_cost_points, 2)
         early_cost_points = round(C.EARLY_COST_PER_MINUTE * early_minutes, 2)
         late_cost_points = round(C.LATE_COST_PER_MINUTE * late_minutes, 2)
         schedule_cost_points = round(early_cost_points + late_cost_points, 2)
-        total_travel_cost_points = round(queue_cost_points + schedule_cost_points, 2)
+        total_travel_cost_points = round(travel_time_cost_points + schedule_cost_points, 2)
         toll_charge_points = round(float(coarse_toll_for_player_slot(player, current_slot)), 2)
         total_choice_cost_points = round(total_travel_cost_points + toll_charge_points, 2)
+        fixed_time_cost_pct = bounded_percent(fixed_time_cost_points, total_choice_cost_points)
         queue_cost_pct = bounded_percent(queue_cost_points, total_choice_cost_points)
         early_cost_pct = bounded_percent(early_cost_points, total_choice_cost_points)
         late_cost_pct = bounded_percent(late_cost_points, total_choice_cost_points)
@@ -2069,13 +2095,16 @@ class Results(Page):
             preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             capacity_per_slot=bottleneck_capacity_per_slot(player.session),
             capacity_window_minutes=minute_value_display(C.SLOT_SIZE_MINUTES),
+            fixed_time_cost_points=minute_value_display(fixed_time_cost_points),
             queue_cost_points=minute_value_display(queue_cost_points),
+            travel_time_cost_points=minute_value_display(travel_time_cost_points),
             early_cost_points=minute_value_display(early_cost_points),
             late_cost_points=minute_value_display(late_cost_points),
             schedule_cost_points=minute_value_display(schedule_cost_points),
             total_travel_cost_points=minute_value_display(total_travel_cost_points),
             toll_charge_points=minute_value_display(toll_charge_points),
             total_choice_cost_points=minute_value_display(total_choice_cost_points),
+            fixed_time_cost_pct=fixed_time_cost_pct,
             queue_cost_pct=queue_cost_pct,
             early_cost_pct=early_cost_pct,
             late_cost_pct=late_cost_pct,

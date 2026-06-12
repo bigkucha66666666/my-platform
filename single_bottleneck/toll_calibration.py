@@ -14,6 +14,7 @@ from typing import Iterable
 
 from . import (
     C,
+    SAME_TIME_QUEUE_RULE,
     build_departure_schedule_record,
     departure_minute_for_slot,
     departure_slots,
@@ -330,20 +331,18 @@ def base_expected_cost(
         first_service_start = max(departure_minute, next_available_minute)
 
         if index == chosen_index:
-            same_slot_others = other_counts[index]
-            possible_costs = []
-            for position in range(same_slot_others + 1):
-                service_start = first_service_start + position * interval
-                queue_delay = max(0, service_start - departure_minute)
-                arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
-                early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
-                late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
-                possible_costs.append(
-                    C.QUEUE_COST_PER_MINUTE * queue_delay
-                    + C.EARLY_COST_PER_MINUTE * early_minutes
-                    + C.LATE_COST_PER_MINUTE * late_minutes
-                )
-            expected_cost = sum(possible_costs) / len(possible_costs)
+            queue_delay = max(
+                0,
+                first_service_start + (total_in_slot - 1) * interval - departure_minute,
+            )
+            arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
+            early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
+            late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
+            expected_cost = (
+                C.QUEUE_COST_PER_MINUTE * queue_delay
+                + C.EARLY_COST_PER_MINUTE * early_minutes
+                + C.LATE_COST_PER_MINUTE * late_minutes
+            )
 
         next_available_minute = first_service_start + total_in_slot * interval
 
@@ -391,9 +390,11 @@ def base_expected_costs_for_counts(
             next_available_minute = departure_minute
 
         first_service_start = max(departure_minute, next_available_minute)
-        same_slot_others = counts[index]
-        expected_service_start = first_service_start + (same_slot_others / 2) * interval
-        queue_delay = max(0, expected_service_start - departure_minute)
+        total_in_slot = counts[index] + 1
+        queue_delay = max(
+            0,
+            first_service_start + (total_in_slot - 1) * interval - departure_minute,
+        )
         arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
         early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
         late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
@@ -1042,7 +1043,8 @@ def calibrate_candidates_by_mode(
     if equilibrium_slots is None:
         equilibrium_slots = exact_equilibrium_slots(valid_slots, players)
 
-    resolved_mode = resolve_calibration_mode(calibration_mode, players, len(equilibrium_slots))
+    requested_mode = parse_calibration_mode(calibration_mode)
+    resolved_mode = resolve_calibration_mode(requested_mode, players, len(equilibrium_slots))
     if resolved_mode == CALIBRATION_MODE_LARGE_GROUP:
         return calibrate_large_group_candidates(
             players=players,
@@ -1058,7 +1060,7 @@ def calibrate_candidates_by_mode(
             approx_refine_iterations=approx_refine_iterations,
         )
 
-    return calibrate_candidates(
+    exact_candidates = calibrate_candidates(
         players=players,
         capacity=capacity,
         min_toll=min_toll,
@@ -1070,6 +1072,22 @@ def calibrate_candidates_by_mode(
         window_slots=window_slots,
         first_departure_minute=first_departure_minute,
         slot_size_minutes=slot_size_minutes,
+    )
+    if exact_candidates or requested_mode != CALIBRATION_MODE_AUTO:
+        return exact_candidates
+
+    return calibrate_large_group_candidates(
+        players=players,
+        capacity=capacity,
+        min_toll=min_toll,
+        max_toll=max_toll,
+        toll_step=toll_step,
+        top_k=top_k,
+        valid_slots=valid_slots,
+        first_departure_minute=first_departure_minute,
+        slot_size_minutes=slot_size_minutes,
+        approx_refine_pool_size=approx_refine_pool_size,
+        approx_refine_iterations=approx_refine_iterations,
     )
 
 
@@ -1243,6 +1261,7 @@ def print_json_output(
             'slots': list(valid_slots),
             'equilibrium_slots': list(equilibrium_slots),
             'window_slots': list(window_slots),
+            'same_time_queue_rule': SAME_TIME_QUEUE_RULE,
         },
         'results': [
             candidate_to_record(candidate, valid_slots=valid_slots, departure_minutes=departure_minutes)
@@ -1347,7 +1366,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         candidates = [candidate] if candidate is not None else []
     else:
-        mode = f'search/{resolved_mode}'
+        mode = f'search/{parse_calibration_mode(args.calibration_mode)}'
         candidates = calibrate_candidates_by_mode(
             players=args.players,
             capacity=args.capacity,
@@ -1360,7 +1379,7 @@ def main(argv: list[str] | None = None) -> int:
             window_slots=window_slots,
             first_departure_minute=first_departure_minute,
             slot_size_minutes=slot_size_minutes,
-            calibration_mode=resolved_mode,
+            calibration_mode=args.calibration_mode,
             approx_refine_pool_size=args.approx_refine_pool_size,
             approx_refine_iterations=args.approx_refine_iterations,
         )

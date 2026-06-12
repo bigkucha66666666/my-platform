@@ -44,6 +44,16 @@
   .report-table thead {
     background: #f7f7f7;
   }
+  .report-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .report-link-note {
+    color: #666;
+    font-size: 12px;
+  }
 </style>
 
 <div class="report-controls">
@@ -54,6 +64,8 @@
     {{ endfor }}
   </select>
   <button type="button" class="btn btn-primary" id="export-session-csv">导出当前 Session CSV</button>
+  <button type="button" class="btn btn-secondary" id="export-participant-links-excel">导出参与者链接 Excel</button>
+  <span class="report-link-note">按当前 Session 人数导出 prod_room 链接；链接进入 prod_room 当前绑定的 session。</span>
 </div>
 
 <div id="report-alert" class="alert alert-warning report-alert" style="display:none;"></div>
@@ -125,16 +137,19 @@
 
 <script id="export-headers-data" type="application/json">{{ export_headers_json|safe }}</script>
 <script id="session-reports-data" type="application/json">{{ session_reports_json|safe }}</script>
+<script id="participant-link-data" type="application/json">{{ participant_link_rows_json|safe }}</script>
 <script>
   (function () {
     const exportHeaders = JSON.parse(document.getElementById('export-headers-data').textContent || '[]');
     const reports = JSON.parse(document.getElementById('session-reports-data').textContent || '[]');
+    const participantLinks = JSON.parse(document.getElementById('participant-link-data').textContent || '[]');
     const reportMap = Object.fromEntries(reports.map(report => [report.session_code, report]));
     const selectEl = document.getElementById('session-select');
     const alertEl = document.getElementById('report-alert');
     const emptyEl = document.getElementById('report-empty');
     const contentEl = document.getElementById('report-content');
     const tbodyEl = document.getElementById('session-data-body');
+    const participantLinksButton = document.getElementById('export-participant-links-excel');
     const defaultSessionCode = selectEl.value || '';
 
     function setText(id, value) {
@@ -216,6 +231,94 @@
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }
+
+    function escapeXml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    function absoluteParticipantUrl(url) {
+      return new URL(url, window.location.origin).href;
+    }
+
+    function currentParticipantLinksForExport() {
+      const report = reportMap[selectEl.value];
+      const participantCount = Number(report?.summary?.participant_count || 0);
+      if (participantCount > 0) {
+        return participantLinks.slice(0, participantCount);
+      }
+      return participantLinks;
+    }
+
+    function excelCell(value, options = {}) {
+      const href = options.href ? ` ss:HRef="${escapeXml(options.href)}"` : '';
+      return `<Cell${href}><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`;
+    }
+
+    function exportParticipantLinksExcel() {
+      const linksForExport = currentParticipantLinksForExport();
+      if (!linksForExport.length) {
+        alertEl.textContent = '没有可导出的参与者链接。请检查 prod_room 是否配置 participant_label_file。';
+        alertEl.style.display = 'block';
+        return;
+      }
+
+      const rows = linksForExport.map(row => {
+        const absoluteUrl = absoluteParticipantUrl(row.participant_url);
+        return {
+          participant_label: row.participant_label,
+          participant_url: absoluteUrl,
+          room_name: row.room_name,
+        };
+      });
+      const headerRow = '<Row>'
+        + excelCell('participant_label')
+        + excelCell('participant_url')
+        + excelCell('room_name')
+        + '</Row>';
+      const bodyRows = rows.map(row => (
+        '<Row>'
+        + excelCell(row.participant_label)
+        + excelCell(row.participant_url, { href: row.participant_url })
+        + excelCell(row.room_name)
+        + '</Row>'
+      )).join('');
+      const workbookXml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Worksheet ss:Name="participant_links">
+    <Table>
+      <Column ss:Width="130"/>
+      <Column ss:Width="620"/>
+      <Column ss:Width="130"/>
+      ${headerRow}
+      ${bodyRows}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+      const blob = new Blob(['\uFEFF' + workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const roomName = rows[0]?.room_name || 'prod_room';
+      const dateText = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      link.href = url;
+      link.download = `${roomName}_participant_links_${dateText}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    participantLinksButton.disabled = !participantLinks.length;
+    participantLinksButton.addEventListener('click', exportParticipantLinksExcel);
 
     if (!reports.length) {
       emptyEl.style.display = 'block';

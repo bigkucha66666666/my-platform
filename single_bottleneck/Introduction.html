@@ -340,7 +340,7 @@
             <p class="intro-title">请确认你理解：这里关注的是选择带来的成本</p>
             <p class="intro-lead">
                 详细规则已经在实验前说明文档中给出。本页只保留正式开始前最关键的信息：
-                你每轮选择一个出发时间，系统根据瓶颈队列长度、早到成本、晚到成本和粗收费计算本轮成本。
+                你每轮选择一个出发时间，系统根据瓶颈等待、早到成本、晚到成本和粗收费计算本轮成本。
             </p>
         </section>
 
@@ -367,7 +367,7 @@
             <div class="route-demo-head">
                 <div>
                     <p class="route-demo-title">论文式单瓶颈示意</p>
-                    <p class="route-demo-note">从 A 点沿单一路径驶向 B 点。道路本身保持畅通；若车辆进入瓶颈的速度超过固定服务率，队列会在闸口前形成。排队时间按你进入队列时的队列长度除以瓶颈服务率计算。</p>
+                    <p class="route-demo-note">从 A 点沿单一路径驶向 B 点。道路本身保持畅通；若车辆进入瓶颈的速度超过固定服务率，队列会在闸口前形成。若多人选择同一出发时间，系统视为同时到达瓶颈，并给该出发时间组相同等待时间。</p>
                     <div class="route-capacity-note">
                         <span class="route-capacity-badge">{{ capacity_per_slot }} 车 / {{ capacity_window_minutes }} 分钟</span>
                         <span>这里每位参与者可理解为一辆车；该值对应论文中的瓶颈服务率，请以本页显示的当前容量为准。</span>

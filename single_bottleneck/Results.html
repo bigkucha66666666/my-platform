@@ -91,8 +91,7 @@
         }
 
         .result-overview-main,
-        .result-overview-timeline,
-        .result-overview-grid {
+        .result-overview-time {
             position: relative;
             z-index: 1;
         }
@@ -125,127 +124,11 @@
             font-weight: 800;
         }
 
-        .result-overview-timeline {
-            display: grid;
-            grid-template-columns: minmax(92px, 0.8fr) minmax(160px, 2fr) minmax(92px, 0.8fr);
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            border: 1px solid var(--result-line);
-            border-radius: 6px;
-            background: rgba(255, 250, 240, 0.78);
-        }
-
-        .result-overview-point {
-            display: grid;
-            gap: 3px;
-            min-width: 0;
-        }
-
-        .result-overview-point span {
-            color: var(--result-muted);
-            font-size: 12px;
-            font-weight: 800;
-        }
-
-        .result-overview-point b {
-            color: var(--result-ink);
-            font-size: 18px;
-            line-height: 1.1;
-        }
-
-        .result-overview-point-end {
-            text-align: right;
-        }
-
-        .result-overview-road {
-            position: relative;
-            min-height: 44px;
-        }
-
-        .result-overview-road-line {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 16px;
-            transform: translateY(-50%);
-            border-radius: 999px;
-            background:
-                repeating-linear-gradient(90deg, transparent 0 20px, rgba(255, 255, 255, 0.78) 20px 28px),
-                linear-gradient(90deg, #263246 0%, #111827 48%, #263246 100%);
-            box-shadow:
-                inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-                0 6px 12px rgba(37, 42, 49, 0.12);
-        }
-
-        .result-overview-road-line::before,
-        .result-overview-road-line::after {
-            content: "";
-            position: absolute;
-            top: -4px;
-            width: 10px;
-            height: 24px;
-            border-radius: 999px;
-            background: var(--result-blue);
-            box-shadow: 0 0 0 4px var(--result-panel);
-        }
-
-        .result-overview-road-line::before {
-            left: 0;
-        }
-
-        .result-overview-road-line::after {
-            right: 0;
-            background: var(--result-sage);
-        }
-
-        .result-overview-bottleneck {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 54px;
-            min-height: 28px;
-            transform: translate(-50%, -50%);
-            border: 1px solid rgba(44, 122, 138, 0.38);
-            border-radius: 6px;
-            background: var(--result-panel-strong);
-            color: var(--result-blue);
-            font-size: 12px;
-            font-weight: 900;
-            box-shadow: 0 6px 14px rgba(44, 122, 138, 0.14);
-        }
-
-        .result-overview-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-        }
-
-        .result-overview-chip {
-            padding: 10px 12px;
+        .result-overview-time {
+            padding: 14px;
             border: 1px solid var(--result-line);
             border-radius: 6px;
             background: rgba(255, 250, 240, 0.76);
-        }
-
-        .result-overview-chip-key {
-            display: block;
-            margin-bottom: 4px;
-            color: var(--result-muted);
-            font-size: 12px;
-            font-weight: 800;
-        }
-
-        .result-overview-chip-value {
-            display: block;
-            color: var(--result-ink);
-            font-size: 15px;
-            font-weight: 900;
-            line-height: 1.25;
         }
 
         .result-cost-row + .result-cost-row {
@@ -295,84 +178,16 @@
             background: linear-gradient(90deg, #91b9a8 0%, var(--result-sage) 100%);
         }
 
+        .result-cost-fill-queue {
+            background: linear-gradient(90deg, #5aa1b0 0%, #235f6f 100%);
+        }
+
         .result-cost-fill-late {
             background: linear-gradient(90deg, #f08a7f 0%, var(--result-coral) 100%);
         }
 
         .result-cost-fill-toll {
             background: linear-gradient(90deg, #8c93d6 0%, var(--result-indigo) 100%);
-        }
-
-        .bottleneck-route-visual {
-            margin-top: 16px;
-            padding: 20px;
-            border: 1px solid var(--result-line-strong);
-            border-radius: 8px;
-            background:
-                linear-gradient(90deg, rgba(38, 54, 68, 0.045) 1px, transparent 1px) 0 0 / 34px 34px,
-                linear-gradient(180deg, #ffffff 0%, #f8fbfc 100%);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.72),
-                0 8px 18px rgba(37, 42, 49, 0.08);
-        }
-
-        .bottleneck-route-title {
-            margin: 0 0 4px;
-            font-size: 15px;
-            font-weight: 800;
-            color: var(--result-ink);
-        }
-
-        .bottleneck-route-note {
-            margin: 0 0 12px;
-            font-size: 12px;
-            line-height: 1.5;
-            color: var(--result-muted);
-        }
-
-        .route-svg {
-            display: block;
-            width: 100%;
-            max-width: 760px;
-            height: auto;
-            margin: 0 auto;
-        }
-
-        .route-label {
-            font-size: 15px;
-            font-weight: 800;
-            fill: var(--result-ink);
-        }
-
-        .route-label-inverse {
-            fill: #ffffff;
-        }
-
-        .route-label-muted {
-            font-size: 12px;
-            fill: var(--result-muted);
-        }
-
-        .route-label-chip {
-            font-size: 12px;
-            font-weight: 800;
-            fill: var(--result-blue);
-        }
-
-        .route-label-small {
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            fill: var(--result-muted);
-        }
-
-        .route-you-label {
-            font-size: 13px;
-            font-weight: 900;
-            fill: #e65100;
-            stroke: #ffffff;
-            stroke-width: 4px;
-            paint-order: stroke;
         }
 
         .result-viz-card {
@@ -561,16 +376,6 @@
             background: var(--result-coral);
         }
 
-        .time-spent-card {
-            margin-top: 16px;
-            padding: 16px;
-            border: 1px solid var(--result-line-strong);
-            border-radius: 8px;
-            background:
-                linear-gradient(90deg, rgba(38, 54, 68, 0.045) 1px, transparent 1px) 0 0 / 30px 30px,
-                #f6faf9;
-        }
-
         .time-spent-title {
             margin: 0 0 4px;
             color: var(--result-ink);
@@ -657,30 +462,10 @@
                 padding: 14px;
             }
 
-            .result-overview-timeline {
-                grid-template-columns: 1fr;
-            }
-
-            .result-overview-point-end {
-                text-align: left;
-            }
-
-            .result-overview-road {
-                min-height: 34px;
-            }
-
-            .result-overview-grid {
-                grid-template-columns: 1fr;
-            }
-
             .result-cost-head {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 2px;
-            }
-
-            .bottleneck-route-visual {
-                padding: 12px;
             }
 
             .result-viz-card {
@@ -705,51 +490,76 @@
 {{ block content }}
 <div class="result-page">
     <div class="card-lite">
-        <div class="result-overview" aria-label="本轮成本概览">
+        <div class="result-overview" aria-label="本轮成本与用时">
             <div class="result-overview-main">
-                <span class="result-overview-kicker">本轮成本概览</span>
+                <span class="result-overview-kicker">本轮成本与用时</span>
                 <span class="result-overview-cost">{{ total_choice_cost_points }}</span>
                 <span class="result-overview-unit">最终选择成本</span>
             </div>
 
-            <div class="result-overview-timeline" aria-label="A 点到 B 点的本轮时间轴">
-                <div class="result-overview-point">
-                    <span>A 出发</span>
-                    <b>{{ departure_time_label }}</b>
-                </div>
-                <div class="result-overview-road" aria-hidden="true">
-                    <span class="result-overview-road-line"></span>
-                    <span class="result-overview-bottleneck">瓶颈</span>
-                </div>
-                <div class="result-overview-point result-overview-point-end">
-                    <span>B 到达</span>
-                    <b>{{ arrival_time_label }}</b>
-                </div>
-            </div>
+            <section class="result-overview-time" aria-label="你的本轮用时示意图">
+                <p class="time-spent-title">你的本轮用时</p>
+                <p class="time-spent-note">总行程时间由固定行驶时间和排队延误组成；这里只展示你自己的本轮用时。</p>
 
-            <div class="result-overview-grid" aria-label="本轮关键成本因素">
-                <div class="result-overview-chip">
-                    <span class="result-overview-chip-key">排队</span>
-                    <span class="result-overview-chip-value">{{ queue_delay_minutes }} 分钟</span>
+                <div class="time-spent-axis">
+                    <span>A 出发 {{ departure_time_label }}</span>
+                    <span>B 到达 {{ arrival_time_label }}</span>
                 </div>
-                <div class="result-overview-chip">
-                    <span class="result-overview-chip-key">同分钟</span>
-                    <span class="result-overview-chip-value">{{ slot_load }} 人</span>
+                <div class="time-spent-track">
+                    <div class="time-spent-segment time-spent-free" data-width-pct="{{ free_flow_time_pct }}">
+                        固定行驶时间 {{ free_flow_travel_minutes }} 分钟
+                    </div>
+                    <div class="time-spent-segment time-spent-queue" data-width-pct="{{ queue_time_pct }}">
+                        {{ if has_queue_delay }}排队 {{ queue_delay_minutes }} 分钟{{ endif }}
+                    </div>
                 </div>
-            </div>
+
+                <div class="time-spent-summary">
+                    <div class="time-spent-stat">
+                        <span class="time-spent-key">固定行驶时间</span>
+                        <span class="time-spent-value">{{ free_flow_travel_minutes }} 分钟</span>
+                    </div>
+                    <div class="time-spent-stat">
+                        <span class="time-spent-key">排队延误</span>
+                        <span class="time-spent-value">{{ if has_queue_delay }}{{ queue_delay_minutes }} 分钟{{ else }}无排队延误{{ endif }}</span>
+                    </div>
+                    <div class="time-spent-stat">
+                        <span class="time-spent-key">同分钟</span>
+                        <span class="time-spent-value">{{ slot_load }} 人</span>
+                    </div>
+                    <div class="time-spent-stat">
+                        <span class="time-spent-key">总行程时间</span>
+                        <span class="time-spent-value">{{ travel_time_minutes }} 分钟</span>
+                    </div>
+                </div>
+            </section>
 
             <section class="result-overview-breakdown" aria-label="成本分解可视化">
                 <p class="result-cost-chart-title">成本分解</p>
-                <p class="result-cost-chart-note">最终选择成本由出行成本和粗收费组成；奖励不用于抵扣这里展示的成本。</p>
+                <p class="result-cost-chart-note">出行时间成本由固定行驶时间成本和排队延误成本组成；固定行驶时间成本是每轮固定数字，奖励不用于抵扣这里展示的成本。</p>
 
                 <div class="result-cost-row">
                     <div class="result-cost-head">
-                        <span class="result-cost-label">出行时间成本</span>
-                        <span class="result-cost-value">{{ queue_cost_points }} 成本</span>
+                        <span class="result-cost-label">固定行驶时间成本</span>
+                        <span class="result-cost-value">{{ fixed_time_cost_points }} 成本</span>
                     </div>
                     <div class="result-cost-track" aria-hidden="true">
                         <div
                             class="result-cost-fill"
+                            data-width-pct="{{ fixed_time_cost_pct }}"
+                            data-min-width-px="{{ cost_bar_min_width_px }}"
+                        ></div>
+                    </div>
+                </div>
+
+                <div class="result-cost-row">
+                    <div class="result-cost-head">
+                        <span class="result-cost-label">排队延误成本</span>
+                        <span class="result-cost-value">{{ queue_cost_points }} 成本</span>
+                    </div>
+                    <div class="result-cost-track" aria-hidden="true">
+                        <div
+                            class="result-cost-fill result-cost-fill-queue"
                             data-width-pct="{{ queue_cost_pct }}"
                             data-min-width-px="{{ cost_bar_min_width_px }}"
                         ></div>
@@ -801,111 +611,6 @@
         </div>
     </div>
 
-    <div class="bottleneck-route-visual" aria-label="A 点到 B 点的瓶颈路径示意">
-        <p class="bottleneck-route-title">论文式单瓶颈路径</p>
-        <p class="bottleneck-route-note">车辆沿单一路径从 A 点驶向 B 点。闸口代表固定服务率的容量受限点；当进入速度超过服务率时，队列会在瓶颈前形成。</p>
-
-        <svg class="route-svg" viewBox="0 0 760 330" role="img" aria-label="论文式单瓶颈路径：车辆从 A 点沿单一路径驶向 B 点，并在容量受限闸口前排队">
-            <defs>
-                <linearGradient id="routeRoadGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                    <stop offset="0%" stop-color="#202633" />
-                    <stop offset="50%" stop-color="#090d14" />
-                    <stop offset="100%" stop-color="#202633" />
-                </linearGradient>
-                <linearGradient id="routeStartGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stop-color="#334155" />
-                    <stop offset="100%" stop-color="#172033" />
-                </linearGradient>
-                <linearGradient id="routeEndGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stop-color="#3f8791" />
-                    <stop offset="100%" stop-color="#24535b" />
-                </linearGradient>
-                <linearGradient id="routeBottleneckGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stop-color="#89c8cf" />
-                    <stop offset="100%" stop-color="#2c7a8a" />
-                </linearGradient>
-                <linearGradient id="routeGrassGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stop-color="#f7fafc" />
-                    <stop offset="100%" stop-color="#e8eff2" />
-                </linearGradient>
-                <linearGradient id="routeCarCurrentGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stop-color="#65c6d2" />
-                    <stop offset="100%" stop-color="#1f8a9c" />
-                </linearGradient>
-                <linearGradient id="routeCarOtherGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stop-color="#dce4ec" />
-                    <stop offset="100%" stop-color="#a9b6c4" />
-                </linearGradient>
-                <filter id="routeSoftShadow" x="-20%" y="-30%" width="140%" height="170%">
-                    <feDropShadow dx="0" dy="14" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.18" />
-                </filter>
-                <pattern id="routeAsphaltTexture" width="16" height="16" patternUnits="userSpaceOnUse">
-                    <rect width="16" height="16" fill="#101827" />
-                    <circle cx="3" cy="5" r="0.8" fill="#334155" opacity="0.24" />
-                    <circle cx="11" cy="12" r="0.7" fill="#020617" opacity="0.24" />
-                </pattern>
-                <marker id="route-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-                    <path d="M0 0 L10 5 L0 10 Z" fill="#2c7a8a" />
-                </marker>
-                <symbol id="resultRouteCar" viewBox="0 0 76 42">
-                    <path d="M7 25 L15 14 Q17 10 23 10 H49 Q54 10 57 15 L64 24 Q69 25 71 30 V34 H4 V29 Q4 26 7 25Z" fill="currentColor" stroke="#ffffff" stroke-width="2.4" />
-                    <path d="M23 14 H47 Q50 14 52 17 L56 23 H17 L21 17 Q22 14 23 14Z" fill="#f6fbfb" opacity="0.88" />
-                    <path d="M34 14 V23" stroke="#a9c1c2" stroke-width="2" />
-                    <circle cx="19" cy="34" r="5" fill="#243039" stroke="#ffffff" stroke-width="1.5" />
-                    <circle cx="57" cy="34" r="5" fill="#243039" stroke="#ffffff" stroke-width="1.5" />
-                    <circle cx="19" cy="34" r="2" fill="#b7c5c6" />
-                    <circle cx="57" cy="34" r="2" fill="#b7c5c6" />
-                </symbol>
-            </defs>
-
-            <path d="M28 230 C168 198 296 244 428 218 S610 204 730 232 V316 H28Z" fill="url(#routeGrassGradient)" opacity="0.72" />
-            <path d="M72 126 H688 V222 H72Z" fill="#0f172a" opacity="0.16" filter="url(#routeSoftShadow)" />
-            <path d="M72 118 H688 V214 H72Z" fill="url(#routeRoadGradient)" stroke="#ffffff" stroke-width="5" />
-            <path d="M92 166 H668" fill="none" stroke="#f5f0dc" stroke-width="4" stroke-dasharray="20 16" opacity="0.94" />
-
-            <g filter="url(#routeSoftShadow)">
-                <circle cx="88" cy="166" r="32" fill="url(#routeStartGradient)" stroke="#ffffff" stroke-width="7" />
-                <circle cx="672" cy="166" r="32" fill="url(#routeEndGradient)" stroke="#ffffff" stroke-width="7" />
-            </g>
-            <text x="88" y="174" text-anchor="middle" class="route-label route-label-inverse">A</text>
-            <text x="672" y="174" text-anchor="middle" class="route-label route-label-inverse">B</text>
-            <text x="88" y="234" text-anchor="middle" class="route-label">出发点</text>
-            <text x="672" y="234" text-anchor="middle" class="route-label">到达点</text>
-
-            <g filter="url(#routeSoftShadow)" aria-label="单瓶颈闸口">
-                <rect x="528" y="82" width="12" height="136" rx="4" fill="#e8eeee" stroke="#8ea4a4" stroke-width="2" />
-                <rect x="578" y="82" width="12" height="136" rx="4" fill="#e8eeee" stroke="#8ea4a4" stroke-width="2" />
-                <path d="M534 88 H584" stroke="#8ea4a4" stroke-width="9" stroke-linecap="round" />
-                <rect x="486" y="30" width="148" height="40" rx="8" fill="#ffffff" stroke="#bdd1d0" stroke-width="2" />
-            </g>
-            <text x="560" y="47" text-anchor="middle" class="route-label-chip">单瓶颈闸口</text>
-            <text x="560" y="63" text-anchor="middle" class="route-label-muted">固定服务率：单位时间限量通行</text>
-            <g aria-label="瓶颈信号灯">
-                <rect x="543" y="96" width="34" height="20" rx="10" fill="#26333a" stroke="#ffffff" stroke-width="2" />
-                <circle cx="554" cy="106" r="5" fill="#ea7667" />
-                <circle cx="566" cy="106" r="5" fill="#b7c5c5" opacity="0.55" />
-            </g>
-            <path d="M540 166 H578" stroke="#edf4f1" stroke-width="8" />
-            <path d="M540 166 H578" stroke="#e96f61" stroke-width="4" stroke-dasharray="8 6" />
-            <text x="560" y="240" text-anchor="middle" class="route-label-small">{{ capacity_per_slot }} 车 / {{ capacity_window_minutes }} 分钟</text>
-
-            <g filter="url(#routeSoftShadow)" aria-label="排队小汽车">
-                <g color="#d95449"><use href="#resultRouteCar" x="202" y="145" width="62" height="34" /></g>
-                <g color="#aebfc1"><use href="#resultRouteCar" x="274" y="145" width="62" height="34" /></g>
-                <g color="#aebfc1"><use href="#resultRouteCar" x="346" y="145" width="62" height="34" /></g>
-                <g color="#aebfc1"><use href="#resultRouteCar" x="418" y="145" width="62" height="34" /></g>
-                <g color="#4d9299"><use href="#resultRouteCar" x="598" y="145" width="62" height="34" /></g>
-            </g>
-            <text x="233" y="138" text-anchor="middle" class="route-label-small route-you-label">你</text>
-            <path d="M264 137 C300 108 390 110 450 137" fill="none" stroke="#718b8e" stroke-width="2" stroke-dasharray="5 6" />
-            <rect x="302" y="96" width="116" height="24" rx="12" fill="#ffffff" stroke="#ccdada" />
-            <text x="360" y="112" text-anchor="middle" class="route-label-muted">瓶颈前形成队列</text>
-            <path d="M142 276 H618" fill="none" stroke="#2c7a8a" stroke-width="4" stroke-linecap="round" marker-end="url(#route-arrow)" />
-            <text x="380" y="264" text-anchor="middle" class="route-label-small">行驶方向 A → B</text>
-        </svg>
-
-    </div>
-
     <div class="result-viz-card" aria-label="所有参与者的成本分布柱状图">
         <p class="result-viz-title">所有参与者的成本分布</p>
         <p class="result-viz-note">横轴为出发时间，柱高表示该出发时间参与者的平均成本，柱顶人数表示该时间的选择人数；横线为当前轮所有参与者平均成本。</p>
@@ -939,43 +644,6 @@
             <span class="trend-legend-item"><span class="trend-legend-mark"></span>各出发时间平均成本</span>
             <span class="trend-legend-item"><span class="trend-legend-mark trend-legend-mark-self"></span>你的选择</span>
             <span class="trend-legend-item"><span class="trend-legend-mark trend-legend-mark-average"></span>所有参与者平均成本</span>
-        </div>
-    </div>
-
-    <div class="time-spent-card" aria-label="你的本轮用时示意图">
-        <p class="time-spent-title">你的本轮用时</p>
-        <p class="time-spent-note">总行程时间由自由流行程和排队延误组成；这里只展示你自己的本轮用时。</p>
-
-        <div class="time-spent-axis">
-            <span>{{ departure_time_label }} 出发</span>
-            <span>{{ arrival_time_label }} 到达</span>
-        </div>
-        <div class="time-spent-track">
-            <div class="time-spent-segment time-spent-free" data-width-pct="{{ free_flow_time_pct }}">
-                自由流 {{ free_flow_travel_minutes }} 分钟
-            </div>
-            <div class="time-spent-segment time-spent-queue" data-width-pct="{{ queue_time_pct }}">
-                {{ if has_queue_delay }}排队 {{ queue_delay_minutes }} 分钟{{ endif }}
-            </div>
-        </div>
-
-        <div class="time-spent-summary">
-            <div class="time-spent-stat">
-                <span class="time-spent-key">固定行驶时间</span>
-                <span class="time-spent-value">{{ free_flow_travel_minutes }} 分钟</span>
-            </div>
-            <div class="time-spent-stat">
-                <span class="time-spent-key">排队延误</span>
-                <span class="time-spent-value">{{ if has_queue_delay }}{{ queue_delay_minutes }} 分钟{{ else }}无排队延误{{ endif }}</span>
-            </div>
-            <div class="time-spent-stat">
-                <span class="time-spent-key">总行程时间</span>
-                <span class="time-spent-value">{{ travel_time_minutes }} 分钟</span>
-            </div>
-            <div class="time-spent-stat">
-                <span class="time-spent-key">目标到达</span>
-                <span class="time-spent-value">{{ preferred_arrival_time }}</span>
-            </div>
         </div>
     </div>
 

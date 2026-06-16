@@ -19,6 +19,7 @@ import argparse
 import json
 import random
 from dataclasses import asdict, dataclass, field
+from math import ceil
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
 
@@ -31,7 +32,7 @@ class SingleBottleneckParams:
     choice_step_minutes: float = 1
     num_slots: int = 21
     service_window_minutes: float = 2
-    capacity_per_window: int = 1
+    capacity_per_window: int = 4
     base_points: float = 140
     queue_cost_per_minute: float = 2
     early_cost_per_minute: float = 1
@@ -62,8 +63,10 @@ class SingleBottleneckParams:
         minute = self.preferred_arrival_minute - self.free_flow_travel_minutes
         return self.slot_for_departure_minute(minute)
 
-    def service_interval_minutes(self) -> float:
-        return self.service_window_minutes / max(1, self.capacity_per_window)
+    def service_batches_needed(self, load: int) -> int:
+        if load <= 0:
+            return 0
+        return ceil(load / max(1, self.capacity_per_window))
 
     def to_policy_dict(self) -> Dict[str, object]:
         data = asdict(self)
@@ -110,7 +113,7 @@ def settle_bottleneck_round(
     actors: Sequence[Mapping[str, object]],
     params: SingleBottleneckParams,
 ) -> List[BottleneckOutcome]:
-    """Settle one round using the point-bottleneck FIFO queue rule."""
+    """Settle one round using the point-bottleneck batch-window queue rule."""
     actors_by_minute: Dict[float, List[Mapping[str, object]]] = {}
     for actor in actors:
         departure_minute = float(_actor_value(actor, "departure_minute"))
@@ -119,24 +122,26 @@ def settle_bottleneck_round(
 
     outcomes_by_id: Dict[str, BottleneckOutcome] = {}
     next_available_minute = params.first_departure_minute
-    service_interval = params.service_interval_minutes()
 
     for departure_minute in sorted(actors_by_minute):
         same_time_actors = actors_by_minute[departure_minute]
         slot_load = len(same_time_actors)
         first_service_start = max(departure_minute, next_available_minute)
+        service_batches = params.service_batches_needed(slot_load)
+        queue_delay = max(
+            0.0,
+            first_service_start + (service_batches - 1) * params.service_window_minutes - departure_minute,
+        )
+        arrival_minute = departure_minute + params.free_flow_travel_minutes + queue_delay
+        early_minutes = max(0.0, params.preferred_arrival_minute - arrival_minute)
+        late_minutes = max(0.0, arrival_minute - params.preferred_arrival_minute)
+        generalized_cost = (
+            params.queue_cost_per_minute * queue_delay
+            + params.early_cost_per_minute * early_minutes
+            + params.late_cost_per_minute * late_minutes
+        )
 
-        for position, actor in enumerate(same_time_actors):
-            service_start = first_service_start + position * service_interval
-            queue_delay = max(0.0, service_start - departure_minute)
-            arrival_minute = departure_minute + params.free_flow_travel_minutes + queue_delay
-            early_minutes = max(0.0, params.preferred_arrival_minute - arrival_minute)
-            late_minutes = max(0.0, arrival_minute - params.preferred_arrival_minute)
-            generalized_cost = (
-                params.queue_cost_per_minute * queue_delay
-                + params.early_cost_per_minute * early_minutes
-                + params.late_cost_per_minute * late_minutes
-            )
+        for actor in same_time_actors:
             actor_id = str(_actor_value(actor, "actor_id"))
             departure_slot = int(_actor_value(actor, "departure_slot"))
             toll_charge = float(params.toll_by_slot.get(departure_slot, 0))
@@ -157,7 +162,7 @@ def settle_bottleneck_round(
                 payoff=payoff,
             )
 
-        next_available_minute = first_service_start + slot_load * service_interval
+        next_available_minute = first_service_start + service_batches * params.service_window_minutes
 
     return [outcomes_by_id[str(_actor_value(actor, "actor_id"))] for actor in actors]
 

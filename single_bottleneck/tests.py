@@ -1,3 +1,6 @@
+from math import ceil
+import unittest
+
 from otree.api import Bot, Submission, expect
 
 from . import (
@@ -9,11 +12,19 @@ from . import (
     Introduction,
     Results,
     ResultsSync,
+    build_auto_group_matrix,
     choice_cost_components_for_player,
     departure_minute_for_player_slot,
     departure_slots_for_player,
     player_departure_minute,
 )
+
+
+class GroupMatrixTests(unittest.TestCase):
+    def test_zero_cohort_size_keeps_all_players_in_one_group(self):
+        players = ['P1', 'P2', 'P3', 'P4']
+
+        self.assertEqual(build_auto_group_matrix(players, 0), [players])
 
 
 class PlayerBot(Bot):
@@ -33,8 +44,11 @@ class PlayerBot(Bot):
             yield Submission(Introduction, check_html=False)
             expect('场景计算题', 'in', self.html)
             expect('排队成本 = 4 分钟 × 2 = 8 成本', 'in', self.html)
-            expect('同一出发时间的等待时间', 'in', self.html)
-            expect('预计到达 = 07:54 + 6 + 2.7 = 08:02:40', 'in', self.html)
+            expect('同一出发时间的人使用相同等待时间', 'in', self.html)
+            expect('瓶颈每 2 分钟通过 4 人', 'in', self.html)
+            expect('预计到达 = 07:54 + 6 + 2 = 08:02', 'in', self.html)
+            expect('0.7 分钟/人', 'not in', self.html)
+            expect('08:02:40', 'not in', self.html)
             expect('排队时间 = 队列长度 ÷ 瓶颈服务率', 'not in', self.html)
             expect('随机通过顺序的平均', 'not in', self.html)
             expect('最大排队时间的一半', 'not in', self.html)
@@ -121,11 +135,11 @@ class PlayerBot(Bot):
 
         if self.case == 'same_time':
             group_players = self.group.get_players()
-            interval = C.SLOT_SIZE_MINUTES / self.session.config.get(
+            capacity = self.session.config.get(
                 'bottleneck_capacity_per_slot',
                 C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT,
             )
-            expected_delay = round((len(group_players) - 1) * interval, 2)
+            expected_delay = round((ceil(len(group_players) / capacity) - 1) * C.SLOT_SIZE_MINUTES, 2)
             for group_player in group_players:
                 expect(round(group_player.queue_delay_minutes, 2), '==', expected_delay)
                 expect(group_player.arrival_time_label, '==', self.player.arrival_time_label)

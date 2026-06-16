@@ -1,10 +1,63 @@
 <h3>single_bottleneck Session 数据查看</h3>
 <style>
+  .report-demo-entry,
   .report-controls,
   .report-summary,
   .report-empty,
   .report-alert {
     margin-bottom: 16px;
+  }
+  .report-demo-entry {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 18px;
+    border: 1px solid #d7e2df;
+    border-radius: 14px;
+    background:
+      linear-gradient(135deg, rgba(236, 248, 243, 0.96), rgba(255, 250, 240, 0.94)),
+      repeating-linear-gradient(90deg, rgba(21, 94, 117, 0.06) 0 1px, transparent 1px 18px);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+  }
+  .report-demo-kicker {
+    margin: 0 0 4px;
+    color: #287064;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+  .report-demo-title {
+    margin: 0;
+    color: #17231f;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+  .report-demo-note {
+    margin: 6px 0 0;
+    color: #5f6f69;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .report-demo-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 150px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: #17231f;
+    color: #fff;
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 10px 22px rgba(23, 35, 31, 0.18);
+  }
+  .report-demo-button:hover,
+  .report-demo-button:focus {
+    color: #fff;
+    text-decoration: none;
+    background: #27443a;
   }
   .report-summary-grid {
     display: grid;
@@ -54,7 +107,26 @@
     color: #666;
     font-size: 12px;
   }
+  @media (max-width: 720px) {
+    .report-demo-entry {
+      grid-template-columns: 1fr;
+    }
+    .report-demo-button {
+      width: 100%;
+    }
+  }
 </style>
+
+<div class="report-demo-entry">
+  <div>
+    <p class="report-demo-kicker">SCENARIO PREVIEW</p>
+    <p class="report-demo-title">单瓶颈 3D 动态演示</p>
+    <p class="report-demo-note">用于向老师或被试说明 A-B 单瓶颈、排队形成和固定服务率；会在新标签页打开，不影响当前 Report 数据。</p>
+  </div>
+  <a class="report-demo-button" href="{{ static 'single_bottleneck/Bottleneck3DDemo.html' }}" target="_blank" rel="noopener">
+    查看 3D 演示
+  </a>
+</div>
 
 <div class="report-controls">
   <label for="session-select"><b>选择 Session：</b></label>

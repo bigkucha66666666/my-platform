@@ -4,7 +4,7 @@
 
 ## 一、推荐的核心汇总字段
 
-- participant_label: 参与者标签（例如 P001-P050），用于和发放名单对齐。
+- participant_label: 参与者标签（例如 P001-P100），用于和发放名单对齐。
 - participant_code: 系统参与者唯一编码，作为兜底唯一标识。
 - session_code: 会话标识，用于区分不同实验批次。
 - grouping_enabled: 是否启用手动分组（0/1）。

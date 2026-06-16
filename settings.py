@@ -60,10 +60,10 @@ SESSION_CONFIGS = [
         doc=(
             "用于真实被试的单瓶颈出发时间实验。\n"
             "参与者在每轮选择出发时间，系统按瓶颈容量与早到/晚到成本计算收益。\n"
-            "默认按每组实际人数自动校准单步粗收费；关闭自动校准后可手动设置收费时段。"
+            "默认所有参与者进入同一个瓶颈组，并按实际人数自动校准单步粗收费。"
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
-        cohort_size=5,
+        cohort_size=0,
         grouping_enabled=0,
         manual_grouping_spec='',
         reward_treatment_enabled=0,
@@ -79,10 +79,10 @@ SESSION_CONFIGS = [
         coarse_toll_auto_approx_refine_pool_size=8,
         coarse_toll_auto_approx_refine_iterations=160,
         coarse_toll_enabled=1,
-        coarse_toll_slot_spec='4-8',
-        coarse_toll_time_window_spec='',
-        coarse_toll_points=8,
-        bottleneck_capacity_per_slot=3,
+        coarse_toll_slot_spec='9-13',
+        coarse_toll_time_window_spec='07:52-07:56',
+        coarse_toll_points=4,
+        bottleneck_capacity_per_slot=4,
         payoff_source_var='single_bottleneck_total_payoff',
         final_payoff_label='单瓶颈出发时间实验',
         payoff_source_label='single_bottleneck 全 10 轮累计结果',
@@ -95,9 +95,9 @@ SESSION_CONFIGS = [
         app_sequence=['single_bottleneck'],
         doc=(
             "用于单瓶颈出发时间实验的流程演示。\n"
-            "默认按每组实际人数自动校准单步粗收费；如需测试奖励，可设置 reward_treatment_enabled=1。"
+            "默认所有参与者进入同一个瓶颈组，并按实际人数自动校准单步粗收费。"
         ),
-        cohort_size=5,
+        cohort_size=0,
         grouping_enabled=0,
         manual_grouping_spec='',
         reward_treatment_enabled=0,
@@ -113,10 +113,10 @@ SESSION_CONFIGS = [
         coarse_toll_auto_approx_refine_pool_size=8,
         coarse_toll_auto_approx_refine_iterations=160,
         coarse_toll_enabled=1,
-        coarse_toll_slot_spec='4-8',
-        coarse_toll_time_window_spec='',
-        coarse_toll_points=8,
-        bottleneck_capacity_per_slot=3,
+        coarse_toll_slot_spec='9-13',
+        coarse_toll_time_window_spec='07:52-07:56',
+        coarse_toll_points=4,
+        bottleneck_capacity_per_slot=4,
         payoff_source_var='single_bottleneck_total_payoff',
         final_payoff_label='单瓶颈出发时间实验',
         payoff_source_label='single_bottleneck 全 10 轮累计结果',
@@ -162,7 +162,7 @@ USE_POINTS = True
 ROOMS = [
     dict(
         name='prod_room',
-        display_name='正式房间(标签登录,P001-P050)',
+        display_name='正式房间(标签登录,P001-P100)',
         participant_label_file='_rooms/econ101.txt',
         use_secure_urls=True,
     ),
@@ -505,7 +505,7 @@ DEMO_PAGE_INTRO_HTML = """
 
   <div class="landing-note">
     <span><strong>正式数据</strong> &mdash; 仅 formal run 的 session 作为正式实验记录与发放依据。</span>
-    <span><strong>分组规则</strong> &mdash; 未启用手动分组时，系统按 cohort_size 自动分组。</span>
+    <span><strong>分组规则</strong> &mdash; 未启用手动分组时，cohort_size=0 表示不拆分，所有参与者进入同一组；cohort_size&gt;0 时按该人数自动分组。</span>
     <span><strong>报告查看</strong> &mdash; 每个 session 创建后可进入对应 Report 查看摘要与明细。</span>
   </div>
 </section>

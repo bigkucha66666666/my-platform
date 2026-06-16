@@ -32,7 +32,8 @@ COARSE_TOLL_CALIBRATION_SOURCE_COMPUTED = 'computed'
 COARSE_TOLL_CALIBRATION_CACHE_FILE = 'toll_calibration_cache.json'
 COARSE_TOLL_CALIBRATION_CACHE = None
 COMPREHENSION_SEEN_VAR = 'single_bottleneck_comprehension_seen'
-SAME_TIME_QUEUE_RULE = 'batch_max_wait'
+SAME_TIME_QUEUE_RULE = 'batch_window_max_wait'
+TOLL_WINDOW_RULE = 'symmetric_around_free_flow_departure'
 
 DEPARTURE_SCHEDULE_SOURCE_STATIC = 'static'
 DEPARTURE_SCHEDULE_SOURCE_AUTO = 'auto'
@@ -62,7 +63,7 @@ class C(BaseConstants):
         - FREE_FLOW_TRAVEL_MINUTES
         - SLOT_SIZE_MINUTES * 5
     )
-    DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT = 3
+    DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT = 4
 
     BASE_POINTS = 140
     FIXED_TRAVEL_TIME_COST = 12
@@ -473,6 +474,8 @@ def bounded_percent(value, max_value):
 
 
 def build_auto_group_matrix(players, cohort_size: int):
+    if cohort_size <= 0:
+        return [players[:]]
     return [
         players[index:index + cohort_size]
         for index in range(0, len(players), cohort_size)
@@ -697,6 +700,34 @@ def bottleneck_capacity_per_slot(session):
 
 def service_interval_minutes(session):
     return C.SLOT_SIZE_MINUTES / bottleneck_capacity_per_slot(session)
+
+
+def service_batches_needed(load: int, capacity: int) -> int:
+    if load <= 0:
+        return 0
+    return ceil(load / max(1, capacity))
+
+
+def service_batch_wait_minutes(
+    *,
+    departure_minute: float,
+    first_service_start_minute: float,
+    load: int,
+    capacity: int,
+) -> float:
+    batches = service_batches_needed(load, capacity)
+    if batches <= 0:
+        return 0
+    return max(
+        0,
+        first_service_start_minute
+        + (batches - 1) * C.SLOT_SIZE_MINUTES
+        - departure_minute,
+    )
+
+
+def service_batch_clear_minute(first_service_start_minute: float, load: int, capacity: int) -> float:
+    return first_service_start_minute + service_batches_needed(load, capacity) * C.SLOT_SIZE_MINUTES
 
 
 def reward_treatment_enabled(session) -> bool:
@@ -1068,6 +1099,7 @@ def cached_toll_assumptions_match(
         and assumptions.get('first_departure_time') == schedule.get('first_departure_time')
         and assumptions.get('last_departure_time') == schedule.get('last_departure_time')
         and assumptions.get('same_time_queue_rule') == SAME_TIME_QUEUE_RULE
+        and assumptions.get('toll_window_rule') == TOLL_WINDOW_RULE
     )
 
 
@@ -1323,7 +1355,7 @@ def creating_session(subsession: Subsession):
         if grouping_enabled:
             matrix = build_manual_group_matrix(players, manual_grouping_spec, session_name)
         else:
-            cohort_size = max(1, int(subsession.session.config.get('cohort_size', len(players) or 1)))
+            cohort_size = int(subsession.session.config.get('cohort_size', 0) or 0)
             matrix = build_auto_group_matrix(players, cohort_size)
 
         apply_departure_schedules(subsession.session, matrix)
@@ -1484,15 +1516,17 @@ def set_results(group: Group):
         players_by_departure_minute.setdefault(player_departure_minute(player), []).append(player)
 
     next_available_bottleneck_minute = first_departure_minute
-    slot_service_interval = service_interval_minutes(group.session)
+    capacity = bottleneck_capacity_per_slot(group.session)
 
     for departure_minute in sorted(players_by_departure_minute):
         same_time_players = players_by_departure_minute[departure_minute]
         slot_load = len(same_time_players)
         first_service_start_minute = max(departure_minute, next_available_bottleneck_minute)
-        queue_delay = max(
-            0,
-            first_service_start_minute + (slot_load - 1) * slot_service_interval - departure_minute,
+        queue_delay = service_batch_wait_minutes(
+            departure_minute=departure_minute,
+            first_service_start_minute=first_service_start_minute,
+            load=slot_load,
+            capacity=capacity,
         )
         arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
         early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
@@ -1532,7 +1566,11 @@ def set_results(group: Group):
             player.reward_bonus = reward_bonus
             player.payoff = cu(points)
 
-        next_available_bottleneck_minute = first_service_start_minute + slot_load * slot_service_interval
+        next_available_bottleneck_minute = service_batch_clear_minute(
+            first_service_start_minute,
+            slot_load,
+            capacity,
+        )
 
     for player in players:
         if group.round_number == C.NUM_ROUNDS:
@@ -1895,16 +1933,17 @@ class ComprehensionCheck(Page):
         example_early_minutes = 3
         example_early_cost = example_early_minutes * C.EARLY_COST_PER_MINUTE
         example_same_departure_people = 5
-        example_service_interval_minutes = service_interval_minutes(player.session)
+        example_capacity_per_slot = bottleneck_capacity_per_slot(player.session)
+        example_capacity_window_minutes = C.SLOT_SIZE_MINUTES
         example_departure_minute = free_flow_departure_minute()
         example_same_departure_wait_minutes = (
-            example_same_departure_people - 1
-        ) * example_service_interval_minutes
+            service_batches_needed(example_same_departure_people, example_capacity_per_slot) - 1
+        ) * C.SLOT_SIZE_MINUTES
         example_arrival_without_queue_minute = (
             example_departure_minute + C.FREE_FLOW_TRAVEL_MINUTES
         )
         example_arrival_with_one_person_minute = (
-            example_arrival_without_queue_minute + example_service_interval_minutes
+            example_arrival_without_queue_minute + C.SLOT_SIZE_MINUTES * 2
         )
         example_arrival_minute = (
             example_arrival_without_queue_minute + example_same_departure_wait_minutes
@@ -1921,7 +1960,8 @@ class ComprehensionCheck(Page):
             example_early_minutes=minute_value_display(example_early_minutes),
             example_early_cost=point_value_display(example_early_cost),
             example_same_departure_people=example_same_departure_people,
-            example_service_interval_minutes=minute_value_display(example_service_interval_minutes),
+            example_capacity_per_slot=example_capacity_per_slot,
+            example_capacity_window_minutes=minute_value_display(example_capacity_window_minutes),
             example_departure_time=minute_to_clock(example_departure_minute),
             example_same_departure_wait_minutes=minute_value_display(example_same_departure_wait_minutes),
             example_arrival_without_queue_time=minute_to_clock(example_arrival_without_queue_minute),

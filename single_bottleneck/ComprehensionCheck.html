@@ -415,7 +415,7 @@
                     <div class="scenario-chip"><b>出发时间</b><span>{{ example_departure_time }}</span></div>
                     <div class="scenario-chip"><b>固定行驶时间</b><span>{{ free_flow_travel_minutes }} 分钟</span></div>
                     <div class="scenario-chip"><b>同一时间人数</b><span>{{ example_same_departure_people }} 人</span></div>
-                    <div class="scenario-chip"><b>服务间隔</b><span>{{ example_service_interval_minutes }} 分钟/人</span></div>
+                    <div class="scenario-chip"><b>瓶颈服务率</b><span>{{ example_capacity_window_minutes }} 分钟通过 {{ example_capacity_per_slot }} 人</span></div>
                 </div>
             </div>
             <div class="answer-options">
@@ -432,7 +432,7 @@
                     <span>{{ example_arrival_time }}</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。同一出发时间的等待时间 = ({{ example_same_departure_people }} - 1) × {{ example_service_interval_minutes }} = {{ example_same_departure_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_same_departure_wait_minutes }} = {{ example_arrival_time }}。" data-wrong-text="请重新看计算：同一出发时间的等待时间 = ({{ example_same_departure_people }} - 1) × {{ example_service_interval_minutes }} = {{ example_same_departure_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_same_departure_wait_minutes }} = {{ example_arrival_time }}。"></p>
+            <p class="answer-feedback" data-correct-text="正确。瓶颈每 {{ example_capacity_window_minutes }} 分钟通过 {{ example_capacity_per_slot }} 人，{{ example_same_departure_people }} 人同一时间出发时，该出发时间组统一等待 {{ example_same_departure_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_same_departure_wait_minutes }} = {{ example_arrival_time }}。" data-wrong-text="请重新看计算：瓶颈每 {{ example_capacity_window_minutes }} 分钟通过 {{ example_capacity_per_slot }} 人，{{ example_same_departure_people }} 人同一时间出发时，该出发时间组统一等待 {{ example_same_departure_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_same_departure_wait_minutes }} = {{ example_arrival_time }}。"></p>
         </section>
 
         <div class="check-actions">

@@ -15,6 +15,7 @@ from typing import Iterable
 from . import (
     C,
     SAME_TIME_QUEUE_RULE,
+    TOLL_WINDOW_RULE,
     build_departure_schedule_record,
     departure_minute_for_slot,
     departure_slots,
@@ -114,7 +115,7 @@ def parse_calibration_mode(value: str) -> str:
 def parse_window(value: str, valid_slots: tuple[int, ...]) -> tuple[int, int]:
     raw_value = (value or '').strip()
     if not raw_value:
-        raise argparse.ArgumentTypeError('收费窗口不能为空。示例：4-8')
+        raise argparse.ArgumentTypeError('收费窗口不能为空。示例：9-13')
 
     if '-' in raw_value:
         start_text, end_text = raw_value.split('-', 1)
@@ -125,7 +126,7 @@ def parse_window(value: str, valid_slots: tuple[int, ...]) -> tuple[int, int]:
         start = int(start_text.strip())
         end = int(end_text.strip())
     except ValueError as exc:
-        raise argparse.ArgumentTypeError('收费窗口必须使用时点编号。示例：4-8') from exc
+        raise argparse.ArgumentTypeError('收费窗口必须使用时点编号。示例：9-13') from exc
 
     if start > end:
         raise argparse.ArgumentTypeError('收费窗口起点不能晚于终点。')
@@ -179,7 +180,7 @@ def build_parser() -> argparse.ArgumentParser:
         action='store_true',
         help='使用常量中的静态出发窗口；默认按 --players 和 --capacity 动态生成。',
     )
-    parser.add_argument('--window', help='只评估指定连续收费窗口，例如 4-8。必须与 --toll 同时使用。')
+    parser.add_argument('--window', help='只评估指定连续收费窗口，例如 9-13。必须与 --toll 同时使用。')
     parser.add_argument('--toll', type=parse_non_negative_float, help='只评估指定收费额。必须与 --window 同时使用。')
     parser.add_argument('--top-k', type=parse_positive_int, default=10, help='搜索模式下输出候选数量。')
     parser.add_argument('--json', action='store_true', help='输出机器可读 JSON。')
@@ -289,8 +290,10 @@ def build_other_count_keys(count_keys: Iterable[tuple[int, ...]]) -> tuple[tuple
     return tuple(sorted(other_count_keys))
 
 
-def service_interval_minutes(capacity: int) -> float:
-    return C.SLOT_SIZE_MINUTES / capacity
+def service_batches_needed(load: int, capacity: int) -> int:
+    if load <= 0:
+        return 0
+    return ceil(load / max(1, capacity))
 
 
 def build_departure_minute_map(
@@ -316,7 +319,6 @@ def base_expected_cost(
     departure_minutes: dict[int, float],
 ) -> float:
     next_available_minute = departure_minutes[valid_slots[0]]
-    interval = service_interval_minutes(capacity)
     expected_cost = None
 
     for index, slot in enumerate(valid_slots):
@@ -329,11 +331,14 @@ def base_expected_cost(
             continue
 
         first_service_start = max(departure_minute, next_available_minute)
+        service_batches = service_batches_needed(total_in_slot, capacity)
 
         if index == chosen_index:
             queue_delay = max(
                 0,
-                first_service_start + (total_in_slot - 1) * interval - departure_minute,
+                first_service_start
+                + (service_batches - 1) * C.SLOT_SIZE_MINUTES
+                - departure_minute,
             )
             arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
             early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
@@ -344,7 +349,7 @@ def base_expected_cost(
                 + C.LATE_COST_PER_MINUTE * late_minutes
             )
 
-        next_available_minute = first_service_start + total_in_slot * interval
+        next_available_minute = first_service_start + service_batches * C.SLOT_SIZE_MINUTES
 
     if expected_cost is None:
         raise RuntimeError('未能计算选择成本，请检查出发时点配置。')
@@ -381,7 +386,6 @@ def base_expected_costs_for_counts(
     departure_minutes: dict[int, float],
 ) -> tuple[float, ...]:
     next_available_minute = departure_minutes[valid_slots[0]]
-    interval = service_interval_minutes(capacity)
     costs = []
 
     for index, slot in enumerate(valid_slots):
@@ -391,9 +395,12 @@ def base_expected_costs_for_counts(
 
         first_service_start = max(departure_minute, next_available_minute)
         total_in_slot = counts[index] + 1
+        service_batches = service_batches_needed(total_in_slot, capacity)
         queue_delay = max(
             0,
-            first_service_start + (total_in_slot - 1) * interval - departure_minute,
+            first_service_start
+            + (service_batches - 1) * C.SLOT_SIZE_MINUTES
+            - departure_minute,
         )
         arrival_minute = departure_minute + C.FREE_FLOW_TRAVEL_MINUTES + queue_delay
         early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
@@ -406,7 +413,8 @@ def base_expected_costs_for_counts(
 
         current_count = counts[index]
         if current_count > 0:
-            next_available_minute = first_service_start + current_count * interval
+            current_batches = service_batches_needed(current_count, capacity)
+            next_available_minute = first_service_start + current_batches * C.SLOT_SIZE_MINUTES
 
     return tuple(costs)
 
@@ -556,6 +564,34 @@ def continuous_windows(window_slots: tuple[int, ...]) -> Iterable[tuple[int, int
                 yield start, end
 
 
+def symmetric_toll_windows(
+    window_slots: tuple[int, ...],
+    *,
+    departure_minutes: dict[int, float] | None = None,
+) -> Iterable[tuple[int, int]]:
+    """Yield toll windows centered on the free-flow departure minute.
+
+    The search still uses one-step coarse tolls, but it no longer allows an
+    arbitrary one-sided interval. This keeps the participant-facing rule
+    interpretable: charged times surround the high-demand departure point.
+    """
+    if not window_slots:
+        return
+
+    if departure_minutes is None:
+        departure_minutes = build_departure_minute_map(window_slots)
+
+    free_flow_minute = C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES
+    center_index = min(
+        range(len(window_slots)),
+        key=lambda index: abs(departure_minutes[window_slots[index]] - free_flow_minute),
+    )
+    max_offset = min(center_index, len(window_slots) - center_index - 1)
+    start_offset = 1 if max_offset >= 1 else 0
+    for offset in range(start_offset, max_offset + 1):
+        yield window_slots[center_index - offset], window_slots[center_index + offset]
+
+
 def toll_values(min_toll: float, max_toll: float, step: float) -> Iterable[float]:
     total_steps = int(floor((max_toll - min_toll) / step + EPSILON))
     for index in range(total_steps + 1):
@@ -571,13 +607,17 @@ def search_configs(
     base_cost_table: dict[tuple[int, ...], tuple[float, ...]],
     valid_slots: tuple[int, ...],
     window_slots: tuple[int, ...] | None = None,
+    departure_minutes: dict[int, float] | None = None,
 ) -> list[EquilibriumCandidate]:
     candidates = []
     seen_toll_vectors = set()
     if window_slots is None:
         window_slots = default_equilibrium_slots(valid_slots)
 
-    for window_start, window_end in continuous_windows(window_slots):
+    for window_start, window_end in symmetric_toll_windows(
+        window_slots,
+        departure_minutes=departure_minutes,
+    ):
         for toll in toll_values(config.min_toll, config.max_toll, config.toll_step):
             tolls = toll_vector_for_window(window_start, window_end, toll, valid_slots)
             rounded_tolls = tuple(round(value, 10) for value in tolls)
@@ -615,21 +655,15 @@ def approximate_windows(
     )
     required_service_slots = max(1, ceil(players / capacity))
     max_offset = max(2, min(len(window_slots) - 1, ceil(required_service_slots / 2) + 4))
-    raw_offsets = [0, 4, 8, 16, 24, max_offset]
+    raw_offsets = [1, 4, 8, 16, 24, max_offset]
     offsets = sorted({offset for offset in raw_offsets if 0 <= offset <= max_offset})
 
     windows = set()
-    for left_offset in offsets:
-        for right_offset in offsets:
-            start_index = max(0, center_index - left_offset)
-            end_index = min(len(window_slots) - 1, center_index + right_offset)
-            if start_index <= end_index:
-                windows.add((window_slots[start_index], window_slots[end_index]))
-
-    # Include a few broad windows anchored at the feasible range boundaries.
     for offset in offsets:
-        windows.add((window_slots[0], window_slots[min(len(window_slots) - 1, center_index + offset)]))
-        windows.add((window_slots[max(0, center_index - offset)], window_slots[-1]))
+        start_index = max(0, center_index - offset)
+        end_index = min(len(window_slots) - 1, center_index + offset)
+        if center_index - start_index == end_index - center_index:
+            windows.add((window_slots[start_index], window_slots[end_index]))
 
     def window_score(window):
         start, end = window
@@ -953,6 +987,11 @@ def calibrate_candidates(
         first_departure_minute=first_departure_minute,
         slot_size_minutes=slot_size_minutes,
     )
+    departure_minutes = build_departure_minute_map(
+        valid_slots,
+        first_departure_minute=first_departure_minute,
+        slot_size_minutes=slot_size_minutes,
+    )
     config = CalibrationConfig(
         players=players,
         capacity=capacity,
@@ -969,6 +1008,7 @@ def calibrate_candidates(
         base_cost_table=base_cost_table,
         valid_slots=valid_slots,
         window_slots=window_slots,
+        departure_minutes=departure_minutes,
     )
 
 
@@ -1262,6 +1302,7 @@ def print_json_output(
             'equilibrium_slots': list(equilibrium_slots),
             'window_slots': list(window_slots),
             'same_time_queue_rule': SAME_TIME_QUEUE_RULE,
+            'toll_window_rule': TOLL_WINDOW_RULE,
         },
         'results': [
             candidate_to_record(candidate, valid_slots=valid_slots, departure_minutes=departure_minutes)

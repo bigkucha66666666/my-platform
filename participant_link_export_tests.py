@@ -63,6 +63,13 @@ class ParticipantLinkExportTests(unittest.TestCase):
         self.assertIn('participant-link-data', template)
         self.assertIn('exportParticipantLinksExcel', template)
 
+    def test_single_bottleneck_admin_report_links_3d_demo(self):
+        template = Path('single_bottleneck/admin_report.html').read_text(encoding='utf-8')
+
+        self.assertIn('单瓶颈 3D 动态演示', template)
+        self.assertIn("{{ static 'single_bottleneck/Bottleneck3DDemo.html' }}", template)
+        self.assertTrue(Path('_static/single_bottleneck/Bottleneck3DDemo.html').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

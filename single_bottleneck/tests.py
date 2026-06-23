@@ -27,6 +27,12 @@ class GroupMatrixTests(unittest.TestCase):
         self.assertEqual(build_auto_group_matrix(players, 0), [players])
 
 
+class ServiceRateTests(unittest.TestCase):
+    def test_default_service_rate_is_two_cars_per_one_minute(self):
+        self.assertEqual(C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT, 2)
+        self.assertEqual(C.SLOT_SIZE_MINUTES, 1)
+
+
 class PlayerBot(Bot):
     cases = ['staggered', 'same_time']
 
@@ -45,7 +51,7 @@ class PlayerBot(Bot):
             expect('场景计算题', 'in', self.html)
             expect('排队成本 = 4 分钟 × 2 = 8 成本', 'in', self.html)
             expect('同一出发时间的人使用相同等待时间', 'in', self.html)
-            expect('瓶颈每 2 分钟通过 4 人', 'in', self.html)
+            expect('瓶颈每 1 分钟通过 2 人', 'in', self.html)
             expect('预计到达 = 07:54 + 6 + 2 = 08:02', 'in', self.html)
             expect('0.7 分钟/人', 'not in', self.html)
             expect('08:02:40', 'not in', self.html)

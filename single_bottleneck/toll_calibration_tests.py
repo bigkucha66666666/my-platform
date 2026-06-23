@@ -5,7 +5,6 @@ from single_bottleneck import (
     build_departure_schedule_record,
     cached_toll_assumptions_match,
     departure_slots_from_schedule,
-    static_departure_schedule_record,
 )
 from single_bottleneck.toll_calibration import (
     CALIBRATION_MODE_AUTO,
@@ -28,7 +27,7 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
         costs = base_expected_costs_for_counts(
             (4, 0, 0),
             valid_slots=valid_slots,
-            capacity=4,
+            capacity=2,
             departure_minutes=departure_minutes,
         )
 
@@ -37,7 +36,7 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
     def test_cache_requires_queue_rule_marker(self):
         cache = {
             'calibration_assumptions': {
-                'capacity': 4,
+                'capacity': 2,
                 'choice_slots': 21,
                 'choice_step_minutes': 1,
                 'min_toll': 0,
@@ -47,12 +46,17 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
                 'last_departure_time': '08:04',
             }
         }
-        schedule = static_departure_schedule_record()
+        schedule = build_departure_schedule_record(
+            players_count=5,
+            capacity=2,
+            min_slots_each_side=10,
+            auto_enabled=True,
+        )
 
         self.assertFalse(
             cached_toll_assumptions_match(
                 cache,
-                capacity=4,
+                capacity=2,
                 min_toll=0,
                 max_toll=40,
                 toll_step=1,
@@ -65,7 +69,7 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
         self.assertFalse(
             cached_toll_assumptions_match(
                 cache,
-                capacity=4,
+                capacity=2,
                 min_toll=0,
                 max_toll=40,
                 toll_step=1,
@@ -78,7 +82,7 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
         self.assertTrue(
             cached_toll_assumptions_match(
                 cache,
-                capacity=4,
+                capacity=2,
                 min_toll=0,
                 max_toll=40,
                 toll_step=1,
@@ -90,13 +94,13 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
     def test_auto_mode_returns_exact_candidate_for_default_group(self):
         schedule = build_departure_schedule_record(
             players_count=5,
-            capacity=4,
-            min_slots_each_side=5,
+            capacity=2,
+            min_slots_each_side=10,
             auto_enabled=True,
         )
         candidates = calibrate_candidates_by_mode(
             players=5,
-            capacity=4,
+            capacity=2,
             max_toll=20,
             top_k=1,
             valid_slots=tuple(departure_slots_from_schedule(schedule)),
@@ -111,13 +115,13 @@ class TollCalibrationQueueRuleTests(unittest.TestCase):
     def test_auto_mode_uses_symmetric_toll_window_around_free_flow_departure(self):
         schedule = build_departure_schedule_record(
             players_count=5,
-            capacity=4,
-            min_slots_each_side=5,
+            capacity=2,
+            min_slots_each_side=10,
             auto_enabled=True,
         )
         candidates = calibrate_candidates_by_mode(
             players=5,
-            capacity=4,
+            capacity=2,
             max_toll=20,
             top_k=1,
             valid_slots=tuple(departure_slots_from_schedule(schedule)),

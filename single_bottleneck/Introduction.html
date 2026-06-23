@@ -366,8 +366,8 @@
         <section class="route-demo-card" aria-label="单瓶颈路径演示">
             <div class="route-demo-head">
                 <div>
-                    <p class="route-demo-title">论文式单瓶颈示意</p>
-                    <p class="route-demo-note">从 A 点沿单一路径驶向 B 点。道路本身保持畅通；若车辆进入瓶颈的速度超过固定服务率，队列会在闸口前形成。若多人选择同一出发时间，系统视为同时到达瓶颈，并给该出发时间组相同等待时间。</p>
+                    <p class="route-demo-title">单瓶颈示意</p>
+                    <p class="route-demo-note">多条入口道路在瓶颈处汇入少量车道。若同一时间进入瓶颈的车辆超过固定服务率，等待会在汇入前形成；若多人选择同一出发时间，系统视为同时到达瓶颈，并给该出发时间组相同等待时间。</p>
                     <div class="route-capacity-note">
                         <span class="route-capacity-badge">{{ capacity_per_slot }} 车 / {{ capacity_window_minutes }} 分钟</span>
                         <span>这里每位参与者可理解为一辆车；该值对应论文中的瓶颈服务率，请以本页显示的当前容量为准。</span>
@@ -377,12 +377,12 @@
             </div>
 
             <div class="bottleneck-visual">
-                <svg class="intro-route-svg" viewBox="0 0 760 300" role="img" aria-label="论文式单瓶颈示意：车辆从 A 点沿单一路径驶向 B 点，并在容量受限闸口前排队">
+                <svg class="intro-route-svg" viewBox="0 0 760 300" role="img" aria-label="单瓶颈示意：多条入口车道在瓶颈处汇入少量车道，车辆在汇入前等待">
                     <defs>
                         <linearGradient id="introRoadGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                            <stop offset="0%" stop-color="#202633" />
-                            <stop offset="50%" stop-color="#090d14" />
-                            <stop offset="100%" stop-color="#202633" />
+                            <stop offset="0%" stop-color="#263241" />
+                            <stop offset="56%" stop-color="#111827" />
+                            <stop offset="100%" stop-color="#263241" />
                         </linearGradient>
                         <linearGradient id="introGrassGradient" x1="0%" x2="100%" y1="0%" y2="100%">
                             <stop offset="0%" stop-color="#f7fafc" />
@@ -415,6 +415,9 @@
                         <marker id="introRouteArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
                             <path d="M0 0 L10 5 L0 10 Z" fill="#2c7a8a" />
                         </marker>
+                        <marker id="introLaneArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                            <path d="M0 0 L10 5 L0 10 Z" fill="#f8fafc" opacity="0.92" />
+                        </marker>
                         <symbol id="introRouteCar" viewBox="0 0 76 42">
                             <path d="M7 25 L15 14 Q17 10 23 10 H49 Q54 10 57 15 L64 24 Q69 25 71 30 V34 H4 V29 Q4 26 7 25Z" fill="currentColor" stroke="#ffffff" stroke-width="2.4" />
                             <path d="M23 14 H47 Q50 14 52 17 L56 23 H17 L21 17 Q22 14 23 14Z" fill="#f6fbfb" opacity="0.88" />
@@ -426,49 +429,61 @@
                         </symbol>
                     </defs>
 
-                    <path d="M20 202 C168 174 286 220 424 196 S604 182 740 208 V300 H20Z" fill="url(#introGrassGradient)" opacity="0.72" />
-                    <path d="M70 112 H690 V196 H70Z" fill="#0f172a" opacity="0.16" filter="url(#introRouteShadow)" />
-                    <path d="M70 106 H690 V190 H70Z" fill="url(#introRoadGradient)" stroke="#ffffff" stroke-width="5" />
-                    <path d="M90 148 H670" fill="none" stroke="#f5f0dc" stroke-width="4" stroke-dasharray="20 16" opacity="0.94" />
+                    <path d="M24 216 C152 178 286 224 424 196 S598 174 736 210 V300 H24Z" fill="url(#introGrassGradient)" opacity="0.78" />
+                    <g filter="url(#introRouteShadow)" opacity="0.95">
+                        <path d="M78 88 C174 86 262 94 344 126 C380 140 408 146 438 148" fill="none" stroke="#cbd7dd" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M78 148 C182 148 276 148 360 148 C392 148 416 148 438 148" fill="none" stroke="#cbd7dd" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M78 208 C174 210 262 202 344 170 C380 156 408 150 438 148" fill="none" stroke="#cbd7dd" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M438 148 C472 148 502 148 532 148" fill="none" stroke="#cbd7dd" stroke-width="50" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M532 148 C580 148 632 148 706 148" fill="none" stroke="#cbd7dd" stroke-width="68" stroke-linecap="round" stroke-linejoin="round" />
+
+                        <path d="M78 88 C174 86 262 94 344 126 C380 140 408 146 438 148" fill="none" stroke="url(#introRoadGradient)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M78 148 C182 148 276 148 360 148 C392 148 416 148 438 148" fill="none" stroke="url(#introRoadGradient)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M78 208 C174 210 262 202 344 170 C380 156 408 150 438 148" fill="none" stroke="url(#introRoadGradient)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M438 148 C472 148 502 148 532 148" fill="none" stroke="url(#introRoadGradient)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M532 148 C580 148 632 148 706 148" fill="none" stroke="url(#introRoadGradient)" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />
+                    </g>
+
+                    <path d="M536 120 C582 120 634 120 702 120" fill="none" stroke="#465667" stroke-width="2" opacity="0.55" />
+                    <path d="M536 176 C582 176 634 176 702 176" fill="none" stroke="#465667" stroke-width="2" opacity="0.55" />
+                    <path d="M406 104 C430 126 442 137 456 148" fill="none" stroke="#dbe7e6" stroke-width="10" stroke-linecap="round" />
+                    <path d="M406 192 C430 170 442 159 456 148" fill="none" stroke="#dbe7e6" stroke-width="10" stroke-linecap="round" />
+                    <path d="M92 88 C174 86 262 94 344 126 C380 140 408 146 438 148" fill="none" stroke="#f5f0dc" stroke-width="3.5" stroke-dasharray="18 14" opacity="0.95" marker-end="url(#introLaneArrow)" />
+                    <path d="M92 148 C190 148 284 148 366 148 C398 148 420 148 438 148" fill="none" stroke="#f5f0dc" stroke-width="3.5" stroke-dasharray="18 14" opacity="0.95" marker-end="url(#introLaneArrow)" />
+                    <path d="M92 208 C174 210 262 202 344 170 C380 156 408 150 438 148" fill="none" stroke="#f5f0dc" stroke-width="3.5" stroke-dasharray="18 14" opacity="0.95" marker-end="url(#introLaneArrow)" />
+                    <path d="M566 148 H704" fill="none" stroke="#f5f0dc" stroke-width="3.5" stroke-dasharray="18 14" opacity="0.95" marker-end="url(#introLaneArrow)" />
 
                     <g filter="url(#introRouteShadow)">
-                        <circle cx="88" cy="148" r="32" fill="url(#introStartGradient)" stroke="#ffffff" stroke-width="7" />
-                        <circle cx="672" cy="148" r="32" fill="url(#introEndGradient)" stroke="#ffffff" stroke-width="7" />
+                        <circle cx="72" cy="148" r="32" fill="url(#introStartGradient)" stroke="#ffffff" stroke-width="7" />
+                        <circle cx="706" cy="148" r="32" fill="url(#introEndGradient)" stroke="#ffffff" stroke-width="7" />
                     </g>
-                    <text x="88" y="152" text-anchor="middle" class="intro-route-label intro-route-label-inverse">A</text>
-                    <text x="672" y="152" text-anchor="middle" class="intro-route-label intro-route-label-inverse">B</text>
-                    <text x="88" y="214" text-anchor="middle" class="intro-route-label">出发点</text>
-                    <text x="672" y="214" text-anchor="middle" class="intro-route-label">到达点</text>
+                    <text x="72" y="152" text-anchor="middle" class="intro-route-label intro-route-label-inverse">A</text>
+                    <text x="706" y="152" text-anchor="middle" class="intro-route-label intro-route-label-inverse">B</text>
+                    <text x="74" y="254" text-anchor="middle" class="intro-route-label">多入口</text>
+                    <text x="706" y="214" text-anchor="middle" class="intro-route-label">到达点</text>
 
-                    <g filter="url(#introRouteShadow)" aria-label="单瓶颈闸口">
-                        <rect x="528" y="70" width="12" height="124" rx="4" fill="#e8eeee" stroke="#8ea4a4" stroke-width="2" />
-                        <rect x="578" y="70" width="12" height="124" rx="4" fill="#e8eeee" stroke="#8ea4a4" stroke-width="2" />
-                        <path d="M534 76 H584" stroke="#8ea4a4" stroke-width="9" stroke-linecap="round" />
-                        <rect x="486" y="22" width="148" height="40" rx="8" fill="#ffffff" stroke="#bdd1d0" stroke-width="2" />
+                    <g filter="url(#introRouteShadow)" aria-label="道路收窄瓶颈">
+                        <rect x="410" y="32" width="192" height="52" rx="10" fill="#ffffff" stroke="#bdd1d0" stroke-width="2" />
                     </g>
-                    <text x="560" y="39" text-anchor="middle" class="intro-route-chip">单瓶颈闸口</text>
-                    <text x="560" y="55" text-anchor="middle" class="intro-route-muted">固定服务率：单位时间限量通行</text>
-                    <g aria-label="瓶颈信号灯">
-                        <rect x="543" y="84" width="34" height="20" rx="10" fill="#26333a" stroke="#ffffff" stroke-width="2" />
-                        <circle cx="554" cy="94" r="5" fill="#ea7667" />
-                        <circle cx="566" cy="94" r="5" fill="#b7c5c5" opacity="0.55" />
-                    </g>
-                    <path d="M540 148 H578" stroke="#edf4f1" stroke-width="8" />
-                    <path d="M540 148 H578" stroke="#e96f61" stroke-width="4" stroke-dasharray="8 6" />
-                    <text x="560" y="216" text-anchor="middle" class="intro-route-small">{{ capacity_per_slot }} 车 / {{ capacity_window_minutes }} 分钟</text>
+                    <text x="506" y="53" text-anchor="middle" class="intro-route-chip">车道收窄</text>
+                    <text x="506" y="70" text-anchor="middle" class="intro-route-muted">服务率：{{ capacity_per_slot }} 车 / {{ capacity_window_minutes }} 分钟</text>
+                    <rect x="426" y="92" width="70" height="24" rx="12" fill="#ffffff" stroke="#c8d9db" />
+                    <text x="461" y="109" text-anchor="middle" class="intro-route-small">汇入点</text>
+                    <rect x="500" y="186" width="120" height="26" rx="13" fill="#ffffff" stroke="#c8d9db" />
+                    <text x="560" y="203" text-anchor="middle" class="intro-route-small">固定服务率</text>
 
                     <g filter="url(#introRouteShadow)" aria-label="排队小汽车">
-                        <g color="#d95449"><use href="#introRouteCar" x="202" y="127" width="62" height="34" /></g>
-                        <g color="#aebfc1"><use href="#introRouteCar" x="274" y="127" width="62" height="34" /></g>
-                        <g color="#aebfc1"><use href="#introRouteCar" x="346" y="127" width="62" height="34" /></g>
-                        <g color="#aebfc1"><use href="#introRouteCar" x="418" y="127" width="62" height="34" /></g>
-                        <g color="#4d9299"><use href="#introRouteCar" x="598" y="127" width="62" height="34" /></g>
+                        <g color="#d95449"><use href="#introRouteCar" x="184" y="77" width="58" height="32" /></g>
+                        <g color="#aebfc1"><use href="#introRouteCar" x="264" y="95" width="58" height="32" /></g>
+                        <g color="#aebfc1"><use href="#introRouteCar" x="216" y="132" width="58" height="32" /></g>
+                        <g color="#aebfc1"><use href="#introRouteCar" x="288" y="165" width="58" height="32" /></g>
+                        <g color="#4d9299"><use href="#introRouteCar" x="604" y="132" width="58" height="32" /></g>
                     </g>
-                    <text x="233" y="120" text-anchor="middle" class="intro-route-small intro-route-you-label">你</text>
-                    <path d="M264 119 C300 92 390 94 450 119" fill="none" stroke="#718b8e" stroke-width="2" stroke-dasharray="5 6" />
-                    <rect x="302" y="78" width="116" height="24" rx="12" fill="#ffffff" stroke="#ccdada" />
-                    <text x="360" y="94" text-anchor="middle" class="intro-route-muted">瓶颈前形成队列</text>
-                    <path d="M142 246 H618" fill="none" stroke="#2c7a8a" stroke-width="4" stroke-linecap="round" marker-end="url(#introRouteArrow)" />
+                    <text x="213" y="73" text-anchor="middle" class="intro-route-small intro-route-you-label">你</text>
+                    <path d="M206 74 C246 40 336 48 390 96" fill="none" stroke="#718b8e" stroke-width="2" stroke-dasharray="5 6" />
+                    <rect x="284" y="34" width="118" height="24" rx="12" fill="#ffffff" stroke="#ccdada" />
+                    <text x="343" y="50" text-anchor="middle" class="intro-route-muted">汇入前等待</text>
+                    <path d="M142 252 H618" fill="none" stroke="#2c7a8a" stroke-width="4" stroke-linecap="round" marker-end="url(#introRouteArrow)" />
                     <text x="380" y="236" text-anchor="middle" class="intro-route-small">行驶方向 A → B</text>
                 </svg>
             </div>

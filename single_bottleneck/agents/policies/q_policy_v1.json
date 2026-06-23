@@ -1191,7 +1191,7 @@
   "params": {
     "background_count": 4,
     "base_points": 140,
-    "capacity_per_window": 1,
+    "capacity_per_window": 2,
     "choice_step_minutes": 1,
     "early_cost_per_minute": 1,
     "first_departure_minute": 464,
@@ -1201,7 +1201,7 @@
     "preferred_arrival_minute": 480,
     "queue_cost_per_minute": 2,
     "reward_by_slot": {},
-    "service_window_minutes": 2,
+    "service_window_minutes": 1,
     "toll_by_slot": {}
   },
   "policy_version": "q_learning_v1",

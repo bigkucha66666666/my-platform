@@ -3,7 +3,7 @@
 This module is intentionally independent from oTree so it can be trained and
 tested without importing ``single_bottleneck.__init__``. Defaults mirror the
 current experiment constants: 08:00 preferred arrival, 6-minute free-flow
-travel time, 1-minute choice grid, 2-minute bottleneck service window, and
+travel time, 1-minute choice grid, 1-minute bottleneck service window, and
 payoff = 140 - queue/early/late costs - toll + reward.
 
 Example:
@@ -31,8 +31,8 @@ class SingleBottleneckParams:
     first_departure_minute: float = 8 * 60 - 6 - 10
     choice_step_minutes: float = 1
     num_slots: int = 21
-    service_window_minutes: float = 2
-    capacity_per_window: int = 4
+    service_window_minutes: float = 1
+    capacity_per_window: int = 2
     base_points: float = 140
     queue_cost_per_minute: float = 2
     early_cost_per_minute: float = 1

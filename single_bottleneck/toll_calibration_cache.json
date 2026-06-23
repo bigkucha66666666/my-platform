@@ -1,16 +1,16 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "description": "Precomputed symmetric two-sided one-step coarse toll calibration candidates for small single_bottleneck groups under the point-bottleneck batch-window same-time queue rule.",
-  "generated_at": "2026-06-15",
+  "generated_at": "2026-06-23",
   "generated_by": {
-    "command_template": "python -m single_bottleneck.toll_calibration --players {players} --capacity 4 --max-toll 40 --top-k 1 --json",
+    "command_template": "python -m single_bottleneck.toll_calibration --players {players} --capacity 2 --max-toll 40 --top-k 1 --json",
     "working_directory": "my_platform",
     "calibration_mode": "exact"
   },
   "calibration_assumptions": {
-    "capacity": 4,
+    "capacity": 2,
     "choice_step_minutes": 1,
-    "service_window_minutes": 2,
+    "service_window_minutes": 1,
     "first_departure_time": "07:44",
     "last_departure_time": "08:04",
     "choice_slots": 21,
@@ -23,7 +23,7 @@
   "records": [
     {
       "players": 1,
-      "capacity": 4,
+      "capacity": 2,
       "calibration_mode": "exact",
       "coarse_toll_enabled": 1,
       "coarse_toll_slot_spec": "10-12",
@@ -54,7 +54,7 @@
     },
     {
       "players": 2,
-      "capacity": 4,
+      "capacity": 2,
       "calibration_mode": "exact",
       "coarse_toll_enabled": 1,
       "coarse_toll_slot_spec": "10-12",
@@ -95,15 +95,97 @@
     },
     {
       "players": 3,
-      "capacity": 4,
+      "capacity": 2,
       "calibration_mode": "exact",
       "coarse_toll_enabled": 1,
-      "coarse_toll_slot_spec": "9-13",
-      "coarse_toll_time_window_spec": "07:52-07:56",
+      "coarse_toll_slot_spec": "10-12",
+      "coarse_toll_time_window_spec": "07:53-07:55",
       "coarse_toll_points": 2,
       "cost_gap": 0.0,
       "deviation_gap": 0,
-      "nash_count": 3,
+      "nash_count": 2,
+      "equilibrium_distribution": [
+        {
+          "slot": 9,
+          "departure_time": "07:52",
+          "count": 1
+        },
+        {
+          "slot": 11,
+          "departure_time": "07:54",
+          "count": 2
+        }
+      ],
+      "selected_costs": [
+        {
+          "slot": 9,
+          "departure_time": "07:52",
+          "expected_cost": 2.0
+        },
+        {
+          "slot": 11,
+          "departure_time": "07:54",
+          "expected_cost": 2
+        }
+      ],
+      "settings_snippet": {
+        "coarse_toll_enabled": 1,
+        "coarse_toll_time_window_spec": "07:53-07:55",
+        "coarse_toll_points": 2
+      }
+    },
+    {
+      "players": 4,
+      "capacity": 2,
+      "calibration_mode": "exact",
+      "coarse_toll_enabled": 1,
+      "coarse_toll_slot_spec": "10-12",
+      "coarse_toll_time_window_spec": "07:53-07:55",
+      "coarse_toll_points": 2,
+      "cost_gap": 0.0,
+      "deviation_gap": 0,
+      "nash_count": 1,
+      "equilibrium_distribution": [
+        {
+          "slot": 9,
+          "departure_time": "07:52",
+          "count": 2
+        },
+        {
+          "slot": 11,
+          "departure_time": "07:54",
+          "count": 2
+        }
+      ],
+      "selected_costs": [
+        {
+          "slot": 9,
+          "departure_time": "07:52",
+          "expected_cost": 2.0
+        },
+        {
+          "slot": 11,
+          "departure_time": "07:54",
+          "expected_cost": 2
+        }
+      ],
+      "settings_snippet": {
+        "coarse_toll_enabled": 1,
+        "coarse_toll_time_window_spec": "07:53-07:55",
+        "coarse_toll_points": 2
+      }
+    },
+    {
+      "players": 5,
+      "capacity": 2,
+      "calibration_mode": "exact",
+      "coarse_toll_enabled": 1,
+      "coarse_toll_slot_spec": "10-12",
+      "coarse_toll_time_window_spec": "07:53-07:55",
+      "coarse_toll_points": 3,
+      "cost_gap": 0.0,
+      "deviation_gap": 0,
+      "nash_count": 7,
       "equilibrium_distribution": [
         {
           "slot": 8,
@@ -111,9 +193,14 @@
           "count": 1
         },
         {
-          "slot": 10,
-          "departure_time": "07:53",
-          "count": 2
+          "slot": 9,
+          "departure_time": "07:52",
+          "count": 3
+        },
+        {
+          "slot": 11,
+          "departure_time": "07:54",
+          "count": 1
         }
       ],
       "selected_costs": [
@@ -123,97 +210,20 @@
           "expected_cost": 3.0
         },
         {
-          "slot": 10,
-          "departure_time": "07:53",
+          "slot": 9,
+          "departure_time": "07:52",
           "expected_cost": 3.0
+        },
+        {
+          "slot": 11,
+          "departure_time": "07:54",
+          "expected_cost": 3
         }
       ],
       "settings_snippet": {
         "coarse_toll_enabled": 1,
-        "coarse_toll_time_window_spec": "07:52-07:56",
-        "coarse_toll_points": 2
-      }
-    },
-    {
-      "players": 4,
-      "capacity": 4,
-      "calibration_mode": "exact",
-      "coarse_toll_enabled": 1,
-      "coarse_toll_slot_spec": "9-13",
-      "coarse_toll_time_window_spec": "07:52-07:56",
-      "coarse_toll_points": 4,
-      "cost_gap": 0.0,
-      "deviation_gap": 0,
-      "nash_count": 3,
-      "equilibrium_distribution": [
-        {
-          "slot": 7,
-          "departure_time": "07:50",
-          "count": 2
-        },
-        {
-          "slot": 11,
-          "departure_time": "07:54",
-          "count": 2
-        }
-      ],
-      "selected_costs": [
-        {
-          "slot": 7,
-          "departure_time": "07:50",
-          "expected_cost": 4.0
-        },
-        {
-          "slot": 11,
-          "departure_time": "07:54",
-          "expected_cost": 4
-        }
-      ],
-      "settings_snippet": {
-        "coarse_toll_enabled": 1,
-        "coarse_toll_time_window_spec": "07:52-07:56",
-        "coarse_toll_points": 4
-      }
-    },
-    {
-      "players": 5,
-      "capacity": 4,
-      "calibration_mode": "exact",
-      "coarse_toll_enabled": 1,
-      "coarse_toll_slot_spec": "9-13",
-      "coarse_toll_time_window_spec": "07:52-07:56",
-      "coarse_toll_points": 4,
-      "cost_gap": 0.0,
-      "deviation_gap": 0,
-      "nash_count": 3,
-      "equilibrium_distribution": [
-        {
-          "slot": 7,
-          "departure_time": "07:50",
-          "count": 2
-        },
-        {
-          "slot": 11,
-          "departure_time": "07:54",
-          "count": 3
-        }
-      ],
-      "selected_costs": [
-        {
-          "slot": 7,
-          "departure_time": "07:50",
-          "expected_cost": 4.0
-        },
-        {
-          "slot": 11,
-          "departure_time": "07:54",
-          "expected_cost": 4
-        }
-      ],
-      "settings_snippet": {
-        "coarse_toll_enabled": 1,
-        "coarse_toll_time_window_spec": "07:52-07:56",
-        "coarse_toll_points": 4
+        "coarse_toll_time_window_spec": "07:53-07:55",
+        "coarse_toll_points": 3
       }
     }
   ]

@@ -328,7 +328,7 @@
                         <h2 class="sync-title">本轮结果已生成</h2>
                         <p class="sync-subtitle">系统已完成同组数据结算，正在进入本轮结果页。</p>
                     {{ else }}
-                        <h2 class="sync-title">正在等待同组完成决策</h2>
+                        <h2 class="sync-title">正在等待其他参与者完成决策</h2>
                         <p class="sync-subtitle">所有同组参与者完成本轮选择后，系统会统一计算瓶颈排队、到达时间和最终选择成本。</p>
                     {{ endif }}
                 </div>
@@ -350,7 +350,7 @@
             <div class="sync-meta-grid" aria-label="同步状态详情">
                 <div class="sync-meta">
                     <span class="sync-meta-key">当前状态</span>
-                    <span class="sync-meta-value">{{ if results_ready }}已完成结算{{ else }}等待同组提交{{ endif }}</span>
+                    <span class="sync-meta-value">{{ if results_ready }}已完成结算{{ else }}等待其他参与者提交{{ endif }}</span>
                 </div>
                 <div class="sync-meta">
                     <span class="sync-meta-key">预计等待</span>

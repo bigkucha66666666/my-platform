@@ -325,11 +325,11 @@
                 <p class="check-context-value">{{ preferred_arrival_time }}</p>
             </div>
             <div class="check-context-item">
-                <p class="check-context-key">每增加 1 分钟产生的成本</p>
+                <p class="check-context-key">单位时间成本</p>
                 <p class="check-context-value">
-                    <span class="check-context-cost-line">排队：{{ queue_cost_per_minute }} 成本</span>
-                    <span class="check-context-cost-line">早到：{{ early_cost_per_minute }} 成本</span>
-                    <span class="check-context-cost-line">晚到：{{ late_cost_per_minute }} 成本</span>
+                    <span class="check-context-cost-line">排队：{{ queue_cost_per_minute }} </span>
+                    <span class="check-context-cost-line">早到：{{ early_cost_per_minute }} </span>
+                    <span class="check-context-cost-line">晚到：{{ late_cost_per_minute }} </span>
                 </p>
             </div>
             <div class="check-context-item">
@@ -337,7 +337,7 @@
                 <p class="check-context-value">{{ coarse_toll_description }}</p>
             </div>
             <div class="check-context-item">
-                <p class="check-context-key">点瓶颈排队</p>
+                <p class="check-context-key">点排队</p>
                 <p class="check-context-value">同一出发时间的人使用相同等待时间</p>
             </div>
         </section>
@@ -351,7 +351,7 @@
                 <p class="scenario-label">已知条件</p>
                 <div class="scenario-grid">
                     <div class="scenario-chip"><b>排队时间</b><span>{{ example_queue_minutes }} 分钟</span></div>
-                    <div class="scenario-chip"><b>排队每增加 1 分钟</b><span>{{ queue_cost_per_minute }} 成本</span></div>
+                    <div class="scenario-chip"><b>排队单位时间成本</b><span>{{ queue_cost_per_minute }} </span></div>
                     <div class="scenario-chip"><b>公式</b><span>排队时间 ✖️ 单位排队时间成本</span></div>
                     <div class="scenario-chip"><b>只问</b><span>出行时间成本</span></div>
                 </div>
@@ -383,7 +383,7 @@
                 <div class="scenario-grid">
                     <div class="scenario-chip"><b>目标到达</b><span>08:00</span></div>
                     <div class="scenario-chip"><b>实际到达</b><span>07:57</span></div>
-                    <div class="scenario-chip"><b>每早到 1 分钟增加</b><span>{{ early_cost_per_minute }} 成本</span></div>
+                    <div class="scenario-chip"><b>早到单位时间成本</b><span>{{ early_cost_per_minute }} </span></div>
                     <div class="scenario-chip"><b>只问</b><span>早到成本</span></div>
                 </div>
             </div>

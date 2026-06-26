@@ -1,11 +1,17 @@
 from math import ceil
 import json
+import os
 from pathlib import Path
 import random
 import time
 
 from otree.api import *
 from participant_link_export import build_participant_link_rows, find_room_config, read_participant_labels
+from .agents.deepseek_shadow_agent import (
+    AgentChoiceSet,
+    DeepSeekAgentConfig,
+    choose_shadow_departure,
+)
 
 
 doc = """
@@ -38,6 +44,11 @@ TOLL_WINDOW_RULE = 'symmetric_around_free_flow_departure'
 DEPARTURE_SCHEDULE_SOURCE_STATIC = 'static'
 DEPARTURE_SCHEDULE_SOURCE_AUTO = 'auto'
 DEPARTURE_SCHEDULE_VAR = 'single_bottleneck_departure_schedule'
+
+API_AGENT_TYPE_DEEPSEEK = 'deepseek_api_agent'
+API_AGENT_MODE_OFF = 'off'
+API_AGENT_MODE_SHADOW = 'shadow'
+API_AGENT_MODE_ACTIVE = 'active'
 
 
 class C(BaseConstants):
@@ -230,10 +241,47 @@ class Player(BasePlayer):
     decision_source = models.StringField(blank=True)
 
 
+class AgentDecision(ExtraModel):
+    group = models.Link(Group)
+    agent_id = models.StringField()
+    agent_type = models.StringField()
+    api_agent_mode = models.StringField(blank=True)
+    policy_version = models.StringField(blank=True)
+    round_number = models.IntegerField()
+    departure_slot = models.IntegerField()
+    departure_minute = models.FloatField()
+    departure_time_label = models.StringField(blank=True)
+    arrival_minute = models.FloatField(initial=0)
+    arrival_time_label = models.StringField(blank=True)
+    queue_delay_minutes = models.FloatField(initial=0)
+    travel_time_minutes = models.FloatField(initial=0)
+    schedule_early_minutes = models.FloatField(initial=0)
+    schedule_late_minutes = models.FloatField(initial=0)
+    slot_load = models.IntegerField(initial=0)
+    reward_bonus = models.CurrencyField(initial=0)
+    coarse_toll_charge = models.CurrencyField(initial=0)
+    payoff = models.CurrencyField(initial=0)
+    decision_source = models.StringField(blank=True)
+    active_in_results = models.BooleanField(initial=False)
+    fallback_used = models.BooleanField(initial=False)
+    latency_ms = models.IntegerField(initial=0)
+    reason = models.LongStringField(blank=True)
+    raw_response_json = models.LongStringField(blank=True)
+    context_json = models.LongStringField(blank=True)
+
+
 EXPORT_HEADERS = [
     'session_code',
     'session_config_name',
     'data_tier',
+    'actor_type',
+    'agent_id',
+    'agent_type',
+    'api_agent_mode',
+    'api_agent_active_in_results',
+    'api_agent_fallback_used',
+    'api_agent_latency_ms',
+    'api_agent_reason',
     'grouping_enabled',
     'manual_grouping_spec',
     'reward_treatment_enabled',
@@ -298,6 +346,71 @@ def config_flag(value) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {'1', 'true', 'yes', 'on'}
     return False
+
+
+def normalized_api_agent_mode(value) -> str:
+    mode = (value or '').strip().lower()
+    if mode in {API_AGENT_MODE_SHADOW, API_AGENT_MODE_ACTIVE}:
+        return mode
+    return API_AGENT_MODE_OFF
+
+
+def default_api_agent_mode_from_env() -> str:
+    if not config_flag(os.environ.get('SINGLE_BOTTLENECK_API_AGENT_ENABLED', '0')):
+        return API_AGENT_MODE_OFF
+    return normalized_api_agent_mode(
+        os.environ.get('SINGLE_BOTTLENECK_API_AGENT_MODE', API_AGENT_MODE_SHADOW)
+    )
+
+
+def api_agent_mode(session) -> str:
+    return normalized_api_agent_mode(
+        session.config.get('api_agent_mode', default_api_agent_mode_from_env())
+    )
+
+
+def api_agent_count_per_group(session) -> int:
+    return max(
+        0,
+        parse_int(
+            session.config.get(
+                'api_agent_count_per_group',
+                os.environ.get('SINGLE_BOTTLENECK_API_AGENT_COUNT_PER_GROUP', 0),
+            ),
+            0,
+        ),
+    )
+
+
+def api_agent_policy_version(session) -> str:
+    return str(session.config.get('api_agent_policy_version', 'deepseek-v4-flash'))
+
+
+def api_agent_model(session) -> str:
+    return str(session.config.get('api_agent_model', os.environ.get('DEEPSEEK_AGENT_MODEL', 'deepseek-v4-flash')))
+
+
+def api_agent_timeout_seconds(session) -> int:
+    return max(
+        1,
+        parse_int(
+            session.config.get(
+                'api_agent_timeout_seconds',
+                os.environ.get('DEEPSEEK_AGENT_TIMEOUT_SECONDS', 30),
+            ),
+            30,
+        ),
+    )
+
+
+def api_agent_temperature(session) -> float:
+    return parse_float(
+        session.config.get(
+            'api_agent_temperature',
+            os.environ.get('DEEPSEEK_AGENT_TEMPERATURE', 0),
+        ),
+        0,
+    )
 
 
 def parse_int(value, default: int):
@@ -1011,6 +1124,155 @@ def slot_preview_for_player(player: Player):
     return preview
 
 
+def deepseek_config_for_session(session):
+    base_config = DeepSeekAgentConfig.from_env()
+    return DeepSeekAgentConfig(
+        api_key=base_config.api_key,
+        base_url=base_config.base_url,
+        model=api_agent_model(session),
+        timeout_seconds=api_agent_timeout_seconds(session),
+        temperature=api_agent_temperature(session),
+    )
+
+
+def api_agent_history_for_group(group: Group):
+    previous_rounds = []
+    for round_number in range(1, group.round_number):
+        round_group = group.in_round(round_number)
+        slot_counts = {}
+        for player in round_group.get_players():
+            slot = player_departure_slot(player)
+            if slot is None:
+                continue
+            slot_counts[str(slot)] = slot_counts.get(str(slot), 0) + 1
+        agent_choices = []
+        for decision in AgentDecision.filter(group=round_group):
+            agent_choices.append(
+                dict(
+                    agent_id=decision.agent_id,
+                    agent_type=decision.agent_type,
+                    mode=decision.api_agent_mode,
+                    active_in_results=decision.active_in_results,
+                    departure_slot=decision.departure_slot,
+                    payoff=float(decision.payoff),
+                    fallback_used=decision.fallback_used,
+                )
+            )
+        previous_rounds.append(
+            dict(
+                round_number=round_number,
+                human_slot_counts=slot_counts,
+                agent_choices=agent_choices,
+            )
+        )
+    return dict(previous_rounds=previous_rounds)
+
+
+def api_agent_choice_set_for_group(group: Group, reference_player: Player):
+    schedule = departure_schedule_for_player(reference_player)
+    preview = slot_preview_for_player(reference_player)
+    available_slots = [
+        dict(
+            slot=item['slot'],
+            departure_minute=item['departure_minute'],
+            departure_time=item['departure_time'],
+        )
+        for item in preview
+    ]
+    tolls = [
+        dict(slot=item['slot'], charge=round(float(item['toll_charge']), 2))
+        for item in preview
+        if item['toll_active']
+    ]
+    rewards = [
+        dict(slot=item['slot'], bonus=round(float(item['reward_bonus']), 2))
+        for item in preview
+        if item['reward_active']
+    ]
+    return AgentChoiceSet(
+        round_number=group.round_number,
+        total_rounds=C.NUM_ROUNDS,
+        available_slots=available_slots,
+        cost_parameters=dict(
+            fixed_travel_time_cost=C.FIXED_TRAVEL_TIME_COST,
+            queue_cost_per_minute=C.QUEUE_COST_PER_MINUTE,
+            early_cost_per_minute=C.EARLY_COST_PER_MINUTE,
+            late_cost_per_minute=C.LATE_COST_PER_MINUTE,
+            preferred_arrival_minute=C.PREFERRED_ARRIVAL_MINUTE,
+            preferred_arrival_time=minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
+            free_flow_travel_minutes=C.FREE_FLOW_TRAVEL_MINUTES,
+            first_departure_minute=schedule.get('first_departure_minute'),
+            last_departure_minute=schedule.get('last_departure_minute'),
+            bottleneck_capacity_per_slot=bottleneck_capacity_per_slot(group.session),
+            capacity_window_minutes=C.SLOT_SIZE_MINUTES,
+        ),
+        tolls=tolls,
+        rewards=rewards,
+        history=api_agent_history_for_group(group),
+    )
+
+
+def create_api_agent_decisions_for_group(group: Group, players, schedule):
+    mode = api_agent_mode(group.session)
+    count = api_agent_count_per_group(group.session)
+    if mode == API_AGENT_MODE_OFF or count <= 0 or not players:
+        return []
+
+    reference_player = players[0]
+    choice_set = api_agent_choice_set_for_group(group, reference_player)
+    config = deepseek_config_for_session(group.session)
+    decisions = []
+    group_label = reference_player.participant.vars.get(
+        'assigned_group_label',
+        f'G{group.id_in_subsession:02d}',
+    )
+    for index in range(1, count + 1):
+        agent_id = f'{group_label}_API_{index:02d}'
+        choice = choose_shadow_departure(config=config, choice_set=choice_set)
+        slot = choice.departure_slot
+        departure_minute = departure_minute_for_slot(slot, schedule)
+        decision = AgentDecision.create(
+            group=group,
+            agent_id=agent_id,
+            agent_type=API_AGENT_TYPE_DEEPSEEK,
+            api_agent_mode=mode,
+            policy_version=api_agent_policy_version(group.session),
+            round_number=group.round_number,
+            departure_slot=slot,
+            departure_minute=round(departure_minute, 2),
+            departure_time_label=minute_to_clock(departure_minute),
+            decision_source=choice.decision_source,
+            active_in_results=mode == API_AGENT_MODE_ACTIVE,
+            fallback_used=choice.fallback_used,
+            latency_ms=choice.latency_ms,
+            reason=choice.reason,
+            raw_response_json=choice.raw_response_json,
+            context_json=choice.context_json,
+        )
+        decisions.append(decision)
+    return decisions
+
+
+def agent_actor_for_decision(decision: AgentDecision, reference_player: Player):
+    return dict(
+        actor_type='api_agent',
+        source=decision,
+        reference_player=reference_player,
+        departure_slot=decision.departure_slot,
+        departure_minute=decision.departure_minute,
+    )
+
+
+def human_actor_for_player(player: Player):
+    return dict(
+        actor_type='human',
+        source=player,
+        reference_player=player,
+        departure_slot=player_departure_slot(player),
+        departure_minute=player_departure_minute(player),
+    )
+
+
 def auto_toll_distribution_summary(candidate, valid_slots, schedule):
     items = []
     for slot, count in zip(valid_slots, candidate.distribution):
@@ -1502,7 +1764,7 @@ def set_results(group: Group):
     players = group.get_players()
     schedule = departure_schedule_for_player(players[0]) if players else static_departure_schedule_record()
     first_departure_minute, _ = departure_minute_bounds(schedule)
-    players_by_departure_minute = {}
+    actors_by_departure_minute = {}
     for player in players:
         departure_minute = player_departure_minute(player)
         if departure_minute is None:
@@ -1513,14 +1775,22 @@ def set_results(group: Group):
             mark_disconnect_dropout(player)
         else:
             set_player_departure_choice(player, departure_minute)
-        players_by_departure_minute.setdefault(player_departure_minute(player), []).append(player)
+        actor = human_actor_for_player(player)
+        actors_by_departure_minute.setdefault(actor['departure_minute'], []).append(actor)
+
+    api_agent_decisions = create_api_agent_decisions_for_group(group, players, schedule)
+    if api_agent_mode(group.session) == API_AGENT_MODE_ACTIVE and players:
+        reference_player = players[0]
+        for decision in api_agent_decisions:
+            actor = agent_actor_for_decision(decision, reference_player)
+            actors_by_departure_minute.setdefault(actor['departure_minute'], []).append(actor)
 
     next_available_bottleneck_minute = first_departure_minute
     capacity = bottleneck_capacity_per_slot(group.session)
 
-    for departure_minute in sorted(players_by_departure_minute):
-        same_time_players = players_by_departure_minute[departure_minute]
-        slot_load = len(same_time_players)
+    for departure_minute in sorted(actors_by_departure_minute):
+        same_time_actors = actors_by_departure_minute[departure_minute]
+        slot_load = len(same_time_actors)
         first_service_start_minute = max(departure_minute, next_available_bottleneck_minute)
         queue_delay = service_batch_wait_minutes(
             departure_minute=departure_minute,
@@ -1539,10 +1809,12 @@ def set_results(group: Group):
             + C.LATE_COST_PER_MINUTE * late_minutes
         )
 
-        for player in same_time_players:
-            slot = player_departure_slot(player)
-            reward_bonus = reward_bonus_for_player_slot(player, slot)
-            coarse_toll_charge = coarse_toll_for_player_slot(player, slot)
+        for actor in same_time_actors:
+            source = actor['source']
+            reference_player = actor['reference_player']
+            slot = actor['departure_slot']
+            reward_bonus = reward_bonus_for_player_slot(reference_player, slot)
+            coarse_toll_charge = coarse_toll_for_player_slot(reference_player, slot)
             points = max(
                 0,
                 round(
@@ -1554,17 +1826,19 @@ def set_results(group: Group):
                 ),
             )
 
-            player.slot_load = slot_load
-            player.departure_minute = round(departure_minute, 2)
-            player.arrival_minute = round(arrival_minute, 2)
-            player.departure_time_label = minute_to_clock(departure_minute)
-            player.arrival_time_label = minute_to_clock(arrival_minute)
-            player.queue_delay_minutes = round(queue_delay, 2)
-            player.travel_time_minutes = round(C.FREE_FLOW_TRAVEL_MINUTES + queue_delay, 2)
-            player.schedule_early_minutes = round(early_minutes, 2)
-            player.schedule_late_minutes = round(late_minutes, 2)
-            player.reward_bonus = reward_bonus
-            player.payoff = cu(points)
+            source.slot_load = slot_load
+            source.departure_minute = round(departure_minute, 2)
+            source.arrival_minute = round(arrival_minute, 2)
+            source.departure_time_label = minute_to_clock(departure_minute)
+            source.arrival_time_label = minute_to_clock(arrival_minute)
+            source.queue_delay_minutes = round(queue_delay, 2)
+            source.travel_time_minutes = round(C.FREE_FLOW_TRAVEL_MINUTES + queue_delay, 2)
+            source.schedule_early_minutes = round(early_minutes, 2)
+            source.schedule_late_minutes = round(late_minutes, 2)
+            source.reward_bonus = reward_bonus
+            if actor['actor_type'] == 'api_agent':
+                source.coarse_toll_charge = coarse_toll_charge
+            source.payoff = cu(points)
 
         next_available_bottleneck_minute = service_batch_clear_minute(
             first_service_start_minute,
@@ -1649,6 +1923,14 @@ def export_row_for_player(player: Player):
         player.session.code,
         session_config_name,
         data_tier,
+        'human',
+        '',
+        '',
+        api_agent_mode(player.session),
+        '',
+        '',
+        '',
+        '',
         grouping_enabled,
         manual_grouping_spec,
         reward_enabled,
@@ -1705,6 +1987,109 @@ def export_row_for_player(player: Player):
     ]
 
 
+def export_row_for_agent_decision(decision: AgentDecision):
+    group = decision.group
+    session = group.session
+    session_config_name = session.config.get('name', '')
+    grouping_enabled = config_flag(session.config.get('grouping_enabled', 0))
+    manual_grouping_spec = session.config.get('manual_grouping_spec', '')
+    reward_enabled = reward_treatment_enabled(session)
+    rewarded_slot_spec = session.config.get('rewarded_slot_spec', '')
+    reward_bonus_points_value = reward_bonus_points(session)
+    reference_players = group.get_players()
+    reference_player = reference_players[0] if reference_players else None
+    auto_toll_result = participant_auto_coarse_toll_result(reference_player) if reference_player else {}
+    toll_source = coarse_toll_source_for_player(reference_player) if reference_player else COARSE_TOLL_SOURCE_MANUAL
+    toll_auto_enabled = coarse_toll_auto_enabled(session)
+    toll_enabled = coarse_toll_enabled_for_player(reference_player) if reference_player else coarse_toll_enabled(session)
+    toll_slot_spec = coarse_toll_slot_spec_for_player(reference_player) if reference_player else coarse_toll_slot_spec(session)
+    toll_time_window_spec = auto_toll_result.get('time_window_spec', coarse_toll_time_window_spec(session))
+    toll_points_value = coarse_toll_points_for_player(reference_player) if reference_player else coarse_toll_points(session)
+    capacity_per_slot = bottleneck_capacity_per_slot(session)
+    departure_schedule = departure_schedule_for_player(reference_player) if reference_player else static_departure_schedule_record()
+    selected_slot = decision.departure_slot
+    fixed_time_cost = round(C.FIXED_TRAVEL_TIME_COST, 2)
+    queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(decision, 'queue_delay_minutes', 0), 2)
+    early_cost = round(C.EARLY_COST_PER_MINUTE * safe_model_field(decision, 'schedule_early_minutes', 0), 2)
+    late_cost = round(C.LATE_COST_PER_MINUTE * safe_model_field(decision, 'schedule_late_minutes', 0), 2)
+    travel_cost_without_toll = round(fixed_time_cost + queue_cost + early_cost + late_cost, 2)
+    choice_cost_with_toll = round(travel_cost_without_toll + float(decision.coarse_toll_charge), 2)
+
+    if session_config_name == 'single_bottleneck_prod':
+        data_tier = 'prod'
+    elif session_config_name == 'single_bottleneck_demo':
+        data_tier = 'demo'
+    else:
+        data_tier = 'other'
+
+    return [
+        session.code,
+        session_config_name,
+        data_tier,
+        'api_agent',
+        decision.agent_id,
+        decision.agent_type,
+        decision.api_agent_mode,
+        decision.active_in_results,
+        decision.fallback_used,
+        decision.latency_ms,
+        decision.reason,
+        grouping_enabled,
+        manual_grouping_spec,
+        reward_enabled,
+        rewarded_slot_spec,
+        reward_bonus_points_value,
+        toll_source,
+        toll_auto_enabled,
+        auto_toll_result.get('calibration_source', ''),
+        auto_toll_result.get('calibration_mode', ''),
+        auto_toll_result.get('calibration_players', ''),
+        auto_toll_result.get('cost_gap', ''),
+        auto_toll_result.get('deviation_gap', ''),
+        auto_toll_result.get('nash_count', ''),
+        auto_toll_result.get('equilibrium_distribution', ''),
+        auto_toll_result.get('equilibrium_costs', ''),
+        toll_enabled,
+        toll_slot_spec,
+        toll_time_window_spec,
+        toll_points_value,
+        capacity_per_slot,
+        departure_schedule.get('source', DEPARTURE_SCHEDULE_SOURCE_STATIC),
+        departure_schedule_auto_enabled(session),
+        departure_schedule.get('calibration_players', ''),
+        departure_schedule.get('capacity', capacity_per_slot),
+        departure_schedule.get('num_slots', C.NUM_DEPARTURE_SLOTS),
+        departure_schedule.get('first_departure_time', minute_to_clock(departure_minute_for_slot(1))),
+        departure_schedule.get('last_departure_time', minute_to_clock(departure_minute_for_slot(C.NUM_DEPARTURE_SLOTS))),
+        '',
+        '',
+        '',
+        decision.agent_id,
+        decision.agent_type,
+        decision.round_number,
+        selected_slot,
+        decision.departure_time_label,
+        decision.decision_source,
+        decision.arrival_time_label,
+        decision.queue_delay_minutes,
+        decision.travel_time_minutes,
+        decision.schedule_early_minutes,
+        decision.schedule_late_minutes,
+        decision.slot_load,
+        decision.reward_bonus,
+        decision.coarse_toll_charge,
+        travel_cost_without_toll,
+        choice_cost_with_toll,
+        decision.payoff,
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+    ]
+
+
 def row_to_dict(row):
     def normalize(value):
         if value is None or isinstance(value, (bool, int, float, str)):
@@ -1715,6 +2100,19 @@ def row_to_dict(row):
     for header, value in zip(EXPORT_HEADERS, row):
         record[header] = normalize(value)
     return record
+
+
+def agent_decisions_for_players(players):
+    groups = {}
+    for player in players:
+        group = player.group
+        groups[(player.session.code, group.round_number, group.id_in_subsession)] = group
+
+    decisions = []
+    for group in groups.values():
+        decisions.extend(AgentDecision.filter(group=group))
+    decisions.sort(key=lambda item: (item.group.session.code, item.round_number, item.agent_id))
+    return decisions
 
 
 def build_session_reports(players):
@@ -1740,6 +2138,10 @@ def build_session_reports(players):
                 active_dropout_codes=set(),
                 recovered_codes=set(),
                 rounds=set(),
+                agent_record_count=0,
+                active_agent_record_count=0,
+                agent_fallback_count=0,
+                api_agent_mode=record.get('api_agent_mode', API_AGENT_MODE_OFF),
             )
 
         report = reports[session_code]
@@ -1755,6 +2157,43 @@ def build_session_reports(players):
             report['recovered_codes'].add(record['participant_code'])
         report['rounds'].add(record['round_number'])
 
+    for decision in agent_decisions_for_players(players):
+        row = export_row_for_agent_decision(decision)
+        record = row_to_dict(row)
+        session_code = record['session_code']
+        session_pk = getattr(decision.group.session, 'id', 0) or 0
+
+        if session_code not in reports:
+            reports[session_code] = dict(
+                session_code=session_code,
+                session_config_name=record['session_config_name'],
+                data_tier=record['data_tier'],
+                grouping_enabled=record['grouping_enabled'],
+                manual_grouping_spec=record['manual_grouping_spec'],
+                session_pk=session_pk,
+                rows=[],
+                participant_codes=set(),
+                finished_codes=set(),
+                historical_dropout_codes=set(),
+                active_dropout_codes=set(),
+                recovered_codes=set(),
+                rounds=set(),
+                agent_record_count=0,
+                active_agent_record_count=0,
+                agent_fallback_count=0,
+                api_agent_mode=record.get('api_agent_mode', API_AGENT_MODE_OFF),
+            )
+
+        report = reports[session_code]
+        report['rows'].append(record)
+        report['rounds'].add(record['round_number'])
+        report['agent_record_count'] += 1
+        if record['api_agent_active_in_results']:
+            report['active_agent_record_count'] += 1
+        if record['api_agent_fallback_used']:
+            report['agent_fallback_count'] += 1
+        report['api_agent_mode'] = record.get('api_agent_mode', report.get('api_agent_mode', API_AGENT_MODE_OFF))
+
     session_reports = []
     for report in reports.values():
         summary = dict(
@@ -1769,6 +2208,10 @@ def build_session_reports(players):
             recovered_count=len(report['recovered_codes']),
             round_count=len(report['rounds']),
             grouping_status='手动分组' if report['grouping_enabled'] else '自动分组',
+            api_agent_mode=report.get('api_agent_mode', API_AGENT_MODE_OFF),
+            agent_record_count=report.get('agent_record_count', 0),
+            active_agent_record_count=report.get('active_agent_record_count', 0),
+            agent_fallback_count=report.get('agent_fallback_count', 0),
         )
         session_reports.append(
             dict(
@@ -1851,6 +2294,26 @@ def choice_cost_components_for_player(player: Player):
     )
 
 
+def choice_cost_components_for_agent_decision(decision: AgentDecision):
+    fixed_time_cost = round(C.FIXED_TRAVEL_TIME_COST, 2)
+    queue_cost = round(C.QUEUE_COST_PER_MINUTE * safe_model_field(decision, 'queue_delay_minutes', 0), 2)
+    early_cost = round(C.EARLY_COST_PER_MINUTE * safe_model_field(decision, 'schedule_early_minutes', 0), 2)
+    late_cost = round(C.LATE_COST_PER_MINUTE * safe_model_field(decision, 'schedule_late_minutes', 0), 2)
+    travel_time_cost = round(fixed_time_cost + queue_cost, 2)
+    travel_cost = round(travel_time_cost + early_cost + late_cost, 2)
+    toll_cost = round(float(safe_model_field(decision, 'coarse_toll_charge', 0)), 2)
+    return dict(
+        fixed_time_cost=fixed_time_cost,
+        queue_cost=queue_cost,
+        travel_time_cost=travel_time_cost,
+        early_cost=early_cost,
+        late_cost=late_cost,
+        travel_cost=travel_cost,
+        toll_cost=toll_cost,
+        total_choice_cost=round(travel_cost + toll_cost, 2),
+    )
+
+
 def result_current_round_cost_snapshot(player: Player):
     schedule = departure_schedule_for_player(player)
     slots = departure_slots_from_schedule(schedule)
@@ -1866,6 +2329,16 @@ def result_current_round_cost_snapshot(player: Player):
         components = choice_cost_components_for_player(round_player)
         cost = components['total_choice_cost']
         slot = player_departure_slot(round_player)
+        if slot in costs_by_slot:
+            costs_by_slot[slot].append(cost)
+        all_costs.append(cost)
+
+    for decision in AgentDecision.filter(group=player.group):
+        if not decision.active_in_results:
+            continue
+        components = choice_cost_components_for_agent_decision(decision)
+        cost = components['total_choice_cost']
+        slot = decision.departure_slot
         if slot in costs_by_slot:
             costs_by_slot[slot].append(cost)
         all_costs.append(cost)
@@ -1893,7 +2366,7 @@ def result_current_round_cost_snapshot(player: Player):
     return dict(
         bars=bars,
         average_cost_label=minute_value_display(average_cost),
-        average_line_bottom_px=round(34 + bounded_percent(average_cost, axis_max) * 1.74, 2),
+        average_line_bottom_px=round(64 + bounded_percent(average_cost, axis_max) * 1.74, 2),
         axis_max_label=minute_value_display(axis_max),
     )
 
@@ -1942,8 +2415,8 @@ class ComprehensionCheck(Page):
         example_arrival_without_queue_minute = (
             example_departure_minute + C.FREE_FLOW_TRAVEL_MINUTES
         )
-        example_arrival_with_one_person_minute = (
-            example_arrival_without_queue_minute + C.SLOT_SIZE_MINUTES * 2
+        example_arrival_with_short_wait_minute = (
+            example_arrival_without_queue_minute + C.SLOT_SIZE_MINUTES
         )
         example_arrival_minute = (
             example_arrival_without_queue_minute + example_same_departure_wait_minutes
@@ -1965,8 +2438,8 @@ class ComprehensionCheck(Page):
             example_departure_time=minute_to_clock(example_departure_minute),
             example_same_departure_wait_minutes=minute_value_display(example_same_departure_wait_minutes),
             example_arrival_without_queue_time=minute_to_clock(example_arrival_without_queue_minute),
-            example_arrival_with_one_person_time=minute_to_clock(
-                example_arrival_with_one_person_minute
+            example_arrival_with_short_wait_time=minute_to_clock(
+                example_arrival_with_short_wait_minute
             ),
             example_arrival_time=minute_to_clock(example_arrival_minute),
         )
@@ -2110,6 +2583,7 @@ class Results(Page):
         total_choice_cost_points = round(total_travel_cost_points + toll_charge_points, 2)
         fixed_time_cost_pct = bounded_percent(fixed_time_cost_points, total_choice_cost_points)
         queue_cost_pct = bounded_percent(queue_cost_points, total_choice_cost_points)
+        travel_time_cost_pct = bounded_percent(travel_time_cost_points, total_choice_cost_points)
         early_cost_pct = bounded_percent(early_cost_points, total_choice_cost_points)
         late_cost_pct = bounded_percent(late_cost_points, total_choice_cost_points)
         toll_cost_pct = bounded_percent(toll_charge_points, total_choice_cost_points)
@@ -2146,6 +2620,7 @@ class Results(Page):
             total_choice_cost_points=minute_value_display(total_choice_cost_points),
             fixed_time_cost_pct=fixed_time_cost_pct,
             queue_cost_pct=queue_cost_pct,
+            travel_time_cost_pct=travel_time_cost_pct,
             early_cost_pct=early_cost_pct,
             late_cost_pct=late_cost_pct,
             toll_cost_pct=toll_cost_pct,
@@ -2163,6 +2638,8 @@ def custom_export(players):
     yield EXPORT_HEADERS
     for player in players:
         yield export_row_for_player(player)
+    for decision in agent_decisions_for_players(players):
+        yield export_row_for_agent_decision(decision)
 
 
 page_sequence = [Introduction, ComprehensionCheck, Decision, ResultsSync, Results]

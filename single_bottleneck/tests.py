@@ -1,4 +1,5 @@
 from math import ceil
+from types import SimpleNamespace
 import unittest
 
 from otree.api import Bot, Submission, expect
@@ -13,6 +14,7 @@ from . import (
     Results,
     ResultsSync,
     build_auto_group_matrix,
+    choice_cost_components_for_agent_decision,
     choice_cost_components_for_player,
     departure_minute_for_player_slot,
     departure_slots_for_player,
@@ -33,26 +35,48 @@ class ServiceRateTests(unittest.TestCase):
         self.assertEqual(C.SLOT_SIZE_MINUTES, 1)
 
 
+class AgentResultCostTests(unittest.TestCase):
+    def test_active_agent_cost_uses_same_display_cost_formula_as_participants(self):
+        decision = SimpleNamespace(
+            queue_delay_minutes=2,
+            schedule_early_minutes=0,
+            schedule_late_minutes=1,
+            coarse_toll_charge=3,
+        )
+
+        components = choice_cost_components_for_agent_decision(decision)
+
+        self.assertEqual(components['fixed_time_cost'], 12)
+        self.assertEqual(components['queue_cost'], 4)
+        self.assertEqual(components['late_cost'], 3)
+        self.assertEqual(components['toll_cost'], 3)
+        self.assertEqual(components['total_choice_cost'], 22)
+
+
 class PlayerBot(Bot):
     cases = ['staggered', 'same_time']
 
     def play_round(self):
         if self.round_number == 1:
-            expect('论文式单瓶颈示意', 'in', self.html)
-            expect('单瓶颈闸口', 'in', self.html)
-            expect('固定服务率：单位时间限量通行', 'in', self.html)
+            expect('单瓶颈示意', 'in', self.html)
+            expect('多条出发流线汇入同一个瓶颈', 'in', self.html)
+            expect('汇入瓶颈', 'in', self.html)
+            expect('瓶颈服务率', 'in', self.html)
+            expect('多条入口道路在瓶颈处汇入少量车道', 'not in', self.html)
+            expect('车道收窄', 'not in', self.html)
             expect('双车道汇入单车道', 'not in', self.html)
             expect('真实车道收窄示意', 'not in', self.html)
-            expect('排队小汽车', 'in', self.html)
+            expect('排队小汽车', 'not in', self.html)
             expect('等待与早到/晚到都会转化为成本', 'not in', self.html)
             expect('无排队基准', 'not in', self.html)
             expect(' 成本分', 'not in', self.html)
             yield Submission(Introduction, check_html=False)
             expect('场景计算题', 'in', self.html)
             expect('排队成本 = 4 分钟 × 2 = 8 成本', 'in', self.html)
-            expect('同一出发时间的人使用相同等待时间', 'in', self.html)
+            expect('点排队', 'not in', self.html)
             expect('瓶颈每 1 分钟通过 2 人', 'in', self.html)
             expect('预计到达 = 07:54 + 6 + 2 = 08:02', 'in', self.html)
+            expect('08:01', 'in', self.html)
             expect('0.7 分钟/人', 'not in', self.html)
             expect('08:02:40', 'not in', self.html)
             expect('排队时间 = 队列长度 ÷ 瓶颈服务率', 'not in', self.html)
@@ -89,20 +113,23 @@ class PlayerBot(Bot):
         yield Submission(ResultsSync, check_html=False)
         expect('你的本轮用时', 'in', self.html)
         expect('固定行驶时间', 'in', self.html)
-        expect('固定行驶时间成本', 'in', self.html)
-        expect('排队延误成本', 'in', self.html)
+        expect('出行时间成本', 'in', self.html)
+        expect('固定行驶时间成本', 'not in', self.html)
+        expect('排队延误成本', 'not in', self.html)
         expect('本轮成本与用时', 'in', self.html)
         expect('result-overview-time', 'in', self.html)
         expect('time-spent-card', 'not in', self.html)
-        expect('A 出发', 'in', self.html)
-        expect('B 到达', 'in', self.html)
+        expect('同分钟参与人数', 'in', self.html)
+        expect('总行程时间', 'in', self.html)
         expect('出发时间：', 'not in', self.html)
         expect('到达时间：', 'not in', self.html)
         expect('总行程时间：', 'not in', self.html)
         expect('同一分钟选择人数：', 'not in', self.html)
         expect('所有参与者的成本分布', 'in', self.html)
         expect('柱高表示该出发时间参与者的平均成本', 'in', self.html)
-        expect('柱顶人数表示该时间的选择人数', 'in', self.html)
+        expect('下方人数带表示该时间的选择人数', 'in', self.html)
+        expect('选择人数带', 'in', self.html)
+        expect('柱顶人数表示该时间的选择人数', 'not in', self.html)
         expect('所有参与者平均成本', 'in', self.html)
         expect('你的选择', 'in', self.html)
         expect('散点为当前轮同组参与者成本', 'not in', self.html)

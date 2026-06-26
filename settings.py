@@ -27,6 +27,44 @@ DEBUG = environ.get('OTREE_PRODUCTION') in [None, '', '0']
 PROD_PARTICIPANT_PASSWORD = environ.get('OTREE_PROD_PARTICIPANT_PASSWORD')
 BROWSER_COMMAND = environ.get('BROWSER_COMMAND')
 
+SINGLE_BOTTLENECK_API_AGENT_COUNT = int(environ.get('SINGLE_BOTTLENECK_API_AGENT_COUNT_PER_GROUP', '1') or 1)
+SINGLE_BOTTLENECK_API_AGENT_MODEL = environ.get('DEEPSEEK_AGENT_MODEL', 'deepseek-v4-flash')
+SINGLE_BOTTLENECK_API_AGENT_TIMEOUT_SECONDS = int(environ.get('DEEPSEEK_AGENT_TIMEOUT_SECONDS', '30') or 30)
+SINGLE_BOTTLENECK_API_AGENT_TEMPERATURE = float(environ.get('DEEPSEEK_AGENT_TEMPERATURE', '0') or 0)
+
+
+SINGLE_BOTTLENECK_COMMON = dict(
+    cohort_size=0,
+    grouping_enabled=0,
+    manual_grouping_spec='',
+    reward_treatment_enabled=0,
+    rewarded_slot_spec='',
+    reward_bonus_points=8,
+    departure_schedule_auto_enabled=1,
+    departure_schedule_min_slots_each_side=10,
+    coarse_toll_auto_enabled=1,
+    coarse_toll_auto_min_toll=0,
+    coarse_toll_auto_max_toll=40,
+    coarse_toll_auto_toll_step=1,
+    coarse_toll_auto_mode='auto',
+    coarse_toll_auto_approx_refine_pool_size=8,
+    coarse_toll_auto_approx_refine_iterations=160,
+    coarse_toll_enabled=1,
+    coarse_toll_slot_spec='10-12',
+    coarse_toll_time_window_spec='07:53-07:55',
+    coarse_toll_points=3,
+    bottleneck_capacity_per_slot=2,
+    payoff_source_var='single_bottleneck_total_payoff',
+    final_payoff_label='单瓶颈出发时间实验',
+    payoff_source_label='single_bottleneck 全 10 轮累计结果',
+    payoff_rounds=10,
+    api_agent_count_per_group=SINGLE_BOTTLENECK_API_AGENT_COUNT,
+    api_agent_model=SINGLE_BOTTLENECK_API_AGENT_MODEL,
+    api_agent_timeout_seconds=SINGLE_BOTTLENECK_API_AGENT_TIMEOUT_SECONDS,
+    api_agent_temperature=SINGLE_BOTTLENECK_API_AGENT_TEMPERATURE,
+    api_agent_policy_version=SINGLE_BOTTLENECK_API_AGENT_MODEL,
+)
+
 SESSION_CONFIGS = [
     dict(
         name='route_choice_prod',
@@ -63,30 +101,21 @@ SESSION_CONFIGS = [
             "默认所有参与者进入同一个瓶颈组，并按实际人数自动校准单步粗收费。"
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
-        cohort_size=0,
-        grouping_enabled=0,
-        manual_grouping_spec='',
-        reward_treatment_enabled=0,
-        rewarded_slot_spec='',
-        reward_bonus_points=8,
-        departure_schedule_auto_enabled=1,
-        departure_schedule_min_slots_each_side=10,
-        coarse_toll_auto_enabled=1,
-        coarse_toll_auto_min_toll=0,
-        coarse_toll_auto_max_toll=40,
-        coarse_toll_auto_toll_step=1,
-        coarse_toll_auto_mode='auto',
-        coarse_toll_auto_approx_refine_pool_size=8,
-        coarse_toll_auto_approx_refine_iterations=160,
-        coarse_toll_enabled=1,
-        coarse_toll_slot_spec='10-12',
-        coarse_toll_time_window_spec='07:53-07:55',
-        coarse_toll_points=3,
-        bottleneck_capacity_per_slot=2,
-        payoff_source_var='single_bottleneck_total_payoff',
-        final_payoff_label='单瓶颈出发时间实验',
-        payoff_source_label='single_bottleneck 全 10 轮累计结果',
-        payoff_rounds=10,
+        **SINGLE_BOTTLENECK_COMMON,
+        api_agent_mode='off',
+        num_demo_participants=1,
+    ),
+    dict(
+        name='single_bottleneck_prod_agent_active',
+        display_name="正式实验 · 单瓶颈出发时间 · DeepSeek Agent 加入",
+        app_sequence=['access_gate', 'single_bottleneck', 'payment_info'],
+        doc=(
+            "用于真实被试的单瓶颈出发时间实验。\n"
+            "DeepSeek API Agent 作为同组虚拟参与者加入排队，并影响本轮拥堵与收益。"
+        ),
+        participant_password=PROD_PARTICIPANT_PASSWORD,
+        **SINGLE_BOTTLENECK_COMMON,
+        api_agent_mode='active',
         num_demo_participants=1,
     ),
     dict(
@@ -97,30 +126,20 @@ SESSION_CONFIGS = [
             "用于单瓶颈出发时间实验的流程演示。\n"
             "默认所有参与者进入同一个瓶颈组，并按实际人数自动校准单步粗收费。"
         ),
-        cohort_size=0,
-        grouping_enabled=0,
-        manual_grouping_spec='',
-        reward_treatment_enabled=0,
-        rewarded_slot_spec='',
-        reward_bonus_points=8,
-        departure_schedule_auto_enabled=1,
-        departure_schedule_min_slots_each_side=10,
-        coarse_toll_auto_enabled=1,
-        coarse_toll_auto_min_toll=0,
-        coarse_toll_auto_max_toll=40,
-        coarse_toll_auto_toll_step=1,
-        coarse_toll_auto_mode='auto',
-        coarse_toll_auto_approx_refine_pool_size=8,
-        coarse_toll_auto_approx_refine_iterations=160,
-        coarse_toll_enabled=1,
-        coarse_toll_slot_spec='10-12',
-        coarse_toll_time_window_spec='07:53-07:55',
-        coarse_toll_points=3,
-        bottleneck_capacity_per_slot=2,
-        payoff_source_var='single_bottleneck_total_payoff',
-        final_payoff_label='单瓶颈出发时间实验',
-        payoff_source_label='single_bottleneck 全 10 轮累计结果',
-        payoff_rounds=10,
+        **SINGLE_BOTTLENECK_COMMON,
+        api_agent_mode='off',
+        num_demo_participants=5,
+    ),
+    dict(
+        name='single_bottleneck_demo_agent_active',
+        display_name="演示测试 · 单瓶颈出发时间 · DeepSeek Agent 加入",
+        app_sequence=['single_bottleneck'],
+        doc=(
+            "用于单瓶颈出发时间实验的流程演示。\n"
+            "DeepSeek API Agent 作为同组虚拟参与者加入排队，并影响本轮拥堵与收益。"
+        ),
+        **SINGLE_BOTTLENECK_COMMON,
+        api_agent_mode='active',
         num_demo_participants=5,
     ),
 ]

@@ -190,6 +190,22 @@
         <div class="report-card-key">分组状态</div>
         <div class="report-card-value" id="summary-grouping-status"></div>
       </div>
+      <div class="report-card">
+        <div class="report-card-key">API Agent 模式</div>
+        <div class="report-card-value" id="summary-api-agent-mode"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">Agent 记录数</div>
+        <div class="report-card-value" id="summary-agent-record-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">Active Agent 记录</div>
+        <div class="report-card-value" id="summary-active-agent-record-count"></div>
+      </div>
+      <div class="report-card">
+        <div class="report-card-key">Agent Fallback 次数</div>
+        <div class="report-card-value" id="summary-agent-fallback-count"></div>
+      </div>
     </div>
   </div>
 
@@ -268,6 +284,10 @@
       setText('summary-recovered-count', summary.recovered_count);
       setText('summary-round-count', summary.round_count);
       setText('summary-grouping-status', summary.grouping_status);
+      setText('summary-api-agent-mode', summary.api_agent_mode);
+      setText('summary-agent-record-count', summary.agent_record_count);
+      setText('summary-active-agent-record-count', summary.active_agent_record_count);
+      setText('summary-agent-fallback-count', summary.agent_fallback_count);
       renderRows(report.rows);
       emptyEl.style.display = 'none';
       contentEl.style.display = 'block';

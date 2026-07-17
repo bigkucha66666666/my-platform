@@ -61,6 +61,8 @@ class AgentChoiceSet:
     tolls: Sequence[Mapping[str, object]] = field(default_factory=list)
     rewards: Sequence[Mapping[str, object]] = field(default_factory=list)
     history: Mapping[str, object] = field(default_factory=dict)
+    agent_id: str = ""
+    persona: Mapping[str, object] = field(default_factory=dict)
 
     def valid_slots(self) -> set[int]:
         return {int(item["slot"]) for item in self.available_slots}
@@ -93,6 +95,8 @@ def build_chat_completion_payload(
                 "role": "system",
                 "content": (
                     "You are a virtual participant in a single-bottleneck departure-time experiment. "
+                    "When a persona is present in the context, treat its 1-10 trait scores as "
+                    "stable behavioral preferences for this Agent and remain consistent with them. "
                     "Choose one legal departure slot. Return only valid JSON with keys "
                     "departure_slot and reason. Do not include markdown."
                 ),

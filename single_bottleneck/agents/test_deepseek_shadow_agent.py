@@ -40,6 +40,13 @@ class DeepSeekShadowAgentTests(unittest.TestCase):
         choice_set = AgentChoiceSet(
             round_number=1,
             total_rounds=10,
+            agent_id="G01_API_01",
+            persona={
+                "persona_id": "queue_averse_v1",
+                "persona_version": "bottleneck_persona_v1",
+                "label": "queue_averse",
+                "traits": {"queue_aversion": 9, "choice_inertia": 5},
+            },
             available_slots=[
                 {"slot": 10, "departure_minute": 473, "departure_time": "07:53"},
                 {"slot": 11, "departure_minute": 474, "departure_time": "07:54"},
@@ -61,6 +68,10 @@ class DeepSeekShadowAgentTests(unittest.TestCase):
         self.assertIn("departure_slot", body)
         self.assertIn("JSON", body)
         self.assertIn("07:54", body)
+        self.assertIn("G01_API_01", body)
+        self.assertIn("queue_averse_v1", body)
+        self.assertIn("queue_aversion", body)
+        self.assertIn("stable behavioral preferences", body)
 
     def test_parse_valid_deepseek_response(self):
         raw_response = {

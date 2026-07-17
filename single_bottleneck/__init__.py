@@ -12,6 +12,7 @@ from .agents.deepseek_shadow_agent import (
     DeepSeekAgentConfig,
     choose_shadow_departure,
 )
+from .agents.personas import get_or_create_api_agent_persona
 
 
 doc = """
@@ -1168,7 +1169,13 @@ def api_agent_history_for_group(group: Group):
     return dict(previous_rounds=previous_rounds)
 
 
-def api_agent_choice_set_for_group(group: Group, reference_player: Player):
+def api_agent_choice_set_for_group(
+    group: Group,
+    reference_player: Player,
+    *,
+    agent_id: str = '',
+    persona=None,
+):
     schedule = departure_schedule_for_player(reference_player)
     preview = slot_preview_for_player(reference_player)
     available_slots = [
@@ -1209,6 +1216,8 @@ def api_agent_choice_set_for_group(group: Group, reference_player: Player):
         tolls=tolls,
         rewards=rewards,
         history=api_agent_history_for_group(group),
+        agent_id=agent_id,
+        persona=persona or {},
     )
 
 
@@ -1219,7 +1228,6 @@ def create_api_agent_decisions_for_group(group: Group, players, schedule):
         return []
 
     reference_player = players[0]
-    choice_set = api_agent_choice_set_for_group(group, reference_player)
     config = deepseek_config_for_session(group.session)
     decisions = []
     group_label = reference_player.participant.vars.get(
@@ -1228,6 +1236,17 @@ def create_api_agent_decisions_for_group(group: Group, players, schedule):
     )
     for index in range(1, count + 1):
         agent_id = f'{group_label}_API_{index:02d}'
+        persona = get_or_create_api_agent_persona(
+            group.session,
+            group_label,
+            agent_id,
+        )
+        choice_set = api_agent_choice_set_for_group(
+            group,
+            reference_player,
+            agent_id=agent_id,
+            persona=persona,
+        )
         choice = choose_shadow_departure(config=config, choice_set=choice_set)
         slot = choice.departure_slot
         departure_minute = departure_minute_for_slot(slot, schedule)

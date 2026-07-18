@@ -127,6 +127,13 @@ class DeepSeekShadowAgentTests(unittest.TestCase):
         choice_set = AgentChoiceSet(
             round_number=2,
             total_rounds=10,
+            agent_id="G01_API_01",
+            persona={
+                "persona_id": "adaptive_v1",
+                "persona_version": "bottleneck_persona_v1",
+                "label": "adaptive",
+                "traits": {"adaptation_speed": 9},
+            },
             available_slots=[
                 {"slot": 10, "departure_minute": 473, "departure_time": "07:53"},
                 {"slot": 11, "departure_minute": 474, "departure_time": "07:54"},
@@ -155,6 +162,9 @@ class DeepSeekShadowAgentTests(unittest.TestCase):
         self.assertEqual(choice.decision_source, "deepseek_api")
         self.assertFalse(choice.fallback_used)
         self.assertEqual(choice.reason, "test")
+        recorded_context = json.loads(choice.context_json)
+        self.assertEqual(recorded_context["agent_id"], "G01_API_01")
+        self.assertEqual(recorded_context["persona"], choice_set.persona)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,10 @@ from .agents.deepseek_shadow_agent import (
     DeepSeekAgentConfig,
     choose_shadow_departure,
 )
-from .agents.personas import get_or_create_api_agent_persona
+from .agents.personas import (
+    get_or_create_api_agent_persona,
+    initialize_api_agent_personas,
+)
 
 
 doc = """
@@ -381,6 +384,39 @@ def api_agent_count_per_group(session) -> int:
             0,
         ),
     )
+
+
+API_AGENT_COUNT_MIN = 1
+API_AGENT_COUNT_MAX = 5
+API_AGENT_COUNT_ERROR = '每组 Agent 数量必须是 1 到 5 之间的整数。'
+
+
+def validate_api_agent_count(session) -> int:
+    count = api_agent_count_per_group(session)
+    if api_agent_mode(session) == API_AGENT_MODE_OFF:
+        return count
+
+    raw_count = session.config.get('api_agent_count_per_group', count)
+    if isinstance(raw_count, bool):
+        raise ValueError(API_AGENT_COUNT_ERROR)
+    if isinstance(raw_count, int):
+        parsed_count = raw_count
+    elif isinstance(raw_count, str):
+        try:
+            parsed_count = int(raw_count.strip())
+        except ValueError as exc:
+            raise ValueError(API_AGENT_COUNT_ERROR) from exc
+    else:
+        raise ValueError(API_AGENT_COUNT_ERROR)
+
+    if parsed_count != count or not API_AGENT_COUNT_MIN <= count <= API_AGENT_COUNT_MAX:
+        raise ValueError(API_AGENT_COUNT_ERROR)
+
+    session.config = {
+        **session.config,
+        'api_agent_count_per_group': count,
+    }
+    return count
 
 
 def api_agent_policy_version(session) -> str:
@@ -1221,6 +1257,27 @@ def api_agent_choice_set_for_group(
     )
 
 
+def api_agent_group_labels(group: Group, fallback_group_label: str):
+    try:
+        first_round_group = group.in_round(1)
+        first_round_groups = first_round_group.subsession.get_groups()
+    except (AttributeError, TypeError):
+        return [fallback_group_label]
+
+    labels = []
+    for first_round_group in first_round_groups:
+        players = first_round_group.get_players()
+        if not players:
+            continue
+        labels.append(
+            players[0].participant.vars.get(
+                'assigned_group_label',
+                f'G{first_round_group.id_in_subsession:02d}',
+            )
+        )
+    return labels or [fallback_group_label]
+
+
 def create_api_agent_decisions_for_group(group: Group, players, schedule):
     mode = api_agent_mode(group.session)
     count = api_agent_count_per_group(group.session)
@@ -1233,6 +1290,11 @@ def create_api_agent_decisions_for_group(group: Group, players, schedule):
     group_label = reference_player.participant.vars.get(
         'assigned_group_label',
         f'G{group.id_in_subsession:02d}',
+    )
+    initialize_api_agent_personas(
+        group.session,
+        api_agent_group_labels(group, group_label),
+        count,
     )
     for index in range(1, count + 1):
         agent_id = f'{group_label}_API_{index:02d}'
@@ -1618,6 +1680,7 @@ def apply_auto_coarse_toll_calibration(session, matrix):
 
 def creating_session(subsession: Subsession):
     if subsession.round_number == 1:
+        validate_api_agent_count(subsession.session)
         players = subsession.get_players()
         for player in players:
             player.participant.is_dropout = False
@@ -1644,6 +1707,12 @@ def creating_session(subsession: Subsession):
         apply_auto_coarse_toll_calibration(subsession.session, matrix)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
+        if api_agent_mode(subsession.session) != API_AGENT_MODE_OFF:
+            initialize_api_agent_personas(
+                subsession.session,
+                [f'G{index:02d}' for index in range(1, len(matrix) + 1)],
+                api_agent_count_per_group(subsession.session),
+            )
     else:
         subsession.group_like_round(1)
 

@@ -11,6 +11,7 @@ from personas import (
     PERSONA_LIBRARY,
     PERSONA_LIBRARY_VERSION,
     get_or_create_api_agent_persona,
+    initialize_api_agent_personas,
 )
 
 
@@ -64,6 +65,39 @@ class PersonaStorageTests(unittest.TestCase):
             session.vars[API_AGENT_PERSONA_SESSION_VAR]["G01_API_01"],
             persona,
         )
+
+    def test_full_initialization_is_deterministic_for_all_groups_and_agents(self):
+        first_session = self.make_session()
+        second_session = self.make_session()
+
+        first = initialize_api_agent_personas(
+            first_session,
+            group_labels=["G01", "G02"],
+            agent_count=2,
+        )
+        second = initialize_api_agent_personas(
+            second_session,
+            group_labels=["G01", "G02"],
+            agent_count=2,
+        )
+
+        self.assertEqual(first, second)
+        self.assertEqual(
+            sorted(first),
+            ["G01_API_01", "G01_API_02", "G02_API_01", "G02_API_02"],
+        )
+
+    def test_incomplete_existing_snapshot_is_replaced(self):
+        session = self.make_session()
+        session.vars[API_AGENT_PERSONA_SESSION_VAR] = {
+            "G01_API_01": {"persona_version": PERSONA_LIBRARY_VERSION}
+        }
+
+        persona = get_or_create_api_agent_persona(session, "G01", "G01_API_01")
+
+        self.assertIn("persona_id", persona)
+        self.assertIn("label", persona)
+        self.assertIn("traits", persona)
 
 
 if __name__ == "__main__":

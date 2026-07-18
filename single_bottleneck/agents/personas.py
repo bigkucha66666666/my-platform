@@ -8,6 +8,16 @@ from copy import deepcopy
 
 API_AGENT_PERSONA_SESSION_VAR = "single_bottleneck_agent_personas_v1"
 PERSONA_LIBRARY_VERSION = "bottleneck_persona_v1"
+PERSONA_TRAIT_NAMES = {
+    "queue_aversion",
+    "early_arrival_aversion",
+    "late_arrival_aversion",
+    "toll_sensitivity",
+    "reward_sensitivity",
+    "risk_aversion",
+    "choice_inertia",
+    "adaptation_speed",
+}
 
 
 def _persona(persona_id, label, **traits):
@@ -91,16 +101,50 @@ def _stable_persona_index(session_code: str, group_label: str, agent_id: str) ->
     return int.from_bytes(digest[:8], "big") % len(PERSONA_LIBRARY)
 
 
+def _is_valid_persona_snapshot(value) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if not all(value.get(key) for key in ("persona_id", "persona_version", "label")):
+        return False
+    traits = value.get("traits")
+    if not isinstance(traits, dict) or set(traits) != PERSONA_TRAIT_NAMES:
+        return False
+    return all(isinstance(score, int) and 1 <= score <= 10 for score in traits.values())
+
+
+def _persona_snapshot(session_code: str, group_label: str, agent_id: str):
+    index = _stable_persona_index(session_code, group_label, agent_id)
+    return deepcopy(PERSONA_LIBRARY[index])
+
+
+def initialize_api_agent_personas(session, group_labels, agent_count: int):
+    stored_value = session.vars.get(API_AGENT_PERSONA_SESSION_VAR, {})
+    store = deepcopy(stored_value) if isinstance(stored_value, dict) else {}
+
+    for group_label in sorted({str(label) for label in group_labels if label}):
+        for index in range(1, max(0, int(agent_count)) + 1):
+            agent_id = f"{group_label}_API_{index:02d}"
+            if not _is_valid_persona_snapshot(store.get(agent_id)):
+                store[agent_id] = _persona_snapshot(
+                    str(session.code),
+                    group_label,
+                    agent_id,
+                )
+
+    if store != stored_value:
+        session.vars[API_AGENT_PERSONA_SESSION_VAR] = store
+    return deepcopy(store)
+
+
 def get_or_create_api_agent_persona(session, group_label: str, agent_id: str):
     stored_value = session.vars.get(API_AGENT_PERSONA_SESSION_VAR, {})
     store = deepcopy(stored_value) if isinstance(stored_value, dict) else {}
 
     existing = store.get(agent_id)
-    if isinstance(existing, dict) and existing.get("persona_version"):
+    if _is_valid_persona_snapshot(existing):
         return deepcopy(existing)
 
-    index = _stable_persona_index(str(session.code), group_label, agent_id)
-    snapshot = deepcopy(PERSONA_LIBRARY[index])
+    snapshot = _persona_snapshot(str(session.code), group_label, agent_id)
     store[agent_id] = snapshot
     session.vars[API_AGENT_PERSONA_SESSION_VAR] = store
     return deepcopy(snapshot)

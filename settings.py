@@ -68,6 +68,37 @@ SINGLE_BOTTLENECK_COMMON = dict(
     api_agent_policy_version=SINGLE_BOTTLENECK_API_AGENT_MODEL,
 )
 
+DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
+    cohort_size=0,
+    grouping_enabled=0,
+    manual_grouping_spec='',
+    dynamic_capacity_values='1,2,3',
+    dynamic_capacity_probabilities='0.3,0.5,0.2',
+    dynamic_capacity_seed=20260718,
+    dynamic_capacity_draw_mode='balanced_shuffle',
+    capacity_reveal_timing='before_decision',
+    reward_treatment_enabled=0,
+    rewarded_slot_spec='',
+    reward_bonus_points=0,
+    departure_schedule_auto_enabled=1,
+    departure_schedule_min_slots_each_side=10,
+    coarse_toll_auto_enabled=1,
+    coarse_toll_auto_min_toll=0,
+    coarse_toll_auto_max_toll=40,
+    coarse_toll_auto_toll_step=1,
+    coarse_toll_auto_mode='auto',
+    coarse_toll_auto_approx_refine_pool_size=8,
+    coarse_toll_auto_approx_refine_iterations=160,
+    coarse_toll_enabled=1,
+    coarse_toll_slot_spec='10-12',
+    coarse_toll_time_window_spec='07:53-07:55',
+    coarse_toll_points=3,
+    payoff_source_var='dynamic_bottleneck_round_total_payoff',
+    final_payoff_label='整轮随机瓶颈服务率实验',
+    payoff_source_label='dynamic_bottleneck_round 全 10 轮累计结果',
+    payoff_rounds=10,
+)
+
 SESSION_CONFIGS = [
     dict(
         name='route_choice_prod',
@@ -145,6 +176,31 @@ SESSION_CONFIGS = [
         api_agent_mode='active',
         num_demo_participants=5,
     ),
+    dict(
+        name='dynamic_bottleneck_round_prod',
+        display_name="正式实验 · 整轮随机瓶颈服务率",
+        app_sequence=['access_gate', 'dynamic_bottleneck_round', 'payment_info'],
+        doc=(
+            "用于真实被试的整轮随机瓶颈服务率实验。\n"
+            "同一小组在同一轮面对相同服务率，不同轮次按配置概率变化。\n"
+            "默认不分组、关闭奖励，并按实际人数和各候选服务率自动校准粗收费。"
+        ),
+        participant_password=PROD_PARTICIPANT_PASSWORD,
+        **DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        num_demo_participants=1,
+    ),
+    dict(
+        name='dynamic_bottleneck_round_demo',
+        display_name="演示测试 · 整轮随机瓶颈服务率",
+        app_sequence=['dynamic_bottleneck_round'],
+        doc=(
+            "用于整轮随机瓶颈服务率实验的流程走查。\n"
+            "默认使用 1、2、3 人/分钟三种状态，概率分别为 30%、50%、20%，"
+            "并启用与服务率匹配的自动粗收费。"
+        ),
+        **DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        num_demo_participants=5,
+    ),
 ]
 
 # if you set a property in SESSION_CONFIG_DEFAULTS, it will be inherited by all configs
@@ -169,6 +225,7 @@ PARTICIPANT_FIELDS = [
     'dropout_active',
     'dropout_reason',
     'has_recovered_after_disconnect',
+    'has_recovered_after_timeout',
     'finished',
 ]
 SESSION_FIELDS = []

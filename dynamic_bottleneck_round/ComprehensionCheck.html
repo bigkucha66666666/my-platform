@@ -1,0 +1,510 @@
+{{ block title }}
+    正式实验前规则测试
+{{ endblock }}
+
+{{ block global_styles }}
+    {{ super() }}
+    <style>
+        .check-shell {
+            display: grid;
+            gap: 16px;
+        }
+
+        .check-hero {
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+            border: 1px solid #d9e5dd;
+            border-radius: 22px;
+            background:
+                radial-gradient(circle at 10% 18%, rgba(32, 122, 90, 0.14), transparent 30%),
+                linear-gradient(135deg, #fffaf0 0%, #f4faf6 54%, #edf6f1 100%);
+            box-shadow: 0 18px 40px rgba(24, 49, 38, 0.08);
+        }
+
+        .check-hero::after {
+            content: "";
+            position: absolute;
+            right: -48px;
+            top: -62px;
+            width: 150px;
+            height: 150px;
+            border: 22px solid rgba(32, 122, 90, 0.09);
+            border-radius: 50%;
+        }
+
+        .check-kicker {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            color: #207a5a;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+        }
+
+        .check-kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #207a5a;
+            box-shadow: 0 0 0 5px rgba(32, 122, 90, 0.14);
+        }
+
+        .check-title {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            color: #17231f;
+            font-size: clamp(22px, 4vw, 34px);
+            line-height: 1.15;
+            font-weight: 950;
+            letter-spacing: -0.04em;
+        }
+
+        .check-note {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            margin: 10px 0 0;
+            color: #5d6d66;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .check-context {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .check-context-item,
+        .question-card {
+            border: 1px solid #dce7e0;
+            background: #ffffff;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.055);
+        }
+
+        .check-context-item {
+            min-height: 92px;
+            padding: 13px 14px;
+            border-radius: 18px;
+        }
+
+        .check-context-key {
+            margin: 0 0 5px;
+            color: #6a7a73;
+            font-size: 12px;
+            font-weight: 850;
+        }
+
+        .check-context-value {
+            margin: 0;
+            color: #17231f;
+            font-size: 15px;
+            font-weight: 950;
+            line-height: 1.45;
+        }
+
+        .check-context-cost-line {
+            display: block;
+        }
+
+        .question-card {
+            display: grid;
+            gap: 13px;
+            padding: 16px;
+            border-radius: 20px;
+        }
+
+        .question-head {
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+        }
+
+        .question-number {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            background: #17231f;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 950;
+        }
+
+        .question-title {
+            margin: 2px 0 0;
+            color: #17231f;
+            font-size: 16px;
+            font-weight: 950;
+            line-height: 1.45;
+        }
+
+        .scenario-box {
+            display: grid;
+            gap: 8px;
+            padding: 12px;
+            border: 1px solid #e5eadf;
+            border-radius: 16px;
+            background:
+                linear-gradient(135deg, rgba(255, 248, 231, 0.88), rgba(246, 251, 247, 0.92));
+        }
+
+        .scenario-label {
+            margin: 0;
+            color: #9a5a17;
+            font-size: 12px;
+            font-weight: 950;
+            letter-spacing: 0.06em;
+        }
+
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .scenario-chip {
+            border-radius: 12px;
+            padding: 9px 10px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(217, 229, 221, 0.9);
+        }
+
+        .scenario-chip b {
+            display: block;
+            margin-bottom: 2px;
+            color: #65756f;
+            font-size: 11px;
+            font-weight: 850;
+        }
+
+        .scenario-chip span {
+            color: #17231f;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .answer-options {
+            display: grid;
+            gap: 8px;
+        }
+
+        .answer-option {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 11px 12px;
+            border: 1px solid #e2e8e4;
+            border-radius: 14px;
+            background: #f8fbf9;
+            color: #33443e;
+            cursor: pointer;
+            transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+
+        .answer-option:hover {
+            transform: translateY(-1px);
+            border-color: #b9d5c4;
+            background: #f2faf5;
+        }
+
+        .answer-option input {
+            margin-top: 4px;
+        }
+
+        .answer-option span {
+            line-height: 1.5;
+        }
+
+        .answer-feedback {
+            display: none;
+            margin: 0;
+            padding: 11px 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .question-card.is-correct .answer-feedback {
+            display: block;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .question-card.is-wrong .answer-feedback,
+        .question-card.is-missing .answer-feedback {
+            display: block;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+
+        .check-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            padding: 14px;
+            border: 1px solid #dce7e0;
+            border-radius: 18px;
+            background: #ffffff;
+        }
+
+        .check-button {
+            border: 0;
+            border-radius: 12px;
+            background: #17231f;
+            color: #ffffff;
+            padding: 10px 15px;
+            font-weight: 950;
+        }
+
+        .check-status {
+            margin: 0;
+            color: #5d6d66;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .comprehension-next:disabled {
+            cursor: not-allowed;
+            opacity: 0.45;
+        }
+
+        @media (max-width: 760px) {
+            .check-context,
+            .scenario-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 575px) {
+            .check-context,
+            .scenario-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .check-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .check-button,
+            .comprehension-next {
+                width: 100%;
+            }
+        }
+    </style>
+{{ endblock }}
+
+{{ block content }}
+    <div class="check-shell">
+        <section class="check-hero">
+            <div class="check-kicker">正式实验前确认</div>
+            <p class="check-title">请完成 4 个场景题</p>
+            <p class="check-note">
+                这些题只用于确认你理解成本计算，不计入正式实验结果，也不会进入后台导出。
+                点击“检查答案”后会显示计算过程；无论答对多少题，阅读解释后都可以进入第 1 轮正式选择。
+            </p>
+        </section>
+
+        <section class="check-context" aria-label="规则速记">
+            <div class="check-context-item">
+                <p class="check-context-key">目标到达</p>
+                <p class="check-context-value">{{ preferred_arrival_time }}</p>
+            </div>
+            <div class="check-context-item">
+                <p class="check-context-key">单位时间成本</p>
+                <p class="check-context-value">
+                    <span class="check-context-cost-line">排队：{{ queue_cost_per_minute }} </span>
+                    <span class="check-context-cost-line">早到：{{ early_cost_per_minute }} </span>
+                    <span class="check-context-cost-line">晚到：{{ late_cost_per_minute }} </span>
+                </p>
+            </div>
+            <div class="check-context-item">
+                <p class="check-context-key">收费处理</p>
+                <p class="check-context-value">{{ coarse_toll_description }}</p>
+            </div>
+        </section>
+
+        <section class="question-card" data-correct="b">
+            <div class="question-head">
+                <span class="question-number">1</span>
+                <p class="question-title">场景一：如果你的排队时间为 {{ example_queue_minutes }} 分钟，出行时间成本是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>排队时间</b><span>{{ example_queue_minutes }} 分钟</span></div>
+                    <div class="scenario-chip"><b>排队单位时间成本</b><span>{{ queue_cost_per_minute }} </span></div>
+                    <div class="scenario-chip"><b>公式</b><span>排队时间 ✖️ 单位排队时间成本</span></div>
+                    <div class="scenario-chip"><b>只问</b><span>出行时间成本</span></div>
+                </div>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q1" value="a">
+                    <span>4 成本</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q1" value="b">
+                    <span>{{ example_queue_cost }} 成本</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q1" value="c">
+                    <span>12 成本</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本。" data-wrong-text="请重新看计算：排队成本 = {{ example_queue_minutes }} 分钟 × {{ queue_cost_per_minute }} = {{ example_queue_cost }} 成本。"></p>
+        </section>
+
+        <section class="question-card" data-correct="a">
+            <div class="question-head">
+                <span class="question-number">2</span>
+                <p class="question-title">场景二：如果目标到达时间是 08:00,你实际 07:57 到达，早到成本是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>目标到达</b><span>08:00</span></div>
+                    <div class="scenario-chip"><b>实际到达</b><span>07:57</span></div>
+                    <div class="scenario-chip"><b>早到单位时间成本</b><span>{{ early_cost_per_minute }} </span></div>
+                    <div class="scenario-chip"><b>只问</b><span>早到成本</span></div>
+                </div>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q2" value="a">
+                    <span>{{ example_early_cost }} 成本</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q2" value="b">
+                    <span>6 成本</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q2" value="c">
+                    <span>9 成本</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本。" data-wrong-text="请重新看计算：07:57 比 08:00 早到 {{ example_early_minutes }} 分钟，早到成本 = {{ example_early_minutes }} 分钟 × {{ early_cost_per_minute }} = {{ example_early_cost }} 成本。"></p>
+        </section>
+
+        <section class="question-card" data-correct="c">
+            <div class="question-head">
+                <span class="question-number">3</span>
+                <p class="question-title">场景三：如果你和同组其他人共 {{ example_same_departure_people }} 人都在 {{ example_departure_time }} 出发，系统给这个出发时间的统一到达 B 点时间是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>出发时间</b><span>{{ example_departure_time }}</span></div>
+                    <div class="scenario-chip"><b>固定行驶时间</b><span>{{ free_flow_travel_minutes }} 分钟</span></div>
+                    <div class="scenario-chip"><b>同一时间人数</b><span>{{ example_same_departure_people }} 人</span></div>
+                    <div class="scenario-chip"><b>瓶颈服务率</b><span>{{ example_capacity_window_minutes }} 分钟通过 {{ example_capacity_per_slot }} 人</span></div>
+                </div>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q3" value="a">
+                    <span>{{ example_arrival_without_queue_time }}</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q3" value="b">
+                    <span>{{ example_arrival_with_short_wait_time }}</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q3" value="c">
+                    <span>{{ example_arrival_time }}</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。瓶颈每 {{ example_capacity_window_minutes }} 分钟通过 {{ example_capacity_per_slot }} 人，{{ example_same_departure_people }} 人同一时间出发时，该出发时间组统一等待 {{ example_same_departure_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_same_departure_wait_minutes }} = {{ example_arrival_time }}。" data-wrong-text="请重新看计算：瓶颈每 {{ example_capacity_window_minutes }} 分钟通过 {{ example_capacity_per_slot }} 人，{{ example_same_departure_people }} 人同一时间出发时，该出发时间组统一等待 {{ example_same_departure_wait_minutes }} 分钟；预计到达 = {{ example_departure_time }} + {{ free_flow_travel_minutes }} + {{ example_same_departure_wait_minutes }} = {{ example_arrival_time }}。"></p>
+        </section>
+
+
+        <section class="question-card" data-correct="c">
+            <div class="question-head">
+                <span class="question-number">4</span>
+                <p class="question-title">场景四：同一小组、同一轮的所有参与者面对的瓶颈服务率是否相同？如果某出发时间原有成本为 10，且标注粗收费 {{ example_toll }}，最终选择成本是多少？</p>
+            </div>
+            <div class="scenario-box">
+                <p class="scenario-label">已知条件</p>
+                <div class="scenario-grid">
+                    <div class="scenario-chip"><b>服务率规则</b><span>同一轮统一确定</span></div>
+                    <div class="scenario-chip"><b>原有成本</b><span>10 成本</span></div>
+                    <div class="scenario-chip"><b>粗收费</b><span>{{ example_toll }} 成本</span></div>
+                    <div class="scenario-chip"><b>计算方式</b><span>原有成本 + 粗收费</span></div>
+                </div>
+            </div>
+            <div class="answer-options">
+                <label class="answer-option">
+                    <input type="radio" name="q4" value="a">
+                    <span>服务率因人而异，最终选择成本仍为 10</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q4" value="b">
+                    <span>服务率相同，但粗收费不计入最终选择成本</span>
+                </label>
+                <label class="answer-option">
+                    <input type="radio" name="q4" value="c">
+                    <span>服务率相同，最终选择成本为 {{ example_total_with_toll }}</span>
+                </label>
+            </div>
+            <p class="answer-feedback" data-correct-text="正确。同一小组、同一轮的所有参与者面对相同服务率；最终选择成本 = 原有成本 10 + 粗收费 {{ example_toll }} = {{ example_total_with_toll }}。" data-wrong-text="请重新看规则：同一小组、同一轮的所有参与者面对相同服务率；标注的粗收费会直接加入最终选择成本，因此结果为 {{ example_total_with_toll }}。"></p>
+        </section>
+
+        <div class="check-actions">
+            <button class="check-button" type="button" id="check-answers">检查答案</button>
+            <button class="otree-btn-next btn btn-primary comprehension-next" id="comprehension-next" disabled>进入正式实验</button>
+            <p class="check-status" id="check-status">请先完成 4 个场景题，并点击“检查答案”。</p>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var checkButton = document.getElementById('check-answers');
+            var nextButton = document.getElementById('comprehension-next');
+            var statusEl = document.getElementById('check-status');
+            var cards = Array.prototype.slice.call(document.querySelectorAll('.question-card'));
+
+            checkButton.addEventListener('click', function () {
+                var correctCount = 0;
+                cards.forEach(function (card) {
+                    var correct = card.getAttribute('data-correct');
+                    var checked = card.querySelector('input[type="radio"]:checked');
+                    var feedback = card.querySelector('.answer-feedback');
+                    card.classList.remove('is-correct', 'is-wrong', 'is-missing');
+
+                    if (!checked) {
+                        card.classList.add('is-missing');
+                        feedback.textContent = '这题尚未选择。' + feedback.getAttribute('data-wrong-text');
+                        return;
+                    }
+
+                    if (checked.value === correct) {
+                        correctCount += 1;
+                        card.classList.add('is-correct');
+                        feedback.textContent = feedback.getAttribute('data-correct-text');
+                        return;
+                    }
+
+                    card.classList.add('is-wrong');
+                    feedback.textContent = feedback.getAttribute('data-wrong-text');
+                });
+
+                nextButton.disabled = false;
+                statusEl.textContent = '你答对 ' + correctCount + ' / ' + cards.length + ' 题。请阅读计算过程后进入正式实验。';
+            });
+        })();
+    </script>
+{{ endblock }}

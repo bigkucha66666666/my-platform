@@ -1,4 +1,5 @@
 from math import ceil
+from pathlib import Path
 from types import SimpleNamespace
 import unittest
 
@@ -13,12 +14,14 @@ from . import (
     Introduction,
     Results,
     ResultsSync,
+    UnifiedStartWait,
     build_auto_group_matrix,
     choice_cost_components_for_agent_decision,
     choice_cost_components_for_player,
     departure_minute_for_player_slot,
     departure_slots_for_player,
     player_departure_minute,
+    page_sequence,
 )
 
 
@@ -33,6 +36,37 @@ class ServiceRateTests(unittest.TestCase):
     def test_default_service_rate_is_two_cars_per_one_minute(self):
         self.assertEqual(C.DEFAULT_BOTTLENECK_CAPACITY_PER_SLOT, 2)
         self.assertEqual(C.SLOT_SIZE_MINUTES, 1)
+
+
+class UnifiedStartTests(unittest.TestCase):
+    def test_wait_page_is_session_wide_and_precedes_first_decision(self):
+        page_names = [page.__name__ for page in page_sequence]
+
+        self.assertIn('UnifiedStartWait', page_names)
+        wait_index = page_names.index('UnifiedStartWait')
+        self.assertEqual(wait_index, page_names.index('ComprehensionCheck') + 1)
+        self.assertEqual(page_names.index('Decision'), wait_index + 1)
+        self.assertTrue(page_sequence[wait_index].wait_for_all_groups)
+
+    def test_wait_page_explains_the_unified_start(self):
+        template_path = Path('single_bottleneck/UnifiedStartWait.html')
+
+        self.assertTrue(template_path.exists())
+        template = template_path.read_text(encoding='utf-8')
+        self.assertIn('正在等待所有参与者', template)
+        self.assertIn('将同时进入第 1 轮', template)
+        self.assertIn('选择计时尚未开始', template)
+
+    def test_release_initializes_each_group_deadline(self):
+        groups = [
+            SimpleNamespace(decision_deadline_ts=0, round_number=1),
+            SimpleNamespace(decision_deadline_ts=0, round_number=1),
+        ]
+        subsession = SimpleNamespace(get_groups=lambda: groups)
+
+        UnifiedStartWait.after_all_players_arrive(subsession)
+
+        self.assertTrue(all(group.decision_deadline_ts > 0 for group in groups))
 
 
 class AgentResultCostTests(unittest.TestCase):
@@ -58,6 +92,7 @@ class PlayerBot(Bot):
 
     def play_round(self):
         if self.round_number == 1:
+            expect(UnifiedStartWait.is_displayed(self.player), '==', True)
             expect('单瓶颈示意', 'in', self.html)
             expect('居住地', 'in', self.html)
             expect('单一瓶颈', 'in', self.html)
@@ -105,6 +140,8 @@ class PlayerBot(Bot):
             if self.session.config.get('coarse_toll_auto_enabled'):
                 auto_toll_result = self.participant.vars.get(COARSE_TOLL_AUTO_RESULT_VAR, {})
                 expect(auto_toll_result.get('calibration_source'), '==', 'cache')
+        else:
+            expect(UnifiedStartWait.is_displayed(self.player), '==', False)
 
         available_slots = departure_slots_for_player(self.player)
         if self.case == 'same_time':

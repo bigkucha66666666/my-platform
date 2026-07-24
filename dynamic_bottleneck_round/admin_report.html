@@ -1,0 +1,15 @@
+<h3>整轮随机瓶颈服务率报告</h3>
+<style>
+  .dynamic-report{display:grid;gap:18px}.report-meta{padding:12px 14px;border-left:4px solid #267b86;background:#edf7f5}.report-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}.report-card{overflow:auto;border:1px solid #cad9dd;background:#fff}.report-card h4{margin:0;padding:12px 14px;background:#1d3948;color:#fff;font-size:15px}.report-table{width:100%;border-collapse:collapse;font-size:13px}.report-table th,.report-table td{padding:8px 10px;border-bottom:1px solid #e1e8e9;text-align:left;white-space:nowrap}.report-table th{background:#edf3f3;color:#435c64}.report-table td:last-child{white-space:normal;min-width:180px}@media(max-width:900px){.report-grid{grid-template-columns:1fr}}
+</style>
+<div class="dynamic-report">
+  <div class="report-meta">Session Code：<strong>{{ session_code }}</strong></div>
+  <div class="report-grid">
+    <section class="report-card"><h4>各轮小组结果</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>服务率</th><th>状态</th><th>目标比例/概率</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>出发时间分布</th></tr></thead><tbody>
+      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.dynamic_capacity_state }}</td><td>{{ row.capacity_probability }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
+    </tbody></table></section>
+    <section class="report-card"><h4>服务率状态出现次数</h4><table class="report-table"><thead><tr><th>状态</th><th>出现次数</th></tr></thead><tbody>
+      {{ for row in state_rows }}<tr><td>{{ row.state }}</td><td>{{ row.count }}</td></tr>{{ endfor }}
+    </tbody></table></section>
+  </div>
+</div>

@@ -1,0 +1,462 @@
+<style>
+  .design-intro {
+    max-width: 980px;
+    margin: 0 auto 22px;
+  }
+
+  .design-intro h2 {
+    margin-bottom: 6px;
+  }
+
+  .direction-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  .direction-card {
+    overflow: hidden;
+    border: 2px solid #dbe5e8;
+    border-radius: 20px;
+    background: #f7faf9;
+    cursor: pointer;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+
+  .direction-card:hover {
+    transform: translateY(-3px);
+    border-color: #78a9ae;
+    box-shadow: 0 16px 36px rgba(28, 69, 75, .12);
+  }
+
+  .direction-card.selected {
+    border-color: #16808a;
+    box-shadow: 0 0 0 4px rgba(22, 128, 138, .12);
+  }
+
+  .direction-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px 13px;
+    border-bottom: 1px solid #dce7e8;
+    background: #fff;
+  }
+
+  .direction-letter {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 50%;
+    background: #173e4a;
+    color: #fff;
+    font-weight: 900;
+  }
+
+  .direction-label h3 {
+    margin: 0;
+    color: #17333c;
+    font-size: 17px;
+  }
+
+  .direction-label p {
+    margin: 2px 0 0;
+    color: #698087;
+    font-size: 12px;
+  }
+
+  .screen {
+    padding: 18px;
+    color: #19343c;
+    font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  }
+
+  .screen + .screen {
+    border-top: 1px dashed #cddbdd;
+  }
+
+  .screen-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    color: #6d8489;
+  }
+
+  .round-pill {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: #173e4a;
+    color: #fff;
+    letter-spacing: 0;
+  }
+
+  .capacity-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 80px;
+    padding: 14px 16px;
+    overflow: hidden;
+    border-radius: 15px;
+    background: #fff4e2;
+    box-shadow: inset 0 0 0 1px #ecd6b4;
+  }
+
+  .capacity-card strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 22px;
+  }
+
+  .capacity-card small {
+    color: #7b6b58;
+  }
+
+  .road-scene {
+    display: flex;
+    align-items: center;
+    width: 126px;
+    height: 50px;
+    padding: 0 8px;
+    border-radius: 28px 8px 8px 28px;
+    background:
+      linear-gradient(90deg, transparent 0 8%, #fff 8% 20%, transparent 20% 34%, #fff 34% 46%, transparent 46% 60%, #fff 60% 72%, transparent 72%) center / 100% 2px no-repeat,
+      #42535b;
+  }
+
+  .car-icon {
+    width: 38px;
+    height: 24px;
+    color: #ef8b38;
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .18));
+  }
+
+  .picker {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(31, 64, 71, .08), inset 0 0 0 1px #d8e5e6;
+  }
+
+  .picker-head,
+  .result-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .picker-head span {
+    font-size: 26px;
+    font-weight: 950;
+    color: #147b83;
+  }
+
+  .wheel {
+    display: grid;
+    grid-template-columns: 32px 1fr 32px;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .arrow {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 50%;
+    background: #e8f3f2;
+    color: #166b73;
+    font-weight: 900;
+  }
+
+  .wheel-list {
+    padding: 7px;
+    border-radius: 14px;
+    background: #edf4f3;
+  }
+
+  .wheel-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 7px 10px;
+    color: #74888d;
+    font-size: 12px;
+  }
+
+  .wheel-row.active {
+    align-items: center;
+    border-radius: 10px;
+    background: #173e4a;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 900;
+  }
+
+  .wheel-row.active em {
+    padding: 3px 6px;
+    border-radius: 999px;
+    background: #f6a453;
+    color: #263b40;
+    font-style: normal;
+    font-size: 10px;
+  }
+
+  .submit {
+    width: 100%;
+    margin-top: 12px;
+    padding: 11px;
+    border-radius: 12px;
+    background: #16808a;
+    color: #fff;
+    text-align: center;
+    font-weight: 900;
+  }
+
+  .result-card {
+    overflow: hidden;
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(31, 64, 71, .08), inset 0 0 0 1px #d8e5e6;
+  }
+
+  .result-head {
+    padding: 15px 16px;
+    background: linear-gradient(125deg, #edf7f5, #fff);
+  }
+
+  .result-number {
+    font-size: 38px;
+    font-weight: 950;
+    color: #d95d4f;
+  }
+
+  .capacity-chip {
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: #173e4a;
+    color: #fff;
+    text-align: right;
+    font-size: 11px;
+  }
+
+  .capacity-chip strong {
+    display: block;
+    font-size: 16px;
+  }
+
+  .journey {
+    padding: 16px;
+  }
+
+  .journey-labels,
+  .journey-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .journey-track {
+    position: relative;
+    height: 12px;
+    margin: 20px 8px 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #278995 0 70%, #e9a14a 70%);
+  }
+
+  .journey-car {
+    position: absolute;
+    right: 25%;
+    bottom: 7px;
+    width: 32px;
+    color: #173e4a;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .metric {
+    padding: 9px 10px;
+    border-radius: 11px;
+    background: #f1f6f5;
+    font-size: 11px;
+  }
+
+  .metric strong {
+    display: block;
+    margin-top: 2px;
+    font-size: 15px;
+  }
+
+  /* Direction B */
+  .direction-b .screen {
+    background: #f3f6f9;
+  }
+
+  .direction-b .capacity-card {
+    border-radius: 11px;
+    background: #e8f0f8;
+    box-shadow: inset 0 0 0 1px #c8d8e5;
+  }
+
+  .direction-b .picker,
+  .direction-b .result-card {
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px #cbd9e2;
+  }
+
+  .direction-b .wheel-list {
+    background: #f3f6f9;
+  }
+
+  .direction-b .wheel-row.active,
+  .direction-b .round-pill,
+  .direction-b .capacity-chip {
+    background: #315b79;
+  }
+
+  .direction-b .submit {
+    border-radius: 9px;
+    background: #315b79;
+  }
+
+  .direction-b .journey-track {
+    height: 8px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #4a83a3 0 70%, #dba252 70%);
+  }
+
+  .direction-b .metric {
+    border-radius: 8px;
+    background: #edf2f6;
+  }
+
+  @media (max-width: 820px) {
+    .direction-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="design-intro">
+  <h2>动态瓶颈：选择页与结果页视觉方向</h2>
+  <p class="subtitle">两版都不改变信息和实验逻辑。点击一版进行选择。</p>
+</div>
+
+<div class="direction-grid">
+  <article class="direction-card" data-choice="a" onclick="toggleSelect(this)">
+    <header class="direction-label">
+      <span class="direction-letter">A</span>
+      <div>
+        <h3>柔和通勤场景（推荐）</h3>
+        <p>圆润卡片、暖色服务率提示、车辆参与时间与行程表达</p>
+      </div>
+    </header>
+
+    <div class="screen">
+      <div class="screen-title"><span>选择页</span><span class="round-pill">第 3 / 10 轮</span></div>
+      <div class="capacity-card">
+        <div><small>本轮瓶颈服务率</small><strong>2 人 / 1 分钟</strong><small>本轮所有参与者相同</small></div>
+        <div class="road-scene">
+          <svg class="car-icon" viewBox="0 0 64 40" aria-hidden="true"><path fill="currentColor" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/><path fill="currentColor" d="M8 25h48v8H8z"/><circle cx="18" cy="33" r="5" fill="#203c45"/><circle cx="46" cy="33" r="5" fill="#203c45"/><path d="M22 14h19l2 7H19l3-7Z" fill="#d8f0f0"/></svg>
+        </div>
+      </div>
+      <div class="picker">
+        <div class="picker-head"><strong>选择出发时间</strong><span>07:54</span></div>
+        <div class="wheel">
+          <span class="arrow">‹</span>
+          <div class="wheel-list">
+            <div class="wheel-row"><span>07:53</span><span>无收费</span></div>
+            <div class="wheel-row active"><span>07:54</span><em>收费 3</em></div>
+            <div class="wheel-row"><span>07:55</span><span>收费 3</span></div>
+          </div>
+          <span class="arrow">›</span>
+        </div>
+        <div class="submit">提交本轮选择</div>
+      </div>
+    </div>
+
+    <div class="screen">
+      <div class="screen-title"><span>结果页</span><span class="round-pill">本轮结果</span></div>
+      <div class="result-card">
+        <div class="result-head">
+          <div><small>本轮最终选择成本</small><div class="result-number">14</div></div>
+          <div class="capacity-chip">本轮服务率<strong>2 人 / 1 分钟</strong></div>
+        </div>
+        <div class="journey">
+          <div class="journey-labels"><span>A · 07:54 出发</span><span>B · 08:02 到达</span></div>
+          <div class="journey-track">
+            <svg class="journey-car" viewBox="0 0 64 40" aria-hidden="true"><path fill="currentColor" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/><path fill="currentColor" d="M8 25h48v8H8z"/><circle cx="18" cy="33" r="5" fill="#1c3339"/><circle cx="46" cy="33" r="5" fill="#1c3339"/></svg>
+          </div>
+          <div class="journey-meta"><span>固定行驶 6 分钟</span><span>排队 2 分钟</span></div>
+          <div class="metrics"><div class="metric">同分钟人数<strong>3 人</strong></div><div class="metric">总行程时间<strong>8 分钟</strong></div></div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="direction-card direction-b" data-choice="b" onclick="toggleSelect(this)">
+    <header class="direction-label">
+      <span class="direction-letter">B</span>
+      <div>
+        <h3>理性交通仪表盘</h3>
+        <p>更克制的蓝灰色、轻圆角、车辆只作为行程位置标记</p>
+      </div>
+    </header>
+
+    <div class="screen">
+      <div class="screen-title"><span>选择页</span><span class="round-pill">第 3 / 10 轮</span></div>
+      <div class="capacity-card">
+        <div><small>本轮瓶颈服务率</small><strong>2 人 / 1 分钟</strong><small>本轮所有参与者相同</small></div>
+        <div class="road-scene">
+          <svg class="car-icon" viewBox="0 0 64 40" aria-hidden="true"><path fill="currentColor" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/><path fill="currentColor" d="M8 25h48v8H8z"/><circle cx="18" cy="33" r="5" fill="#203c45"/><circle cx="46" cy="33" r="5" fill="#203c45"/><path d="M22 14h19l2 7H19l3-7Z" fill="#d8f0f0"/></svg>
+        </div>
+      </div>
+      <div class="picker">
+        <div class="picker-head"><strong>选择出发时间</strong><span>07:54</span></div>
+        <div class="wheel">
+          <span class="arrow">‹</span>
+          <div class="wheel-list">
+            <div class="wheel-row"><span>07:53</span><span>无收费</span></div>
+            <div class="wheel-row active"><span>07:54</span><em>收费 3</em></div>
+            <div class="wheel-row"><span>07:55</span><span>收费 3</span></div>
+          </div>
+          <span class="arrow">›</span>
+        </div>
+        <div class="submit">提交本轮选择</div>
+      </div>
+    </div>
+
+    <div class="screen">
+      <div class="screen-title"><span>结果页</span><span class="round-pill">本轮结果</span></div>
+      <div class="result-card">
+        <div class="result-head">
+          <div><small>本轮最终选择成本</small><div class="result-number">14</div></div>
+          <div class="capacity-chip">本轮服务率<strong>2 人 / 1 分钟</strong></div>
+        </div>
+        <div class="journey">
+          <div class="journey-labels"><span>A · 07:54 出发</span><span>B · 08:02 到达</span></div>
+          <div class="journey-track">
+            <svg class="journey-car" viewBox="0 0 64 40" aria-hidden="true"><path fill="currentColor" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/><path fill="currentColor" d="M8 25h48v8H8z"/><circle cx="18" cy="33" r="5" fill="#1c3339"/><circle cx="46" cy="33" r="5" fill="#1c3339"/></svg>
+          </div>
+          <div class="journey-meta"><span>固定行驶 6 分钟</span><span>排队 2 分钟</span></div>
+          <div class="metrics"><div class="metric">同分钟人数<strong>3 人</strong></div><div class="metric">总行程时间<strong>8 分钟</strong></div></div>
+        </div>
+      </div>
+    </div>
+  </article>
+</div>

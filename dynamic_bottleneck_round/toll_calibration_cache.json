@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "same_time_queue_rule": "batch_max_wait",
+  "toll_window_rule": "symmetric_continuous",
+  "records": []
+}

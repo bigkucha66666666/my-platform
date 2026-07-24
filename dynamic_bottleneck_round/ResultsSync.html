@@ -1,0 +1,23 @@
+{{ block title }}正在汇总本轮决策{{ endblock }}
+
+{{ block content }}
+<style>
+  .sync-panel{position:relative;overflow:hidden;padding:28px;border:1px solid #c8d8dc;border-radius:8px;background:linear-gradient(135deg,#eef7f5,#fbfdfc);color:#172b3a}
+  .sync-panel::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:#267b86}.sync-kicker{margin:0 0 8px;color:#267b86;font-size:12px;font-weight:900;letter-spacing:.1em}.sync-title{margin:0;font-size:25px}.sync-copy{margin:10px 0 18px;color:#60727b;line-height:1.7}.sync-track{height:7px;overflow:hidden;background:#dce8e8}.sync-track span{display:block;width:36%;height:100%;background:#267b86;animation:syncMove 1.4s ease-in-out infinite alternate}@keyframes syncMove{to{transform:translateX(178%)}}
+</style>
+<div class="sync-panel" id="sync-panel" data-ready="{{ if results_ready }}1{{ else }}0{{ endif }}" data-poll="{{ poll_interval_ms }}" data-delay="{{ auto_continue_delay_ms }}">
+  <p class="sync-kicker">GROUP SYNCHRONIZATION</p>
+  <h3 class="sync-title">等待同组参与者</h3>
+  <p class="sync-copy">系统会在同组决策齐全后使用本轮服务率统一计算结果。当前预计还需等待 {{ remaining_seconds }} 秒。</p>
+  <div class="sync-track"><span></span></div>
+</div>
+<button class="otree-btn-next btn btn-primary" id="sync-next" hidden>查看本轮结果</button>
+<script>
+  (function(){
+    const panel=document.getElementById('sync-panel');
+    const ready=panel.dataset.ready==='1';
+    if(ready){setTimeout(function(){document.getElementById('sync-next').click();},Number(panel.dataset.delay)||200);return;}
+    setTimeout(function(){window.location.reload();},Number(panel.dataset.poll)||3000);
+  })();
+</script>
+{{ endblock }}

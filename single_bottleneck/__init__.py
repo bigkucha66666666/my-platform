@@ -2537,6 +2537,19 @@ class ComprehensionCheck(Page):
         player.participant.vars[COMPREHENSION_SEEN_VAR] = True
 
 
+class UnifiedStartWait(WaitPage):
+    wait_for_all_groups = True
+
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == 1 and access_allowed(player)
+
+    @staticmethod
+    def after_all_players_arrive(subsession: Subsession):
+        for group in subsession.get_groups():
+            ensure_decision_deadline(group)
+
+
 class Decision(Page):
     form_model = 'player'
     form_fields = ['departure_minute']
@@ -2730,4 +2743,11 @@ def custom_export(players):
         yield export_row_for_agent_decision(decision)
 
 
-page_sequence = [Introduction, ComprehensionCheck, Decision, ResultsSync, Results]
+page_sequence = [
+    Introduction,
+    ComprehensionCheck,
+    UnifiedStartWait,
+    Decision,
+    ResultsSync,
+    Results,
+]

@@ -1,0 +1,135 @@
+{{ block title }}
+    等待统一开始
+{{ endblock }}
+
+{{ block content }}
+    <style>
+        .unified-start-shell {
+            display: grid;
+            gap: 18px;
+            padding: 8px 4px 4px;
+            color: #20313b;
+        }
+
+        .unified-start-status {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 14px;
+            align-items: center;
+            padding: 18px;
+            border: 1px solid #bfd4d8;
+            border-radius: 10px;
+            background: #f4f9f9;
+        }
+
+        .unified-start-signal {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border: 1px solid #8db7bf;
+            border-radius: 50%;
+            background: #ffffff;
+        }
+
+        .unified-start-signal::before,
+        .unified-start-signal::after {
+            content: "";
+            position: absolute;
+            inset: 50% auto auto 50%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .unified-start-signal::before {
+            width: 14px;
+            height: 14px;
+            background: #23778a;
+        }
+
+        .unified-start-signal::after {
+            width: 28px;
+            height: 28px;
+            border: 2px solid rgba(35, 119, 138, 0.34);
+            animation: unified-start-pulse 1.8s ease-out infinite;
+        }
+
+        .unified-start-heading {
+            margin: 0;
+            color: #173a46;
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .unified-start-copy {
+            margin: 5px 0 0;
+            color: #526970;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .unified-start-timing {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-left: 3px solid #d28a2d;
+            background: #fffaf1;
+            color: #58452b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .unified-start-timing strong {
+            color: #3d3020;
+        }
+
+        .otree-wait-page .progress {
+            height: 7px;
+            margin-top: 18px;
+            border-radius: 0;
+            background: #e4edef;
+        }
+
+        .otree-wait-page .progress-bar {
+            background-color: #23778a;
+        }
+
+        @keyframes unified-start-pulse {
+            0% {
+                opacity: 0.75;
+                transform: translate(-50%, -50%) scale(0.72);
+            }
+            80%,
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+        }
+
+        @media (max-width: 575px) {
+            .unified-start-status {
+                grid-template-columns: 1fr;
+                padding: 15px;
+            }
+        }
+    </style>
+
+    <div class="unified-start-shell">
+        <section class="unified-start-status" aria-label="正式实验统一开始状态">
+            <span class="unified-start-signal" aria-hidden="true"></span>
+            <div>
+                <p class="unified-start-heading">正在等待所有参与者</p>
+                <p class="unified-start-copy">
+                    全部参与者到达本页后，系统将同时进入第 1 轮出发时间选择。
+                    请保持本页打开。
+                </p>
+            </div>
+        </section>
+
+        <div class="unified-start-timing">
+            <span aria-hidden="true">●</span>
+            <span><strong>选择计时尚未开始。</strong>统一放行后，每位参与者都将获得完整的本轮选择时间。</span>
+        </div>
+    </div>
+{{ endblock }}

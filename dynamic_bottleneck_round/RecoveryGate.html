@@ -1,0 +1,30 @@
+{{ block title }}重新加入实验{{ endblock }}
+
+{{ block content }}
+<style>
+  .recovery-shell{--ink:#172b3a;--muted:#60727b;--line:#c8d8dc;--teal:#267b86;max-width:760px;margin:0 auto;border:1px solid var(--line);border-radius:8px;background:#f8fbfa;overflow:hidden}
+  .recovery-head{padding:24px 26px;background:#1d3948;color:#fff}.recovery-kicker{margin:0 0 7px;color:#a9d8dc;font-size:12px;font-weight:900;letter-spacing:.08em}.recovery-head h3{margin:0;font-size:26px}.recovery-body{padding:24px 26px;color:var(--ink)}
+  .recovery-copy{margin:0 0 18px;color:var(--muted);line-height:1.75}.recovery-facts{display:grid;grid-template-columns:1fr 1fr;margin:0 0 20px;border:1px solid var(--line);background:#fff}.recovery-fact{padding:14px 16px}.recovery-fact+ .recovery-fact{border-left:1px solid var(--line)}.recovery-fact span{display:block;color:var(--muted);font-size:12px}.recovery-fact strong{display:block;margin-top:4px;font-size:18px}
+  .recovery-note{margin:0 0 22px;padding:12px 14px;border-left:4px solid var(--teal);background:#eaf4f3;color:#334d56;line-height:1.65}.recovery-action{display:flex;align-items:center;justify-content:space-between;gap:16px}.recovery-action small{color:var(--muted)}
+  @media(max-width:600px){.recovery-head,.recovery-body{padding:20px 18px}.recovery-facts{grid-template-columns:1fr}.recovery-fact+ .recovery-fact{border-left:0;border-top:1px solid var(--line)}.recovery-action{display:block}.recovery-action small{display:block;margin-bottom:14px}}
+</style>
+
+<section class="recovery-shell">
+  <header class="recovery-head">
+    <p class="recovery-kicker">PARTICIPANT RECOVERY</p>
+    <h3>实验流程已暂停</h3>
+  </header>
+  <div class="recovery-body">
+    <p class="recovery-copy">系统检测到本轮未完成有效提交。为避免无人操作的页面持续自动进入后续轮次，请确认你已经返回实验。</p>
+    <div class="recovery-facts">
+      <div class="recovery-fact"><span>当前轮次</span><strong>第 {{ round_number }} 轮</strong></div>
+      <div class="recovery-fact"><span>记录原因</span><strong>{{ recovery_reason_label }}</strong></div>
+    </div>
+    <p class="recovery-note">本轮自动选择为 <strong>{{ automatic_departure_time }}</strong>，该选择已经进入组内计算，恢复后不能修改。下一轮开始时，你将重新获得完整决策时间。</p>
+    <div class="recovery-action">
+      <small>此页面不会自动跳转。</small>
+      <button class="otree-btn-next btn btn-primary">重新加入实验</button>
+    </div>
+  </div>
+</section>
+{{ endblock }}

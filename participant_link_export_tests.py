@@ -70,6 +70,14 @@ class ParticipantLinkExportTests(unittest.TestCase):
         self.assertIn("{{ static 'single_bottleneck/Bottleneck3DDemo.html' }}", template)
         self.assertTrue(Path('_static/single_bottleneck/Bottleneck3DDemo.html').exists())
 
+    def test_single_bottleneck_admin_report_links_unified_start_control(self):
+        template = Path('single_bottleneck/admin_report.html').read_text(encoding='utf-8')
+
+        self.assertIn('open-unified-start-control', template)
+        self.assertIn('/SessionMonitor/', template)
+        self.assertIn('推进最慢参与者', template)
+        self.assertIn('可能需要多次操作', template)
+
 
 if __name__ == '__main__':
     unittest.main()

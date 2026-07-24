@@ -1,0 +1,646 @@
+{{ block title }}
+    开始前最后提醒
+{{ endblock }}
+
+{{ block global_styles }}
+    {{ super() }}
+    <style>
+        .intro-shell {
+            display: grid;
+            gap: 16px;
+        }
+
+        .intro-hero,
+        .route-demo-card,
+        .process-card,
+        .confirm-card {
+            border: 1px solid #dbe5f0;
+            background: #ffffff;
+            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.07);
+        }
+
+        .capacity-state-panel {
+            margin: 0 16px 16px;
+            padding: 14px;
+            border: 1px solid #dbe5f0;
+            border-radius: 16px;
+            background: #f8fafc;
+        }
+
+        .capacity-state-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .capacity-state-title {
+            margin: 0;
+            color: #172033;
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .capacity-state-note {
+            margin: 0;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .capacity-state-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+        }
+
+        .capacity-state-item {
+            display: grid;
+            gap: 3px;
+            padding: 10px 11px;
+            border: 1px solid #cfdae6;
+            border-radius: 12px;
+            background: #ffffff;
+        }
+
+        .capacity-state-item strong {
+            color: #183f6f;
+            font-size: 14px;
+        }
+
+        .capacity-state-item span {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .capacity-reveal-copy {
+            margin: 10px 0 0;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .intro-hero {
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+            border-radius: 20px;
+            background:
+                radial-gradient(circle at 88% 16%, rgba(247, 178, 103, 0.18), transparent 28%),
+                radial-gradient(circle at 12% 8%, rgba(31, 95, 204, 0.12), transparent 30%),
+                linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
+        }
+
+        .intro-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -50px -70px auto;
+            width: 190px;
+            height: 190px;
+            border-radius: 999px;
+            border: 34px solid rgba(31, 95, 204, 0.07);
+            pointer-events: none;
+        }
+
+        .intro-eyebrow {
+            display: inline-flex;
+            margin: 0 0 10px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #172033;
+            color: #fff7ed;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+        }
+
+        .intro-title {
+            margin: 0;
+            color: #172033;
+            font-size: 23px;
+            font-weight: 900;
+            line-height: 1.25;
+        }
+
+        .intro-lead {
+            max-width: 760px;
+            margin: 9px 0 0;
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .process-card {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border-radius: 16px;
+            background: #dbe5f0;
+        }
+
+        .process-step {
+            padding: 13px 14px;
+            background: #ffffff;
+        }
+
+        .process-step-current {
+            background: #fff7ed;
+        }
+
+        .process-step-next {
+            background: #eef6ff;
+        }
+
+        .process-kicker {
+            display: block;
+            margin-bottom: 4px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .process-text {
+            margin: 0;
+            color: #172033;
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1.35;
+        }
+
+        .route-demo-card {
+            overflow: hidden;
+            border-radius: 20px;
+        }
+
+        .route-demo-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 15px 18px;
+            border-bottom: 1px solid #dbe5f0;
+            background: #f8fafc;
+        }
+
+        .route-demo-title {
+            margin: 0;
+            color: #172033;
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .route-demo-note {
+            margin: 5px 0 0;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .route-capacity-note {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+            padding: 10px 12px;
+            border: 1px solid #c8d9db;
+            border-radius: 10px;
+            background: #f6faf9;
+            color: #21313a;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .route-capacity-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 58px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: #223746;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .route-demo-pill {
+            flex: 0 0 auto;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #172033;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .bottleneck-visual {
+            position: relative;
+            margin: 16px;
+            padding: 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 86% 18%, rgba(44, 122, 138, 0.10), transparent 26%),
+                linear-gradient(180deg, #ffffff 0%, #f7faf8 100%);
+        }
+
+        .intro-route-svg {
+            position: relative;
+            z-index: 2;
+            display: block;
+            width: 100%;
+            height: auto;
+            min-height: 260px;
+        }
+
+        .intro-diagram-panel {
+            fill: #ffffff;
+            stroke: #d8e3ef;
+            stroke-width: 1.4;
+        }
+
+        .intro-origin-card,
+        .intro-work-card {
+            fill: #f7fbff;
+            stroke: #afc6e2;
+            stroke-width: 1.4;
+        }
+
+        .intro-road {
+            fill: #1b2d40;
+            stroke: #304961;
+            stroke-width: 2;
+        }
+
+        .intro-road-lane {
+            fill: none;
+            stroke: #f4f7f8;
+            stroke-width: 2.5;
+            stroke-dasharray: 12 12;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .intro-guide-arrow {
+            fill: none;
+            stroke: #218294;
+            stroke-width: 3.2;
+            stroke-linecap: round;
+        }
+
+        .intro-bottleneck-callout {
+            fill: #fffaf3;
+            stroke: #f08a24;
+            stroke-width: 1.6;
+        }
+
+        .intro-bottleneck-pointer {
+            fill: none;
+            stroke: #f08a24;
+            stroke-width: 1.5;
+            stroke-dasharray: 4 3;
+        }
+
+        .intro-legend-panel {
+            fill: #fbfdff;
+            stroke: #d8e3ef;
+            stroke-width: 1.2;
+        }
+
+        .intro-legend-divider {
+            stroke: #d8e3ef;
+            stroke-width: 1;
+        }
+
+        .intro-icon-stroke {
+            fill: none;
+            stroke: #1f4f88;
+            stroke-width: 2.3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .intro-route-label {
+            font-size: 15px;
+            font-weight: 900;
+            fill: #183f6f;
+        }
+
+        .intro-route-label-dark {
+            fill: #172033;
+        }
+
+        .intro-route-muted {
+            font-size: 11px;
+            font-weight: 700;
+            fill: #64748b;
+        }
+
+        .intro-route-detail {
+            font-size: 10px;
+            font-weight: 750;
+            fill: #64748b;
+            letter-spacing: 0.01em;
+        }
+
+        .intro-route-chip {
+            font-size: 13px;
+            font-weight: 900;
+            fill: #e77712;
+        }
+
+        .intro-route-small {
+            font-size: 11px;
+            font-weight: 900;
+            fill: #218294;
+        }
+
+        .intro-facts {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            padding: 0 16px 16px;
+        }
+
+        .intro-fact {
+            padding: 12px 13px;
+            border: 1px solid #dbe5f0;
+            border-radius: 14px;
+            background: #f8fafc;
+        }
+
+        .intro-fact-key {
+            margin: 0 0 4px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .intro-fact-value {
+            margin: 0;
+            color: #172033;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1.35;
+        }
+
+        .confirm-card {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 14px 15px;
+            border-radius: 16px;
+            background: #eef6ff;
+        }
+
+        .confirm-card input {
+            margin-top: 4px;
+        }
+
+        .confirm-card label {
+            margin: 0;
+            color: #1e3a5f;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .intro-actions {
+            margin-top: 2px;
+        }
+
+        @media (max-width: 900px) {
+            .process-card,
+            .intro-facts {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 575px) {
+            .intro-hero,
+            .route-demo-head {
+                padding: 15px;
+            }
+
+            .intro-title {
+                font-size: 20px;
+            }
+
+            .process-card,
+            .intro-facts {
+                grid-template-columns: 1fr;
+            }
+
+            .route-demo-head {
+                display: block;
+            }
+
+            .route-demo-pill {
+                display: inline-flex;
+                margin-top: 10px;
+            }
+
+            .bottleneck-visual {
+                margin: 12px;
+                padding: 8px;
+            }
+
+            .intro-route-svg {
+                min-width: 620px;
+            }
+        }
+    </style>
+{{ endblock }}
+
+{{ block content }}
+    <div class="intro-shell">
+        <section class="intro-hero">
+            <p class="intro-eyebrow">最后提醒</p>
+            <p class="intro-title">请确认你理解：这里关注的是选择带来的成本</p>
+            <p class="intro-lead">
+                详细规则已经在实验前说明文档中给出。本页只保留正式开始前最关键的信息：
+                你每轮选择一个出发时间，系统根据固定行驶成本、排队成本、早到成本、晚到成本和粗收费计算本轮成本。
+            </p>
+        </section>
+
+        <section class="process-card" aria-label="当前流程">
+            <div class="process-step">
+                <span class="process-kicker">Step 1</span>
+                <p class="process-text">阅读实验说明</p>
+            </div>
+            <div class="process-step process-step-current">
+                <span class="process-kicker">Step 2</span>
+                <p class="process-text">最后提醒</p>
+            </div>
+            <div class="process-step process-step-next">
+                <span class="process-kicker">Step 3</span>
+                <p class="process-text">规则测试</p>
+            </div>
+            <div class="process-step">
+                <span class="process-kicker">Step 4</span>
+                <p class="process-text">正式选择</p>
+            </div>
+        </section>
+
+        <section class="route-demo-card" aria-label="单瓶颈路径演示">
+            <div class="route-demo-head">
+                <div>
+                    <p class="route-demo-title">单瓶颈示意</p>
+                    <p class="route-demo-note">参与者从居住地出发，经过单一瓶颈后驶向工作地。若同一分钟进入瓶颈的车辆超过本轮服务率，等待会在瓶颈前形成；同一出发时间的参与者使用相同等待时间。</p>
+                    <div class="route-capacity-note">
+                        <span class="route-capacity-badge">每轮可能变化</span>
+                        <span>系统在每轮确定一个瓶颈服务率；所有参与者在同一轮面对相同服务率，并且该服务率在同一轮内保持不变。</span>
+                    </div>
+                </div>
+                <span class="route-demo-pill">单一瓶颈</span>
+            </div>
+
+            <div class="bottleneck-visual">
+                <svg class="intro-route-svg" viewBox="0 0 760 330" role="img" aria-label="单一瓶颈示意：参与者从居住地出发，道路由四车道收窄后再扩宽为四车道，到达工作地">
+                    <defs>
+                        <filter id="introFlowShadow" x="-20%" y="-40%" width="140%" height="180%">
+                            <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10" />
+                        </filter>
+                        <marker id="introFlowGuideArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                            <path d="M0 0 L10 5 L0 10 Z" fill="#218294" />
+                        </marker>
+                    </defs>
+
+                    <rect x="18" y="14" width="724" height="302" rx="20" class="intro-diagram-panel" />
+
+                    <g filter="url(#introFlowShadow)" aria-label="居住地出发区">
+                        <rect x="34" y="76" width="104" height="122" rx="14" class="intro-origin-card" />
+                        <text x="86" y="105" text-anchor="middle" class="intro-route-label">居住地</text>
+                        <g transform="translate(50 118)" class="intro-icon-stroke" aria-label="住宅建筑图标">
+                            <path d="M2 22 L36 2 L70 22" />
+                            <path d="M9 19 V52 H63 V19" />
+                            <path d="M29 52 V35 H43 V52" />
+                            <rect x="17" y="27" width="8" height="8" rx="1" />
+                            <rect x="47" y="27" width="8" height="8" rx="1" />
+                            <path d="M2 52 H70" />
+                        </g>
+                        <text x="86" y="185" text-anchor="middle" class="intro-route-muted">多位参与者出发</text>
+                    </g>
+
+                    <path d="M141 138 H159" class="intro-guide-arrow" marker-end="url(#introFlowGuideArrow)" />
+
+                    <g filter="url(#introFlowShadow)" aria-label="平滑收窄并扩宽的道路">
+                        <path d="M166 64 H270 C310 64 320 98 354 98 H430 C464 98 474 64 514 64 H588 V212 H514 C474 212 464 178 430 178 H354 C320 178 310 212 270 212 H166 Z" class="intro-road" />
+                        <path d="M178 101 H270 C305 101 320 122 354 122" class="intro-road-lane" />
+                        <path d="M178 138 H354" class="intro-road-lane" />
+                        <path d="M178 175 H270 C305 175 320 154 354 154" class="intro-road-lane" />
+                        <path d="M354 138 H430" class="intro-road-lane" />
+                        <path d="M430 122 C464 122 479 101 514 101 H576" class="intro-road-lane" />
+                        <path d="M430 138 H576" class="intro-road-lane" />
+                        <path d="M430 154 C464 154 479 175 514 175 H576" class="intro-road-lane" />
+                    </g>
+
+                    <g aria-label="瓶颈中心标记">
+                        <rect x="332" y="28" width="120" height="34" rx="10" class="intro-bottleneck-callout" />
+                        <text x="392" y="50" text-anchor="middle" class="intro-route-chip">单一瓶颈</text>
+                        <path d="M392 62 V95" class="intro-bottleneck-pointer" />
+                        <circle cx="392" cy="98" r="4" fill="#f08a24" />
+                    </g>
+
+                    <path d="M591 138 H616" class="intro-guide-arrow" marker-end="url(#introFlowGuideArrow)" aria-label="驶向工作地" />
+
+                    <g filter="url(#introFlowShadow)" aria-label="工作地">
+                        <rect x="622" y="76" width="96" height="122" rx="14" class="intro-work-card" />
+                        <text x="670" y="105" text-anchor="middle" class="intro-route-label">工作地</text>
+                        <g transform="translate(640 118)" class="intro-icon-stroke">
+                            <path d="M0 54 H60" />
+                            <path d="M8 54 V23 H20 V54" />
+                            <path d="M20 54 V4 H43 V54" />
+                            <path d="M43 54 V18 H54 V54" />
+                            <path d="M27 13 H32 M36 13 H39 M27 23 H32 M36 23 H39 M27 33 H32 M36 33 H39" />
+                            <path d="M26 54 V42 H36 V54" />
+                        </g>
+                    </g>
+
+                    <path d="M166 230 H588" class="intro-guide-arrow" marker-end="url(#introFlowGuideArrow)" />
+                    <text x="377" y="249" text-anchor="middle" class="intro-route-small">出发方向</text>
+
+                    <rect x="112" y="260" width="536" height="60" rx="10" class="intro-legend-panel" />
+                    <line x1="288" y1="269" x2="288" y2="311" class="intro-legend-divider" />
+                    <line x1="468" y1="269" x2="468" y2="311" class="intro-legend-divider" />
+
+                    <g transform="translate(126 273) scale(0.72)" class="intro-icon-stroke" aria-label="住宅建筑图标">
+                        <path d="M2 18 L18 5 L34 18" />
+                        <path d="M7 16 V36 H29 V16" />
+                        <path d="M15 36 V25 H22 V36" />
+                        <rect x="10" y="20" width="5" height="5" rx="0.8" />
+                        <rect x="23" y="20" width="4" height="5" rx="0.8" />
+                    </g>
+                    <text x="160" y="280" class="intro-route-label intro-route-label-dark">居住地</text>
+                    <text x="200" y="305" text-anchor="middle" class="intro-route-detail">从居住地出发</text>
+
+                    <path d="M306 275 H318 L326 281 H337 L345 275" fill="none" stroke="#e77712" stroke-width="2.4" stroke-linejoin="round" />
+                    <path d="M306 291 H318 L326 285 H337 L345 291" fill="none" stroke="#e77712" stroke-width="2.4" stroke-linejoin="round" />
+                    <text x="356" y="280" class="intro-route-label intro-route-label-dark">单一瓶颈</text>
+                    <text x="378" y="299" text-anchor="middle" class="intro-route-detail">本轮服务率</text>
+                    <text x="378" y="313" text-anchor="middle" class="intro-route-detail">由系统统一确定</text>
+
+                    <g transform="translate(486 269)" class="intro-icon-stroke">
+                        <path d="M2 26 H27 M6 26 V11 H11 V26 M11 26 V3 H20 V26 M20 26 V14 H24 V26" />
+                        <path d="M14 8 H17 M14 14 H17" />
+                    </g>
+                    <text x="522" y="280" class="intro-route-label intro-route-label-dark">工作地</text>
+                    <text x="558" y="305" text-anchor="middle" class="intro-route-detail">目标到达时间：{{ preferred_arrival_time }}</text>
+                </svg>
+            </div>
+
+            <section class="capacity-state-panel" aria-label="候选瓶颈服务率">
+                <div class="capacity-state-head">
+                    <p class="capacity-state-title">候选瓶颈服务率</p>
+                    <p class="capacity-state-note">平衡随机模式显示目标比例；独立抽取模式显示每轮抽取概率。</p>
+                </div>
+                <div class="capacity-state-grid">
+                    {{ for item in capacity_states }}
+                    <div class="capacity-state-item">
+                        <strong>{{ item.capacity }} 车 / {{ capacity_window_minutes }} 分钟</strong>
+                        <span>{{ capacity_frequency_label }}：{{ item.probability_label }}</span>
+                    </div>
+                    {{ endfor }}
+                </div>
+                <p class="capacity-reveal-copy">{{ capacity_reveal_description }}</p>
+            </section>
+
+            <div class="intro-facts" aria-label="正式选择前核心信息">
+                <div class="intro-fact">
+                    <p class="intro-fact-key">正式轮数</p>
+                    <p class="intro-fact-value">{{ total_rounds }} 轮</p>
+                </div>
+                <div class="intro-fact">
+                    <p class="intro-fact-key">目标到达</p>
+                    <p class="intro-fact-value">{{ preferred_arrival_time }}</p>
+                </div>
+                <div class="intro-fact">
+                    <p class="intro-fact-key">瓶颈服务率</p>
+                    <p class="intro-fact-value">每轮可能不同，同轮保持一致</p>
+                </div>
+                <div class="intro-fact">
+                    <p class="intro-fact-key">收费提示</p>
+                    <p class="intro-fact-value">选择页会直接标注金额</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="confirm-card">
+            <input id="rules-read-confirmation" type="checkbox" required>
+            <label for="rules-read-confirmation">
+                我已阅读实验前发放的详细说明，并理解下一页会进行规则测试；测试后进入正式实验。
+            </label>
+        </div>
+
+        <div class="intro-actions">
+            <button class="otree-btn-next btn btn-primary">进入规则测试</button>
+        </div>
+    </div>
+{{ endblock }}

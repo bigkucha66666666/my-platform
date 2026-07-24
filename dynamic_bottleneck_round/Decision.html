@@ -1,0 +1,438 @@
+{{ block title }}动态瓶颈出发时间选择{{ endblock }}
+
+{{ block content }}
+<style>
+  .decision-shell {
+    --ink: #18343c;
+    --muted: #657b80;
+    --line: #d4e2e2;
+    --teal: #177d86;
+    --teal-dark: #173f49;
+    --warm: #e28b3e;
+    --surface: #fbfdfc;
+    display: grid;
+    gap: 16px;
+    color: var(--ink);
+  }
+
+  .capacity-panel,
+  .picker-card {
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    background: var(--surface);
+    box-shadow: 0 10px 28px rgba(27, 69, 75, .08);
+  }
+
+  .capacity-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 18px;
+    align-items: center;
+    min-height: 112px;
+    padding: 18px 20px;
+    overflow: hidden;
+  }
+
+  .capacity-panel.is-known {
+    border-color: #ead7bb;
+    background: linear-gradient(120deg, #fff8ec 0%, #fbfdfc 72%);
+  }
+
+  .capacity-copy {
+    min-width: 0;
+  }
+
+  .capacity-kicker {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
+    letter-spacing: .04em;
+  }
+
+  .capacity-value {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 950;
+    line-height: 1.2;
+  }
+
+  .capacity-note {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .round-tag {
+    align-self: start;
+    padding: 7px 11px;
+    border-radius: 999px;
+    background: var(--teal-dark);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .state-strip {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  .state-chip {
+    padding: 5px 9px;
+    border: 1px solid #cbdcde;
+    border-radius: 999px;
+    background: #fff;
+    color: #345961;
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .capacity-road-scene {
+    position: relative;
+    width: 146px;
+    height: 58px;
+    overflow: hidden;
+    border-radius: 30px 10px 10px 30px;
+    background: #42545c;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+  }
+
+  .road-dash {
+    position: absolute;
+    right: 8px;
+    left: 8px;
+    top: 50%;
+    height: 2px;
+    transform: translateY(-50%);
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .88) 0 14px, transparent 14px 25px);
+  }
+
+  .commute-car {
+    display: block;
+    color: var(--warm);
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .2));
+  }
+
+  .capacity-car {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    width: 43px;
+    height: 28px;
+  }
+
+  .car-body,
+  .car-base {
+    fill: currentColor;
+  }
+
+  .car-window {
+    fill: #d9eff0;
+  }
+
+  .car-wheel {
+    fill: #18343c;
+  }
+
+  .picker-card {
+    padding: 20px;
+  }
+
+  .picker-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+  }
+
+  .picker-heading h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .selected-time {
+    color: var(--teal);
+    font-size: 30px;
+    font-weight: 950;
+    letter-spacing: .02em;
+  }
+
+  .time-wheel-frame {
+    position: relative;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 38px;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .wheel-arrow {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid #c1d7d9;
+    border-radius: 50%;
+    background: #eaf4f3;
+    color: #1c6971;
+    box-shadow: 0 4px 10px rgba(27, 81, 87, .08);
+    font-size: 18px;
+    font-weight: 900;
+    transition: background .16s ease, color .16s ease, transform .16s ease;
+  }
+
+  .wheel-arrow:hover,
+  .wheel-arrow:focus-visible {
+    background: var(--teal);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
+  .time-wheel {
+    height: 250px;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    border: 1px solid #d1e0e1;
+    border-radius: 15px;
+    background:
+      linear-gradient(#edf5f4 0%, rgba(237, 245, 244, 0) 28%, rgba(237, 245, 244, 0) 72%, #edf5f4 100%),
+      #edf5f4;
+    padding: 88px 8px;
+    scrollbar-color: #9cbfc2 transparent;
+  }
+
+  .time-wheel-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    min-height: 54px;
+    margin: 4px 0;
+    padding: 9px 13px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, .9);
+    color: var(--ink);
+    scroll-snap-align: center;
+    text-align: left;
+    transition: background .16s ease, border-color .16s ease, transform .16s ease;
+  }
+
+  .time-wheel-row:hover {
+    border-color: #bcd4d6;
+    transform: translateY(-1px);
+  }
+
+  .time-wheel-row.is-selected {
+    border-color: var(--teal-dark);
+    background: var(--teal-dark);
+    color: #fff;
+    box-shadow: 0 7px 16px rgba(23, 63, 73, .18);
+  }
+
+  .time-wheel-time {
+    font-size: 20px;
+    font-weight: 900;
+  }
+
+  .time-wheel-tag {
+    color: #536a71;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .time-wheel-row.is-tolled .time-wheel-tag {
+    color: #a64e18;
+  }
+
+  .time-wheel-row.is-selected .time-wheel-tag {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .14);
+    color: #e7f5f4;
+  }
+
+  .time-wheel-row.is-selected.is-tolled .time-wheel-tag {
+    background: var(--warm);
+    color: #293b40;
+  }
+
+  .picker-summary {
+    margin: 14px 0 0;
+    padding: 11px 13px;
+    border-radius: 11px;
+    background: #edf6f5;
+    color: #355d62;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .decision-shell > .otree-btn-next {
+    min-height: 46px;
+    border: 0;
+    border-radius: 13px;
+    background: var(--teal);
+    box-shadow: 0 8px 18px rgba(23, 125, 134, .18);
+    font-weight: 850;
+  }
+
+  .decision-shell > .otree-btn-next:hover,
+  .decision-shell > .otree-btn-next:focus-visible {
+    background: #126c74;
+  }
+
+  @media (max-width: 760px) {
+    .capacity-panel {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 13px;
+    }
+
+    .capacity-copy {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .round-tag {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .capacity-road-scene {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      width: 100%;
+      height: 48px;
+      border-radius: 24px 9px 9px 24px;
+    }
+
+    .capacity-car {
+      top: 11px;
+    }
+
+    .picker-heading {
+      align-items: flex-start;
+    }
+
+    .selected-time {
+      font-size: 26px;
+    }
+
+    .time-wheel-frame {
+      grid-template-columns: 32px minmax(0, 1fr) 32px;
+      gap: 7px;
+    }
+
+    .wheel-arrow {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .capacity-panel,
+    .picker-card {
+      border-radius: 14px;
+    }
+
+    .capacity-panel,
+    .picker-card {
+      padding: 16px;
+    }
+
+    .time-wheel-row {
+      grid-template-columns: 1fr;
+      gap: 3px;
+    }
+
+    .time-wheel-row.is-selected .time-wheel-tag {
+      justify-self: start;
+    }
+  }
+</style>
+
+<div class="decision-shell">
+  {{ if capacity_revealed }}
+  <section class="capacity-panel is-known">
+    <div class="capacity-copy">
+      <p class="capacity-kicker">本轮真实瓶颈服务率</p>
+      <p class="capacity-value">{{ actual_capacity }} 人 / {{ capacity_window_minutes }} 分钟</p>
+      <p class="capacity-note">同组所有参与者本轮使用相同服务率。</p>
+    </div>
+    <div class="capacity-road-scene" aria-hidden="true">
+      <span class="road-dash"></span>
+      <svg class="commute-car capacity-car" viewBox="0 0 64 40">
+        <path class="car-body" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/>
+        <path class="car-base" d="M8 25h48v8H8z"/>
+        <path class="car-window" d="M22 14h19l2 7H19l3-7Z"/>
+        <circle class="car-wheel" cx="18" cy="33" r="5"/>
+        <circle class="car-wheel" cx="46" cy="33" r="5"/>
+      </svg>
+    </div>
+    <div class="round-tag">R{{ round_number }} / {{ total_rounds }}</div>
+  </section>
+  {{ else }}
+  <section class="capacity-panel">
+    <div class="capacity-copy">
+      <p class="capacity-kicker">本轮服务率将在提交后公布</p>
+      <p class="capacity-note">请根据候选状态和概率作出选择。</p>
+      <div class="state-strip">{{ for item in capacity_states }}<span class="state-chip">{{ item.capacity }} 人 / 1 分钟 · {{ item.probability_percent }}%</span>{{ endfor }}</div>
+    </div>
+    <div class="capacity-road-scene" aria-hidden="true">
+      <span class="road-dash"></span>
+      <svg class="commute-car capacity-car" viewBox="0 0 64 40">
+        <path class="car-body" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/>
+        <path class="car-base" d="M8 25h48v8H8z"/>
+        <path class="car-window" d="M22 14h19l2 7H19l3-7Z"/>
+        <circle class="car-wheel" cx="18" cy="33" r="5"/>
+        <circle class="car-wheel" cx="46" cy="33" r="5"/>
+      </svg>
+    </div>
+    <div class="round-tag">R{{ round_number }} / {{ total_rounds }}</div>
+  </section>
+  {{ endif }}
+
+  <section class="picker-card commute-picker">
+    <div class="picker-heading"><h3>滚动选择出发时间</h3><output class="selected-time" id="selected-time" aria-live="polite">{{ default_departure_time }}</output></div>
+    <input type="hidden" id="departure-minute" name="departure_minute" value="{{ default_departure_minute }}">
+    <div class="time-wheel-frame">
+      <button type="button" class="wheel-arrow wheel-arrow-previous" id="previous-time" aria-label="上一个时间">↑</button>
+      <div class="time-wheel" id="time-wheel" role="listbox" aria-label="出发时间选择" tabindex="0">
+        {{ for item in choice_preview }}
+        <button type="button" class="time-wheel-row {{ if item.toll_active }}is-tolled{{ endif }}" id="departure-option-{{ item.minute }}" data-minute="{{ item.minute }}" role="option" tabindex="-1">
+          <span class="time-wheel-time">{{ item.time }}</span>
+          <span class="time-wheel-tag">{{ if item.toll_active }}收费 {{ item.toll_charge_label }}{{ else }}无收费{{ endif }}</span>
+        </button>
+        {{ endfor }}
+      </div>
+      <button type="button" class="wheel-arrow wheel-arrow-next" id="next-time" aria-label="下一个时间">↓</button>
+    </div>
+    <p class="picker-summary" id="selected-toll">{{ coarse_toll_description }}</p>
+  </section>
+  <button class="otree-btn-next btn btn-primary">提交本轮选择</button>
+</div>
+
+<script id="choice-preview-data" type="application/json">{{ choice_preview_json|safe }}</script>
+<script>
+  (function(){
+    const preview=JSON.parse(document.getElementById('choice-preview-data').textContent||'{}');
+    const input=document.getElementById('departure-minute');
+    const readout=document.getElementById('selected-time');
+    const wheel=document.getElementById('time-wheel');
+    const rows=Array.from(document.querySelectorAll('.time-wheel-row'));
+    let index=Math.max(0,rows.findIndex(function(row){return Math.round(Number(row.dataset.minute))===Math.round(Number(input.value));}));
+    function select(nextIndex,scroll){index=Math.max(0,Math.min(rows.length-1,nextIndex));rows.forEach(function(row,rowIndex){const selected=rowIndex===index;row.classList.toggle('is-selected',selected);row.setAttribute('aria-selected',selected?'true':'false');});const row=rows[index];wheel.setAttribute('aria-activedescendant',row.id);input.value=row.dataset.minute;const item=preview[String(Math.round(Number(row.dataset.minute)))];if(item){readout.textContent=item.time;}if(scroll){row.scrollIntoView({block:'center',behavior:'smooth'});}}
+    rows.forEach(function(row,rowIndex){row.addEventListener('click',function(){select(rowIndex,true);wheel.focus({preventScroll:true});});});
+    document.getElementById('previous-time').addEventListener('click',function(){select(index-1,true);});
+    document.getElementById('next-time').addEventListener('click',function(){select(index+1,true);});
+    wheel.addEventListener('keydown',function(event){if(event.key==='ArrowUp'){event.preventDefault();select(index-1,true);}if(event.key==='ArrowDown'){event.preventDefault();select(index+1,true);}});
+    select(index,true);
+  })();
+</script>
+{{ endblock }}

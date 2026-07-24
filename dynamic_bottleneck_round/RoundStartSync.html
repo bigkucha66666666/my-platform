@@ -1,0 +1,51 @@
+{{ block title }}第 {{ round_number }} 轮准备{{ endblock }}
+
+{{ block content }}
+<style>
+  .round-sync{--ink:#172b3a;--muted:#61747d;--line:#c8d8dc;--teal:#267b86;position:relative;overflow:hidden;padding:28px;border:1px solid var(--line);border-radius:8px;background:#f7fbfa;color:var(--ink)}
+  .round-sync::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--teal)}
+  .round-sync-head{display:flex;align-items:start;justify-content:space-between;gap:20px}
+  .round-sync-kicker{margin:0 0 7px;color:var(--teal);font-size:12px;font-weight:900;letter-spacing:.08em}
+  .round-sync-title{margin:0;font-size:26px}.round-sync-copy{max-width:650px;margin:10px 0 22px;color:var(--muted);line-height:1.7}
+  .round-sync-round{padding:7px 10px;background:#1d3948;color:#fff;font-weight:850}
+  .round-sync-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:18px}
+  .round-sync-metric{padding:13px 14px;border:1px solid var(--line);background:#fff}.round-sync-metric span{display:block;color:var(--muted);font-size:12px}.round-sync-metric strong{display:block;margin-top:4px;font-size:20px}
+  .round-sync-track{height:7px;overflow:hidden;background:#dce8e8}.round-sync-track span{display:block;width:36%;height:100%;background:var(--teal);animation:roundSyncMove 1.8s ease-in-out infinite alternate}
+  @keyframes roundSyncMove{to{transform:translateX(178%)}}
+  @media(max-width:600px){.round-sync{padding:22px 18px}.round-sync-head{display:block}.round-sync-round{display:inline-block;margin-top:12px}.round-sync-status{grid-template-columns:1fr}}
+</style>
+
+<section class="round-sync" id="round-start-sync" data-ready="{{ if round_started }}1{{ else }}0{{ endif }}" data-poll="{{ poll_interval_ms }}" data-delay="{{ auto_continue_delay_ms }}">
+  <div class="round-sync-head">
+    <div>
+      <p class="round-sync-kicker">ROUND READY CHECK</p>
+      <h3 class="round-sync-title">等待同组参与者进入本轮</h3>
+      <p class="round-sync-copy">全组到齐后，系统会统一开始本轮 60 秒决策计时。若有人未及时到达，最长等待到期后也会自动开始。</p>
+    </div>
+    <div class="round-sync-round">R{{ round_number }} / {{ total_rounds }}</div>
+  </div>
+  <div class="round-sync-status">
+    <div class="round-sync-metric"><span>已进入本轮</span><strong>{{ ready_count }} / {{ group_size }} 人</strong></div>
+    <div class="round-sync-metric"><span>最长剩余等待</span><strong>{{ remaining_seconds }} 秒</strong></div>
+  </div>
+  <div class="round-sync-track"><span></span></div>
+</section>
+
+<button class="otree-btn-next btn btn-primary" id="round-start-next" hidden>进入本轮决策</button>
+
+<script>
+  (function () {
+    const panel = document.getElementById('round-start-sync');
+    const ready = panel.dataset.ready === '1';
+    if (ready) {
+      window.setTimeout(function () {
+        document.getElementById('round-start-next').click();
+      }, Number(panel.dataset.delay) || 200);
+      return;
+    }
+    window.setTimeout(function () {
+      window.location.reload();
+    }, Number(panel.dataset.poll) || 3000);
+  })();
+</script>
+{{ endblock }}

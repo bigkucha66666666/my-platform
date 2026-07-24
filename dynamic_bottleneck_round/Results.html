@@ -1,0 +1,478 @@
+{{ block title }}本轮结果{{ endblock }}
+
+{{ block content }}
+<style>
+  .result-shell {
+    --ink: #18343c;
+    --muted: #63797f;
+    --line: #d3e2e3;
+    --teal: #177d86;
+    --teal-dark: #173f49;
+    --warm: #d96352;
+    --queue: #df914b;
+    display: grid;
+    gap: 16px;
+    color: var(--ink);
+  }
+
+  .result-overview,
+  .cost-card,
+  .chart-card {
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    background: #fbfdfc;
+    box-shadow: 0 10px 28px rgba(27, 69, 75, .08);
+  }
+
+  .result-overview {
+    overflow: hidden;
+  }
+
+  .overview-head {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+  }
+
+  .personal-cost {
+    padding: 22px 24px;
+    background:
+      radial-gradient(circle at 92% 12%, rgba(23, 125, 134, .1) 0 42px, transparent 43px),
+      linear-gradient(125deg, #edf7f5, #fff);
+  }
+
+  .capacity-result {
+    padding: 22px 24px;
+    background: var(--teal-dark);
+    color: #fff;
+  }
+
+  .result-kicker {
+    margin: 0 0 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .04em;
+  }
+
+  .capacity-result .result-kicker {
+    color: #bfd3d6;
+  }
+
+  .result-total {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin: 0;
+    color: var(--warm);
+    font-size: 48px;
+    font-weight: 950;
+    line-height: 1;
+  }
+
+  .result-total small {
+    color: var(--ink);
+    font-size: 15px;
+  }
+
+  .capacity-value {
+    margin: 0;
+    font-size: 29px;
+    font-weight: 950;
+  }
+
+  .capacity-previous {
+    margin: 9px 0 0;
+    color: #d5e2e4;
+    font-size: 13px;
+  }
+
+  .time-summary {
+    padding: 19px 22px 21px;
+    border-top: 1px solid var(--line);
+    background: #fffdfa;
+  }
+
+  .time-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: #3e5b62;
+    font-weight: 850;
+  }
+
+  .journey-track {
+    margin-top: 12px;
+  }
+
+  .journey-visual-label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .journey-route {
+    display: flex;
+    height: 35px;
+    margin: 8px 0 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5eef0;
+    box-shadow: inset 0 0 0 1px rgba(44, 93, 99, .08);
+  }
+
+  .commute-car {
+    display: block;
+    color: var(--teal-dark);
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .16));
+  }
+
+  .journey-car {
+    width: 31px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .car-body,
+  .car-base {
+    fill: currentColor;
+  }
+
+  .car-wheel {
+    fill: #d96352;
+  }
+
+  .time-fixed,
+  .time-queue {
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .time-fixed {
+    flex: 6;
+    background: linear-gradient(90deg, #258692, #4e8ca4);
+  }
+
+  .time-queue {
+    flex: 1;
+    min-width: 72px;
+    background: var(--queue);
+  }
+
+  .time-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .time-meta div {
+    padding: 11px 13px;
+    border: 1px solid #d7e4e5;
+    border-radius: 11px;
+    background: #f7fbfa;
+  }
+
+  .time-meta span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .time-meta strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 16px;
+  }
+
+  .cost-card,
+  .chart-card {
+    padding: 20px;
+  }
+
+  .cost-card h3,
+  .chart-card h3 {
+    margin: 0 0 5px;
+    font-size: 18px;
+  }
+
+  .card-note {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .cost-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid #d7e4e5;
+    border-radius: 13px;
+    background: #f7fbfa;
+  }
+
+  .cost-item {
+    padding: 13px;
+    border-right: 1px solid #d7e4e5;
+    background: linear-gradient(180deg, #fff, #f7fbfa);
+  }
+
+  .cost-item:last-child {
+    border-right: 0;
+  }
+
+  .cost-item span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .cost-item strong {
+    display: block;
+    margin-top: 5px;
+    font-size: 18px;
+  }
+
+  .chart-card {
+    background:
+      linear-gradient(rgba(23, 125, 134, .025) 1px, transparent 1px),
+      #fbfdfc;
+    background-size: 100% 44px;
+  }
+
+  .chart-axis {
+    margin: 0 0 9px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .chart-scroll {
+    overflow-x: auto;
+    padding: 27px 0 7px;
+    scrollbar-color: #a9c2c5 transparent;
+  }
+
+  .cost-chart {
+    --plot-height: 168px;
+    --plot-offset: 70px;
+    position: relative;
+    display: flex;
+    align-items: end;
+    gap: 7px;
+    min-width: 860px;
+    height: 270px;
+    padding: 0 8px;
+    border-bottom: 2px solid #9fb8bd;
+  }
+
+  .average-plot {
+    position: absolute;
+    right: 0;
+    bottom: var(--plot-offset);
+    left: 0;
+    height: var(--plot-height);
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .average-line {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-top: 3px dashed #8067a8;
+  }
+
+  .average-label {
+    position: absolute;
+    top: -25px;
+    right: 7px;
+    padding: 4px 8px;
+    border: 1px solid #ded2ed;
+    border-radius: 999px;
+    background: #f7f2fb;
+    color: #5e467f;
+    font-size: 11px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .cost-column {
+    display: grid;
+    grid-template-rows: 32px 168px 30px 22px 18px;
+    flex: 1;
+    min-width: 39px;
+    align-items: end;
+    justify-items: center;
+  }
+
+  .cost-value {
+    color: #34525a;
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .cost-track {
+    display: flex;
+    width: 72%;
+    height: 100%;
+    align-items: end;
+  }
+
+  .cost-bar {
+    width: 100%;
+    min-height: 0;
+    border-radius: 7px 7px 2px 2px;
+    background: linear-gradient(180deg, #56a9b2, #177d86);
+    box-shadow: 0 4px 9px rgba(23, 125, 134, .12);
+  }
+
+  .cost-column.is-current .cost-bar {
+    background: linear-gradient(180deg, #ef897a, #bd4c43);
+    box-shadow: 0 4px 9px rgba(189, 76, 67, .14);
+  }
+
+  .count-band {
+    min-width: 42px;
+    padding: 4px 9px;
+    border: 1px solid #cadcdf;
+    border-radius: 999px;
+    background: #f7fbfa;
+    color: #4f6870;
+    font-size: 11px;
+    font-weight: 850;
+    text-align: center;
+  }
+
+  .cost-column.is-current .count-band {
+    border-color: #e8a39a;
+    background: #fff3f1;
+    color: #a53f38;
+  }
+
+  .time-label {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .current-label {
+    min-height: 16px;
+    color: #b5443c;
+    font-size: 10px;
+    font-weight: 850;
+  }
+
+  .result-shell > .otree-btn-next {
+    min-height: 46px;
+    border: 0;
+    border-radius: 13px;
+    background: var(--teal);
+    box-shadow: 0 8px 18px rgba(23, 125, 134, .18);
+    font-weight: 850;
+  }
+
+  .result-shell > .otree-btn-next:hover,
+  .result-shell > .otree-btn-next:focus-visible {
+    background: #126c74;
+  }
+
+  @media (max-width: 760px) {
+    .overview-head {
+      grid-template-columns: 1fr;
+    }
+
+    .cost-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .cost-item {
+      border-right: 1px solid #d7e4e5;
+      border-bottom: 1px solid #d7e4e5;
+    }
+
+    .cost-item:nth-child(2n) {
+      border-right: 0;
+    }
+
+    .cost-item:last-child {
+      grid-column: 1 / -1;
+      border-bottom: 0;
+    }
+
+    .result-total {
+      font-size: 40px;
+    }
+  }
+
+  @media (max-width: 460px) {
+    .result-overview,
+    .cost-card,
+    .chart-card {
+      border-radius: 14px;
+    }
+
+    .personal-cost,
+    .capacity-result,
+    .time-summary,
+    .cost-card,
+    .chart-card {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+
+    .time-head {
+      font-size: 13px;
+    }
+
+    .time-meta {
+      grid-template-columns: 1fr;
+    }
+
+    .time-fixed,
+    .time-queue {
+      font-size: 10px;
+    }
+  }
+</style>
+
+<div class="result-shell">
+  <section class="result-overview" aria-label="本轮成本与用时">
+    <div class="overview-head">
+      <div class="personal-cost"><p class="result-kicker">本轮成本与用时</p><p class="result-total">{{ total_cost }} <small>最终选择成本</small></p></div>
+      <div class="capacity-result"><p class="result-kicker">本轮真实瓶颈服务率</p><p class="capacity-value">{{ dynamic_capacity }} 人 / {{ capacity_window_minutes }} 分钟</p><p class="capacity-previous">上一轮服务率：{{ previous_capacity_label }}</p></div>
+    </div>
+    <div class="time-summary">
+      <div class="time-head"><span>{{ departure_time }} 出发</span><span>{{ arrival_time }} 到达</span></div>
+      <div class="journey-track">
+        <div class="journey-visual-label">
+          <svg class="commute-car journey-car" viewBox="0 0 64 40" aria-hidden="true">
+            <path class="car-body" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/>
+            <path class="car-base" d="M8 25h48v8H8z"/>
+            <circle class="car-wheel" cx="18" cy="33" r="5"/>
+            <circle class="car-wheel" cx="46" cy="33" r="5"/>
+          </svg>
+          <span>你的本轮行程</span>
+        </div>
+        <div class="journey-route"><div class="time-fixed">固定行驶 {{ C.FREE_FLOW_TRAVEL_MINUTES }} 分钟</div>{{ if queue_delay != '0' }}<div class="time-queue">排队 {{ queue_delay }} 分钟</div>{{ endif }}</div>
+      </div>
+      <div class="time-meta"><div><span>同分钟参与人数</span><strong>{{ slot_load }} 人</strong></div><div><span>总行程时间</span><strong>{{ travel_time }} 分钟</strong></div></div>
+    </div>
+  </section>
+
+  <section class="cost-card"><h3>成本分解</h3><p class="card-note">粗收费直接计入最终选择成本。</p><div class="cost-grid"><div class="cost-item"><span>固定行驶成本</span><strong>{{ fixed_cost }}</strong></div><div class="cost-item"><span>排队成本</span><strong>{{ queue_cost }}</strong></div><div class="cost-item"><span>早到成本</span><strong>{{ early_cost }}</strong></div><div class="cost-item"><span>晚到成本</span><strong>{{ late_cost }}</strong></div><div class="cost-item"><span>粗收费</span><strong>{{ toll_cost }}</strong></div></div></section>
+
+  <section class="chart-card"><h3>所有参与者的成本分布</h3><p class="card-note">横轴为出发时间，柱高为该时间的平均最终选择成本；人数带显示选择人数，紫色虚线为当前轮所有参与者平均成本。</p><p class="chart-axis">纵轴最高 {{ cost_snapshot_axis_max_label }}</p><div class="chart-scroll"><div class="cost-chart"><div class="average-plot"><div class="average-line" data-bottom="{{ cost_snapshot_average_line_pct }}"><span class="average-label">平均成本 {{ cost_snapshot_average_cost_label }}</span></div></div>{{ for item in cost_snapshot_bars }}<div class="cost-column {{ if item.is_current }}is-current{{ endif }}"><span class="cost-value">{{ item.average_cost_label }}</span><div class="cost-track"><div class="cost-bar" data-height="{{ item.height_pct }}"></div></div><span class="count-band">{{ item.participant_count }} 人</span><span class="time-label">{{ item.departure_time }}</span><span class="current-label">{{ if item.is_current }}你的选择{{ endif }}</span></div>{{ endfor }}</div></div></section>
+
+  <button class="otree-btn-next btn btn-primary">{{ if player.round_number == C.NUM_ROUNDS }}查看最终奖励{{ else }}进入下一轮{{ endif }}</button>
+</div>
+<script>
+  document.querySelectorAll('.cost-bar').forEach(function(bar){bar.style.height=(Number(bar.dataset.height)||0)+'%';});
+  const line=document.querySelector('.average-line');if(line){line.style.bottom=(Number(line.dataset.bottom)||0)+'%';}
+</script>
+{{ endblock }}

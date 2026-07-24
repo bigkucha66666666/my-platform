@@ -107,6 +107,20 @@
     color: #666;
     font-size: 12px;
   }
+  .report-unified-start-note {
+    flex: 1 1 100%;
+    margin: 2px 0 0;
+    padding: 9px 11px;
+    border-left: 3px solid #287064;
+    background: #f3f8f6;
+    color: #52635d;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  #open-unified-start-control[aria-disabled="true"] {
+    pointer-events: none;
+    opacity: 0.52;
+  }
   @media (max-width: 720px) {
     .report-demo-entry {
       grid-template-columns: 1fr;
@@ -137,7 +151,14 @@
   </select>
   <button type="button" class="btn btn-primary" id="export-session-csv">导出当前 Session CSV</button>
   <button type="button" class="btn btn-secondary" id="export-participant-links-excel">导出参与者链接 Excel</button>
+  <a class="btn btn-outline-primary" id="open-unified-start-control" href="#" target="_blank" rel="noopener" aria-disabled="true">
+    打开统一开始控制
+  </a>
   <span class="report-link-note">按当前 Session 人数导出 prod_room 链接；链接进入 prod_room 当前绑定的 session。</span>
+  <p class="report-unified-start-note">
+    若有人未到达统一开始页，请在 Session Monitor 中使用“推进最慢参与者”。
+    缺席席位落后多个页面时可能需要多次操作，直到所有席位到达等待点。
+  </p>
 </div>
 
 <div id="report-alert" class="alert alert-warning report-alert" style="display:none;"></div>
@@ -238,6 +259,7 @@
     const contentEl = document.getElementById('report-content');
     const tbodyEl = document.getElementById('session-data-body');
     const participantLinksButton = document.getElementById('export-participant-links-excel');
+    const unifiedStartControl = document.getElementById('open-unified-start-control');
     const defaultSessionCode = selectEl.value || '';
 
     function setText(id, value) {
@@ -264,7 +286,15 @@
       });
     }
 
+    function updateUnifiedStartControl(sessionCode) {
+      unifiedStartControl.href = sessionCode
+        ? `/SessionMonitor/${encodeURIComponent(sessionCode)}`
+        : '#';
+      unifiedStartControl.setAttribute('aria-disabled', sessionCode ? 'false' : 'true');
+    }
+
     function renderSession(sessionCode) {
+      updateUnifiedStartControl(sessionCode);
       const report = reportMap[sessionCode];
       if (!report) {
         emptyEl.style.display = 'block';
@@ -417,6 +447,7 @@
       contentEl.style.display = 'none';
       selectEl.disabled = true;
       document.getElementById('export-session-csv').disabled = true;
+      updateUnifiedStartControl('');
       return;
     }
 

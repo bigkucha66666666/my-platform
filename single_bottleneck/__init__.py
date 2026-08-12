@@ -1130,9 +1130,8 @@ def coarse_toll_description_for_player(player: Player):
         return '粗收费处理已开启，但当前没有配置收费出发时点。'
 
     time_labels = slot_time_window_label_for_player(player, tolled_slots)
-    prefix = '粗收费已自动校准' if coarse_toll_source_for_player(player) == COARSE_TOLL_SOURCE_AUTO else '粗收费已开启'
     return (
-        f'{prefix}：若选择 {time_labels} 出发，每轮需支付 '
+        f'若选择 {time_labels} 出发，每轮需支付 '
         f'{point_value_display(coarse_toll_points_for_player(player))} 成本。'
     )
 

@@ -1122,6 +1122,28 @@ class PlayerBot(Bot):
             expect(self.player.decision_source, '==', 'manual')
             expect(self.player.timeout_happened, '==', False)
         expect(self.player.coarse_toll_calibration_capacity, '==', self.player.dynamic_capacity)
+        if dynamic_app.api_agent_mode(self.session) == 'active':
+            agent_records = dynamic_app.active_agent_decisions_for_group(self.group)
+            expect(
+                len(agent_records),
+                '==',
+                dynamic_app.api_agent_count_per_group(self.session),
+            )
+            expect(agent_records[0]['dynamic_capacity'], '==', self.player.dynamic_capacity)
+            expect(agent_records[0]['total_cost'], '>=', 0)
+            expect(
+                self.player.coarse_toll_calibration_players,
+                '==',
+                len(self.group.get_players()) + len(agent_records),
+            )
+            if dynamic_app.rl_fallback_enabled(self.session):
+                expect(agent_records[0]['decision_source'], '==', 'deepseek_fallback_rl')
+                rl_states = self.group.get_players()[0].participant.vars.get(
+                    dynamic_app.RL_AGENT_STATE_PARTICIPANT_VAR,
+                    {},
+                )
+                rl_state = rl_states.get(agent_records[0]['agent_id'], {})
+                expect(rl_state.get('rounds_observed'), '==', self.round_number)
 
         expected_payoff = max(
             0,
@@ -1130,9 +1152,31 @@ class PlayerBot(Bot):
         expect(float(self.player.payoff), '==', expected_payoff)
 
         if self.case == 'same_time':
-            expected_wait = (
-                ceil(len(self.group.get_players()) / self.player.dynamic_capacity) - 1
-            ) * C.CAPACITY_WINDOW_MINUTES
+            actors_by_minute = {chosen_minute: len(self.group.get_players())}
+            for record in dynamic_app.active_agent_decisions_for_group(self.group):
+                minute = record['departure_minute']
+                actors_by_minute[minute] = actors_by_minute.get(minute, 0) + 1
+            next_available = self.participant.vars[DEPARTURE_SCHEDULE_VAR][
+                'first_departure_minute'
+            ]
+            expected_wait = None
+            for minute in sorted(actors_by_minute):
+                first_service_start = max(minute, next_available)
+                wait = dynamic_app.service_batch_wait_minutes(
+                    departure_minute=minute,
+                    first_service_start_minute=first_service_start,
+                    load=actors_by_minute[minute],
+                    capacity=self.player.dynamic_capacity,
+                    capacity_window_minutes=C.CAPACITY_WINDOW_MINUTES,
+                )
+                if minute == chosen_minute:
+                    expected_wait = wait
+                next_available = dynamic_app.service_batch_clear_minute(
+                    first_service_start,
+                    actors_by_minute[minute],
+                    self.player.dynamic_capacity,
+                )
+            assert expected_wait is not None
             for group_player in self.group.get_players():
                 expect(group_player.dynamic_capacity, '==', self.player.dynamic_capacity)
                 expect(group_player.queue_delay_minutes, '==', expected_wait)

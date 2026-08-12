@@ -1,4 +1,4 @@
-{% extends "otree/BaseAdminRegular.html" %}
+{% extends "otree/BaseAdmin.html" %}
 
 {% block head_title %}Create session{% endblock %}
 {% block title %}Create session{% endblock %}
@@ -31,67 +31,197 @@
     </div>
 </div>
 
+<div id="dynamic-agent-control" class="mb-3" hidden>
+    <label class="col-form-label" for="dynamic-agent-enabled">
+        是否加入 Agent
+    </label>
+    <div class="controls">
+        <div class="form-check form-switch mb-2">
+            <input
+                id="dynamic-agent-enabled"
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+            >
+            <label class="form-check-label" for="dynamic-agent-enabled">
+                开启后，Agent 将作为虚拟参与者加入本轮拥堵与成本计算
+            </label>
+        </div>
+        <div id="dynamic-agent-count-wrap" hidden>
+            <label for="dynamic-agent-count-per-group">每组 Agent 数量</label>
+            <input
+                id="dynamic-agent-count-per-group"
+                class="form-control w-auto"
+                type="number"
+                min="1"
+                max="5"
+                step="1"
+                required
+            >
+            <p class="help-block">
+                默认不分组时，此数量就是整个 Session 中加入的 Agent 总数。
+            </p>
+            <p class="help-block text-warning">
+                DeepSeek 不可用时，Agent 会自动使用你在下方选择的备用策略。
+            </p>
+            <div class="form-check form-switch mt-3">
+                <input
+                    id="dynamic-rl-fallback-enabled"
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                >
+                <label class="form-check-label" for="dynamic-rl-fallback-enabled">
+                    启用强化学习备用策略
+                </label>
+            </div>
+            <p class="help-block">
+                开启后，本地策略全程影子学习；仅在 DeepSeek 失败时接管选择。
+            </p>
+        </div>
+        <input id="dynamic-agent-mode" type="hidden" value="off">
+        <input id="dynamic-rl-fallback" type="hidden" value="0">
+    </div>
+</div>
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     const activeAgentConfigs = new Set([
         "single_bottleneck_prod_agent_active",
         "single_bottleneck_demo_agent_active",
     ]);
-    const suffix = ".api_agent_count_per_group";
+    const dynamicAgentConfigs = new Set([
+        "dynamic_bottleneck_round_prod",
+        "dynamic_bottleneck_round_demo",
+    ]);
+    const countSuffix = ".api_agent_count_per_group";
+    const modeSuffix = ".api_agent_mode";
+    const rlFallbackSuffix = ".rl_fallback_enabled";
     const dropdown = document.querySelector('[name="session_config"]');
     const participantBlock = document
         .querySelector('label[for="num_participants"]')
         ?.closest(".mb-3");
     const control = document.getElementById("agent-count-control");
     const countInput = document.getElementById("agent-count-per-group");
+    const dynamicControl = document.getElementById("dynamic-agent-control");
+    const dynamicEnabled = document.getElementById("dynamic-agent-enabled");
+    const dynamicCountWrap = document.getElementById("dynamic-agent-count-wrap");
+    const dynamicCountInput = document.getElementById("dynamic-agent-count-per-group");
+    const dynamicModeInput = document.getElementById("dynamic-agent-mode");
+    const dynamicRlEnabled = document.getElementById("dynamic-rl-fallback-enabled");
+    const dynamicRlInput = document.getElementById("dynamic-rl-fallback");
     const createButton = document.getElementById("btn-create-session");
-    const sourceInputs = new Map();
+    const countSources = new Map();
+    const modeSources = new Map();
+    const rlFallbackSources = new Map();
 
-    document.querySelectorAll(`input[name$="${suffix}"]`).forEach((input) => {
-        const configName = input.name.slice(0, -suffix.length);
-        sourceInputs.set(configName, input);
+    document.querySelectorAll(`input[name$="${countSuffix}"]`).forEach((input) => {
+        const configName = input.name.slice(0, -countSuffix.length);
+        countSources.set(configName, input);
+    });
+    document.querySelectorAll(`input[name$="${modeSuffix}"]`).forEach((input) => {
+        const configName = input.name.slice(0, -modeSuffix.length);
+        modeSources.set(configName, input);
+    });
+    document.querySelectorAll(`input[name$="${rlFallbackSuffix}"]`).forEach((input) => {
+        const configName = input.name.slice(0, -rlFallbackSuffix.length);
+        rlFallbackSources.set(configName, input);
     });
 
     if (!dropdown || !participantBlock || !control || !countInput || !createButton
-            || Array.from(activeAgentConfigs).some((name) => !sourceInputs.has(name))) {
+            || !dynamicControl || !dynamicEnabled || !dynamicCountWrap
+            || !dynamicCountInput || !dynamicModeInput
+            || !dynamicRlEnabled || !dynamicRlInput
+            || Array.from(activeAgentConfigs).some((name) => !countSources.has(name))
+            || Array.from(dynamicAgentConfigs).some(
+                (name) => !countSources.has(name) || !modeSources.has(name)
+                    || !rlFallbackSources.has(name)
+            )) {
         return;
     }
 
-    sourceInputs.forEach((input) => {
+    countSources.forEach((input) => {
         input.closest("tr")?.setAttribute("hidden", "hidden");
         input.removeAttribute("name");
     });
+    dynamicAgentConfigs.forEach((configName) => {
+        [modeSources.get(configName), rlFallbackSources.get(configName)].forEach((input) => {
+            input.closest("tr")?.setAttribute("hidden", "hidden");
+            input.removeAttribute("name");
+        });
+    });
     participantBlock.insertAdjacentElement("afterend", control);
+    control.insertAdjacentElement("afterend", dynamicControl);
 
     let currentConfig = "";
 
-    function syncControl() {
-        if (currentConfig && sourceInputs.has(currentConfig)) {
-            sourceInputs.get(currentConfig).value = countInput.value;
-        }
-
-        currentConfig = dropdown.value;
-        const source = sourceInputs.get(currentConfig);
-        const visible = activeAgentConfigs.has(currentConfig) && Boolean(source);
-
-        control.hidden = !visible;
-        countInput.removeAttribute("name");
-        if (!visible) {
+    function storeCurrentValues() {
+        if (!currentConfig) {
             return;
         }
+        if (activeAgentConfigs.has(currentConfig) && countSources.has(currentConfig)) {
+            countSources.get(currentConfig).value = countInput.value;
+        }
+        if (dynamicAgentConfigs.has(currentConfig)) {
+            countSources.get(currentConfig).value = dynamicCountInput.value;
+            modeSources.get(currentConfig).value = dynamicEnabled.checked ? "active" : "off";
+            rlFallbackSources.get(currentConfig).value = dynamicRlEnabled.checked ? "1" : "0";
+        }
+    }
 
-        countInput.name = `${currentConfig}${suffix}`;
-        countInput.value = source.value;
+    function syncDynamicState() {
+        const enabled = dynamicEnabled.checked;
+        dynamicCountWrap.hidden = !enabled;
+        dynamicCountInput.disabled = !enabled;
+        dynamicModeInput.value = enabled ? "active" : "off";
+        dynamicRlEnabled.disabled = !enabled;
+        dynamicRlInput.value = enabled && dynamicRlEnabled.checked ? "1" : "0";
+    }
+
+    function syncControl() {
+        storeCurrentValues();
+        currentConfig = dropdown.value;
+        const source = countSources.get(currentConfig);
+        const singleVisible = activeAgentConfigs.has(currentConfig) && Boolean(source);
+        const dynamicVisible = dynamicAgentConfigs.has(currentConfig)
+            && countSources.has(currentConfig)
+            && modeSources.has(currentConfig);
+
+        control.hidden = !singleVisible;
+        dynamicControl.hidden = !dynamicVisible;
+        countInput.removeAttribute("name");
+        dynamicCountInput.removeAttribute("name");
+        dynamicModeInput.removeAttribute("name");
+        dynamicRlInput.removeAttribute("name");
+
+        if (singleVisible) {
+            countInput.name = `${currentConfig}${countSuffix}`;
+            countInput.value = source.value;
+        }
+
+        if (dynamicVisible) {
+            dynamicEnabled.checked = modeSources.get(currentConfig).value === "active";
+            dynamicCountInput.value = countSources.get(currentConfig).value || "1";
+            dynamicCountInput.name = `${currentConfig}${countSuffix}`;
+            dynamicModeInput.name = `${currentConfig}${modeSuffix}`;
+            dynamicRlEnabled.checked = rlFallbackSources.get(currentConfig).value === "1";
+            dynamicRlInput.name = `${currentConfig}${rlFallbackSuffix}`;
+            syncDynamicState();
+        }
     }
 
     dropdown.addEventListener("change", syncControl);
+    dynamicEnabled.addEventListener("change", syncDynamicState);
+    dynamicRlEnabled.addEventListener("change", syncDynamicState);
     createButton.addEventListener("click", (event) => {
-        if (control.hidden) {
-            return;
-        }
-
-        if (!countInput.checkValidity()) {
+        if (!control.hidden && !countInput.checkValidity()) {
             countInput.reportValidity();
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+        if (!dynamicControl.hidden && dynamicEnabled.checked
+                && !dynamicCountInput.checkValidity()) {
+            dynamicCountInput.reportValidity();
             event.preventDefault();
             event.stopImmediatePropagation();
         }

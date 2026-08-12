@@ -31,9 +31,18 @@ BROWSER_COMMAND = environ.get('BROWSER_COMMAND')
 SINGLE_BOTTLENECK_API_AGENT_COUNT = str(
     environ.get('SINGLE_BOTTLENECK_API_AGENT_COUNT_PER_GROUP', '1') or '1'
 ).strip()
-SINGLE_BOTTLENECK_API_AGENT_MODEL = environ.get('DEEPSEEK_AGENT_MODEL', 'deepseek-v4-flash')
-SINGLE_BOTTLENECK_API_AGENT_TIMEOUT_SECONDS = int(environ.get('DEEPSEEK_AGENT_TIMEOUT_SECONDS', '30') or 30)
-SINGLE_BOTTLENECK_API_AGENT_TEMPERATURE = float(environ.get('DEEPSEEK_AGENT_TEMPERATURE', '0') or 0)
+DEEPSEEK_AGENT_MODEL = environ.get('DEEPSEEK_AGENT_MODEL', 'deepseek-v4-flash')
+DEEPSEEK_AGENT_TIMEOUT_SECONDS = int(environ.get('DEEPSEEK_AGENT_TIMEOUT_SECONDS', '30') or 30)
+DEEPSEEK_AGENT_TEMPERATURE = float(environ.get('DEEPSEEK_AGENT_TEMPERATURE', '0') or 0)
+DYNAMIC_BOTTLENECK_API_AGENT_COUNT = str(
+    environ.get('DYNAMIC_BOTTLENECK_API_AGENT_COUNT_PER_GROUP', '1') or '1'
+).strip()
+DYNAMIC_BOTTLENECK_API_AGENT_MODE = str(
+    environ.get('DYNAMIC_BOTTLENECK_API_AGENT_MODE', 'off') or 'off'
+).strip().lower()
+DYNAMIC_BOTTLENECK_RL_FALLBACK_ENABLED = str(
+    environ.get('DYNAMIC_BOTTLENECK_RL_FALLBACK_ENABLED', '0') or '0'
+).strip()
 
 
 SINGLE_BOTTLENECK_COMMON = dict(
@@ -62,10 +71,10 @@ SINGLE_BOTTLENECK_COMMON = dict(
     payoff_source_label='single_bottleneck 全 10 轮累计结果',
     payoff_rounds=10,
     api_agent_count_per_group=SINGLE_BOTTLENECK_API_AGENT_COUNT,
-    api_agent_model=SINGLE_BOTTLENECK_API_AGENT_MODEL,
-    api_agent_timeout_seconds=SINGLE_BOTTLENECK_API_AGENT_TIMEOUT_SECONDS,
-    api_agent_temperature=SINGLE_BOTTLENECK_API_AGENT_TEMPERATURE,
-    api_agent_policy_version=SINGLE_BOTTLENECK_API_AGENT_MODEL,
+    api_agent_model=DEEPSEEK_AGENT_MODEL,
+    api_agent_timeout_seconds=DEEPSEEK_AGENT_TIMEOUT_SECONDS,
+    api_agent_temperature=DEEPSEEK_AGENT_TEMPERATURE,
+    api_agent_policy_version=DEEPSEEK_AGENT_MODEL,
 )
 
 DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
@@ -93,6 +102,13 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     coarse_toll_slot_spec='10-12',
     coarse_toll_time_window_spec='07:53-07:55',
     coarse_toll_points=3,
+    api_agent_mode=DYNAMIC_BOTTLENECK_API_AGENT_MODE,
+    api_agent_count_per_group=DYNAMIC_BOTTLENECK_API_AGENT_COUNT,
+    api_agent_model=DEEPSEEK_AGENT_MODEL,
+    api_agent_timeout_seconds=DEEPSEEK_AGENT_TIMEOUT_SECONDS,
+    api_agent_temperature=DEEPSEEK_AGENT_TEMPERATURE,
+    api_agent_policy_version=DEEPSEEK_AGENT_MODEL,
+    rl_fallback_enabled=DYNAMIC_BOTTLENECK_RL_FALLBACK_ENABLED,
     payoff_source_var='dynamic_bottleneck_round_total_payoff',
     final_payoff_label='整轮随机瓶颈服务率实验',
     payoff_source_label='dynamic_bottleneck_round 全 10 轮累计结果',
@@ -183,7 +199,8 @@ SESSION_CONFIGS = [
         doc=(
             "用于真实被试的整轮随机瓶颈服务率实验。\n"
             "同一小组在同一轮面对相同服务率，不同轮次按配置概率变化。\n"
-            "默认不分组、关闭奖励，并按实际人数和各候选服务率自动校准粗收费。"
+            "默认不分组、关闭奖励，并按实际人数和各候选服务率自动校准粗收费。\n"
+            "创建 Session 时可选择是否加入 Agent，并设置每组 Agent 数量。"
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
         **DYNAMIC_BOTTLENECK_ROUND_COMMON,
@@ -196,7 +213,7 @@ SESSION_CONFIGS = [
         doc=(
             "用于整轮随机瓶颈服务率实验的流程走查。\n"
             "默认使用 1、2、3 人/分钟三种状态，概率分别为 30%、50%、20%，"
-            "并启用与服务率匹配的自动粗收费。"
+            "并启用与服务率匹配的自动粗收费；创建时可选择是否加入 Agent。"
         ),
         **DYNAMIC_BOTTLENECK_ROUND_COMMON,
         num_demo_participants=5,

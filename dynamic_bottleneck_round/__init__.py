@@ -1,11 +1,35 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+import fcntl
 from math import ceil, floor, isfinite
 import json
+import os
 from pathlib import Path
 import random
+import tempfile
+from threading import Lock
 import time
 
 from otree.api import *
+from .agents.deepseek_agent import (
+    AgentChoice,
+    AgentChoiceSet,
+    choose_agent_departure,
+    config_from_session,
+    fallback_lowest_schedule_cost,
+)
+from .agents.personas import (
+    get_or_create_api_agent_persona,
+    initialize_api_agent_personas,
+)
+from .agents.rl_fallback import (
+    choose_rl_departure,
+    initial_rl_state,
+    observe_rl_outcome,
+    valid_or_initial_state,
+)
 
 
 doc = """
@@ -33,6 +57,21 @@ TOLL_SOURCE_AUTO = 'auto'
 TOLL_SOURCE_MANUAL = 'manual'
 SAME_TIME_QUEUE_RULE = 'batch_max_wait'
 TOLL_WINDOW_RULE = 'symmetric_continuous'
+API_AGENT_MODE_OFF = 'off'
+API_AGENT_MODE_ACTIVE = 'active'
+API_AGENT_TYPE_DEEPSEEK = 'deepseek_api_agent'
+API_AGENT_COUNT_MIN = 1
+API_AGENT_COUNT_MAX = 5
+API_AGENT_COUNT_ERROR = '每组 Agent 数量必须是 1 到 5 之间的整数。'
+AGENT_DECISIONS_PARTICIPANT_VAR = 'dynamic_bottleneck_round_agent_decisions_by_round_v1'
+RL_AGENT_STATE_PARTICIPANT_VAR = 'dynamic_bottleneck_round_rl_agent_state_v1'
+API_AGENT_DECISIONS_PENDING = object()
+_API_AGENT_PREFETCH_EXECUTOR = ThreadPoolExecutor(
+    max_workers=8,
+    thread_name_prefix='dynamic-bottleneck-agent',
+)
+_API_AGENT_PREFETCH_TASKS = {}
+_API_AGENT_PREFETCH_LOCK = Lock()
 
 
 class DynamicCapacityConfigError(ValueError):
@@ -396,6 +435,14 @@ EXPORT_HEADERS = [
     'dropout_reason_at_export',
     'has_recovered_after_disconnect',
     'has_recovered_after_timeout',
+    'actor_type',
+    'agent_id',
+    'agent_type',
+    'api_agent_mode',
+    'agent_fallback_used',
+    'agent_latency_ms',
+    'agent_reason',
+    'agent_context_json',
 ]
 
 
@@ -407,6 +454,74 @@ def config_flag(value) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {'1', 'true', 'yes', 'on'}
     return False
+
+
+def api_agent_mode(session) -> str:
+    mode = str(session.config.get('api_agent_mode', API_AGENT_MODE_OFF) or '').strip().lower()
+    return API_AGENT_MODE_ACTIVE if mode == API_AGENT_MODE_ACTIVE else API_AGENT_MODE_OFF
+
+
+def rl_fallback_enabled(session) -> bool:
+    return (
+        api_agent_mode(session) == API_AGENT_MODE_ACTIVE
+        and config_flag(session.config.get('rl_fallback_enabled', 0))
+    )
+
+
+def api_agent_count_per_group(session) -> int:
+    if api_agent_mode(session) == API_AGENT_MODE_OFF:
+        return 0
+    return max(0, config_int(session.config.get('api_agent_count_per_group', 0), 0))
+
+
+def validate_api_agent_count(session) -> int:
+    raw_mode = str(
+        session.config.get('api_agent_mode', API_AGENT_MODE_OFF) or ''
+    ).strip().lower()
+    if raw_mode not in {API_AGENT_MODE_OFF, API_AGENT_MODE_ACTIVE}:
+        raise ValueError('api_agent_mode 必须是 off 或 active。')
+    if raw_mode == API_AGENT_MODE_OFF:
+        return 0
+
+    raw_count = session.config.get('api_agent_count_per_group', 0)
+    if isinstance(raw_count, bool):
+        raise ValueError(API_AGENT_COUNT_ERROR)
+    if isinstance(raw_count, int):
+        count = raw_count
+    elif isinstance(raw_count, str):
+        try:
+            count = int(raw_count.strip())
+        except ValueError as exc:
+            raise ValueError(API_AGENT_COUNT_ERROR) from exc
+    else:
+        raise ValueError(API_AGENT_COUNT_ERROR)
+    if not API_AGENT_COUNT_MIN <= count <= API_AGENT_COUNT_MAX:
+        raise ValueError(API_AGENT_COUNT_ERROR)
+
+    session.config = {
+        **session.config,
+        'api_agent_mode': API_AGENT_MODE_ACTIVE,
+        'api_agent_count_per_group': count,
+    }
+    return count
+
+
+def effective_group_actor_count(session, human_count) -> int:
+    return int(human_count) + api_agent_count_per_group(session)
+
+
+def agent_capacity_context(
+    config: DynamicCapacityConfig,
+    *,
+    actual_capacity,
+    previous_capacity,
+):
+    context = decision_capacity_context(
+        config,
+        actual_capacity=actual_capacity,
+    )
+    context['previous_capacity'] = previous_capacity
+    return context
 
 
 def minute_to_clock(value):
@@ -511,9 +626,10 @@ def apply_dynamic_departure_schedules(session, matrix, config):
         config_int(session.config.get('departure_schedule_min_slots_each_side', 10), 10),
     )
     for group_players in matrix:
+        actor_count = effective_group_actor_count(session, len(group_players))
         if auto_enabled:
             schedule = build_dynamic_departure_schedule(
-                players_count=len(group_players),
+                players_count=actor_count,
                 capacity_values=config.values,
                 min_slots_each_side=min_slots_each_side,
             )
@@ -1040,9 +1156,10 @@ def apply_dynamic_toll_calibrations(session, matrix, config):
     for group_players in matrix:
         if not group_players:
             continue
+        actor_count = effective_group_actor_count(session, len(group_players))
         schedule = departure_schedule_for_player(group_players[0])
         cache_key = (
-            len(group_players),
+            actor_count,
             tuple(config.values),
             schedule['num_slots'],
             schedule['first_departure_minute'],
@@ -1051,7 +1168,7 @@ def apply_dynamic_toll_calibrations(session, matrix, config):
         )
         if cache_key not in result_cache:
             result_cache[cache_key] = calibrate_tolls_for_group(
-                players_count=len(group_players),
+                players_count=actor_count,
                 capacities=config.values,
                 schedule=schedule,
                 settings=session.config,
@@ -1096,7 +1213,10 @@ def _manual_round_toll(player):
         'enabled': enabled,
         'source': TOLL_SOURCE_MANUAL,
         'capacity': int(player.dynamic_capacity),
-        'calibration_players': len(player.group.get_players()),
+        'calibration_players': effective_group_actor_count(
+            session,
+            len(player.group.get_players()),
+        ),
         'calibration_mode': '',
         'calibration_source': '',
         'slot_spec': slot_spec,
@@ -1180,6 +1300,7 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll)
 def creating_session(subsession):
     config = parse_dynamic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
+        agent_count = validate_api_agent_count(subsession.session)
         validate_toll_reveal_compatibility(subsession.session.config)
         validate_optional_treatments(subsession.session)
         players = subsession.get_players()
@@ -1207,6 +1328,12 @@ def creating_session(subsession):
         apply_dynamic_toll_calibrations(subsession.session, matrix, config)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
+        if agent_count:
+            initialize_api_agent_personas(
+                subsession.session,
+                [f'G{index:02d}' for index in range(1, len(matrix) + 1)],
+                agent_count,
+            )
         initialize_group_capacity_sequences(subsession, config)
     else:
         subsession.group_like_round(1)
@@ -1342,14 +1469,53 @@ def service_batch_clear_minute(first_service_start_minute, load, capacity):
     return round(first_service_start_minute + batches * C.CAPACITY_WINDOW_MINUTES, 2)
 
 
+def group_results_lock_path(group):
+    return Path(tempfile.gettempdir()) / (
+        'dynamic_bottleneck_round_'
+        f'uid{os.getuid()}_'
+        f'{group.session.code}_{group.id_in_subsession}_{group.round_number}.lock'
+    )
+
+
+@contextmanager
+def try_group_results_lock(group):
+    """Prevent duplicate Agent calls while result pages poll concurrently."""
+    lock_path = group_results_lock_path(group)
+    lock_file = lock_path.open('a+', encoding='utf-8')
+    acquired = False
+    try:
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            pass
+        yield acquired
+    finally:
+        if acquired:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+
+
 def set_results(group):
+    with try_group_results_lock(group) as acquired:
+        if not acquired:
+            return False
+        return _set_results_locked(group)
+
+
+def _set_results_locked(group):
     if group.results_ready:
-        return
+        return True
     if not all_players_have_choice(group):
         fill_missing_choices(group)
 
-    players_by_minute = {}
-    for player in group.get_players():
+    agent_records = collect_api_agent_prefetch(group)
+    if agent_records is API_AGENT_DECISIONS_PENDING:
+        return False
+
+    players = group.get_players()
+    actors_by_minute = {}
+    for player in players:
         schedule = departure_schedule_for_player(player)
         slot = player_departure_slot(player)
         if slot is None:
@@ -1362,14 +1528,33 @@ def set_results(group):
             mark_disconnect(player)
         else:
             set_player_departure_choice(player, departure_minute_for_slot(slot, schedule))
-        players_by_minute.setdefault(player.departure_minute, []).append(player)
+        actors_by_minute.setdefault(player.departure_minute, []).append(
+            {
+                'actor_type': 'human',
+                'source': player,
+                'reference_player': player,
+                'departure_slot': slot,
+            }
+        )
 
-    reference_schedule = departure_schedule_for_player(group.get_players()[0])
+    if players:
+        reference_player = players[0]
+        for record in agent_records:
+            actors_by_minute.setdefault(record['departure_minute'], []).append(
+                {
+                    'actor_type': 'api_agent',
+                    'source': record,
+                    'reference_player': reference_player,
+                    'departure_slot': record['departure_slot'],
+                }
+            )
+
+    reference_schedule = departure_schedule_for_player(players[0])
     next_available_minute = reference_schedule['first_departure_minute']
     capacity = group.dynamic_capacity
-    for departure_minute in sorted(players_by_minute):
-        same_time_players = players_by_minute[departure_minute]
-        load = len(same_time_players)
+    for departure_minute in sorted(actors_by_minute):
+        same_time_actors = actors_by_minute[departure_minute]
+        load = len(same_time_actors)
         first_service_start = max(departure_minute, next_available_minute)
         queue_delay = service_batch_wait_minutes(
             departure_minute=departure_minute,
@@ -1382,10 +1567,12 @@ def set_results(group):
         early_minutes = max(0, C.PREFERRED_ARRIVAL_MINUTE - arrival_minute)
         late_minutes = max(0, arrival_minute - C.PREFERRED_ARRIVAL_MINUTE)
 
-        for player in same_time_players:
-            slot = player_departure_slot(player)
+        for actor in same_time_actors:
+            source = actor['source']
+            reference_player = actor['reference_player']
+            slot = actor['departure_slot']
             reward_bonus = reward_bonus_for_slot(group.session, slot)
-            toll = coarse_toll_for_player_slot(player, slot)
+            toll = coarse_toll_for_player_slot(reference_player, slot)
             cost_components = calculate_cost_components(
                 queue_delay=queue_delay,
                 early_minutes=early_minutes,
@@ -1394,26 +1581,49 @@ def set_results(group):
             )
             total_cost = cost_components['total_cost']
             payoff = max(0, round(C.BASE_POINTS - total_cost + reward_bonus, 2))
-            player.slot_load = load
-            player.arrival_minute = round(arrival_minute, 2)
-            player.arrival_time_label = minute_to_clock(arrival_minute)
-            player.queue_delay_minutes = queue_delay
-            player.travel_time_minutes = round(C.FREE_FLOW_TRAVEL_MINUTES + queue_delay, 2)
-            player.early_minutes = round(early_minutes, 2)
-            player.late_minutes = round(late_minutes, 2)
-            player.reward_bonus = cu(reward_bonus)
-            player.coarse_toll_charge = cu(toll)
-            player.total_cost = cu(total_cost)
-            player.payoff = cu(payoff)
+            result_values = {
+                'slot_load': load,
+                'arrival_minute': round(arrival_minute, 2),
+                'arrival_time_label': minute_to_clock(arrival_minute),
+                'queue_delay_minutes': queue_delay,
+                'travel_time_minutes': round(
+                    C.FREE_FLOW_TRAVEL_MINUTES + queue_delay,
+                    2,
+                ),
+                'early_minutes': round(early_minutes, 2),
+                'late_minutes': round(late_minutes, 2),
+                'reward_bonus': round(float(reward_bonus), 2),
+                'coarse_toll_charge': round(float(toll), 2),
+                'total_cost': round(float(total_cost), 2),
+                'payoff': round(float(payoff), 2),
+            }
+            if actor['actor_type'] == 'api_agent':
+                source.update(result_values)
+                source['arrival_time_label'] = minute_to_clock(arrival_minute)
+            else:
+                for field_name, value in result_values.items():
+                    if field_name in {
+                        'reward_bonus',
+                        'coarse_toll_charge',
+                        'total_cost',
+                        'payoff',
+                    }:
+                        value = cu(value)
+                    setattr(source, field_name, value)
 
         next_available_minute = service_batch_clear_minute(first_service_start, load, capacity)
 
+    if agent_records:
+        update_rl_shadow_states(group, agent_records)
+        save_agent_decisions_for_group(group, agent_records)
+
     if group.round_number == C.NUM_ROUNDS:
-        for player in group.get_players():
+        for player in players:
             player.participant.vars[TOTAL_PAYOFF_VAR] = sum(
                 round_player.payoff for round_player in player.in_all_rounds()
             )
     group.results_ready = True
+    return True
 
 
 def maybe_prepare_results(group):
@@ -1470,6 +1680,461 @@ def choice_preview(player):
     ]
 
 
+def active_agent_decisions_for_group(group):
+    if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
+        return []
+    players = group.get_players()
+    if players:
+        participant_records = players[0].participant.vars.get(
+            AGENT_DECISIONS_PARTICIPANT_VAR,
+            {},
+        )
+        if isinstance(participant_records, dict):
+            records = participant_records.get(str(group.round_number), [])
+            if isinstance(records, list) and records:
+                return deepcopy(records)
+    return []
+
+
+def save_agent_decisions_for_group(group, records):
+    players = group.get_players()
+    if players:
+        stored = players[0].participant.vars.get(
+            AGENT_DECISIONS_PARTICIPANT_VAR,
+            {},
+        )
+        by_round = deepcopy(stored) if isinstance(stored, dict) else {}
+        by_round[str(group.round_number)] = deepcopy(records)
+        players[0].participant.vars[AGENT_DECISIONS_PARTICIPANT_VAR] = by_round
+
+
+def agent_history_for_group(group, agent_id):
+    players = group.get_players()
+    participant_store = (
+        players[0].participant.vars.get(AGENT_DECISIONS_PARTICIPANT_VAR, {})
+        if players else {}
+    )
+    rounds = []
+    for round_number in range(1, int(group.round_number)):
+        records = (
+            participant_store.get(str(round_number), [])
+            if isinstance(participant_store, dict)
+            else []
+        )
+        for record in records:
+            if record.get('agent_id') != agent_id:
+                continue
+            rounds.append(
+                {
+                    'round_number': round_number,
+                    'dynamic_capacity': record.get('dynamic_capacity'),
+                    'departure_slot': record.get('departure_slot'),
+                    'departure_minute': record.get('departure_minute'),
+                    'queue_delay_minutes': record.get('queue_delay_minutes'),
+                    'arrival_minute': record.get('arrival_minute'),
+                    'total_cost': record.get('total_cost'),
+                    'payoff': record.get('payoff'),
+                }
+            )
+    return {'previous_rounds': rounds}
+
+
+def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
+    config = parse_dynamic_capacity_config(group.session.config)
+    schedule = departure_schedule_for_player(reference_player)
+    preview = choice_preview(reference_player)
+    previous_capacity = (
+        reference_player.previous_round_capacity
+        if group.round_number > 1
+        else None
+    )
+    return AgentChoiceSet(
+        round_number=group.round_number,
+        total_rounds=C.NUM_ROUNDS,
+        available_slots=[
+            {
+                'slot': item['slot'],
+                'departure_minute': item['minute'],
+                'departure_time': item['time'],
+            }
+            for item in preview
+        ],
+        cost_parameters={
+            'fixed_travel_time_cost': C.FIXED_TRAVEL_TIME_COST,
+            'queue_cost_per_minute': C.QUEUE_COST_PER_MINUTE,
+            'early_cost_per_minute': C.EARLY_COST_PER_MINUTE,
+            'late_cost_per_minute': C.LATE_COST_PER_MINUTE,
+            'preferred_arrival_minute': C.PREFERRED_ARRIVAL_MINUTE,
+            'preferred_arrival_time': minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
+            'free_flow_travel_minutes': C.FREE_FLOW_TRAVEL_MINUTES,
+            'first_departure_minute': schedule['first_departure_minute'],
+            'last_departure_minute': schedule['last_departure_minute'],
+            'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
+        },
+        capacity_context=agent_capacity_context(
+            config,
+            actual_capacity=group.dynamic_capacity,
+            previous_capacity=previous_capacity,
+        ),
+        tolls=[
+            {'slot': item['slot'], 'charge': item['toll']}
+            for item in preview
+            if item['toll_active']
+        ],
+        rewards=[
+            {'slot': item['slot'], 'bonus': item['reward']}
+            for item in preview
+            if item['reward']
+        ],
+        history=agent_history_for_group(group, agent_id),
+        agent_id=agent_id,
+        persona=persona,
+    )
+
+
+def rl_state_store_for_group(group):
+    players = group.get_players()
+    if not players:
+        return {}, None
+    stored = players[0].participant.vars.get(RL_AGENT_STATE_PARTICIPANT_VAR, {})
+    return deepcopy(stored) if isinstance(stored, dict) else {}, players[0]
+
+
+def rl_candidate_for_choice_set(group, choice_set):
+    if not rl_fallback_enabled(group.session):
+        return None
+    capacity_states = choice_set.capacity_context.get('capacity_states', [])
+    if not capacity_states:
+        return None
+    store, _reference_player = rl_state_store_for_group(group)
+    state = valid_or_initial_state(store.get(choice_set.agent_id), capacity_states)
+    visible_capacity = choice_set.capacity_context.get('actual_capacity')
+    choice = choose_rl_departure(
+        state=state,
+        available_slots=choice_set.available_slots,
+        cost_parameters=choice_set.cost_parameters,
+        capacity_states=capacity_states,
+        tolls=choice_set.tolls,
+        rewards=choice_set.rewards,
+        persona=choice_set.persona,
+        known_current_capacity=visible_capacity,
+    )
+    return {
+        **choice,
+        'context_json': json.dumps(
+            {
+                'agent_id': choice_set.agent_id,
+                'round_number': choice_set.round_number,
+                'capacity_context': choice_set.capacity_context,
+                'rl_policy': choice,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+    }
+
+
+def prepare_rl_candidates_for_agents(group, prepared_agents):
+    candidates = {}
+    for agent_id, choice_set in prepared_agents:
+        try:
+            candidates[agent_id] = rl_candidate_for_choice_set(group, choice_set)
+        except (KeyError, TypeError, ValueError, ArithmeticError):
+            candidates[agent_id] = None
+    return candidates
+
+
+def apply_rl_fallback_to_choice(choice, choice_set, rl_candidate):
+    if not choice.fallback_used or not rl_candidate:
+        return choice
+    slot = int(rl_candidate['departure_slot'])
+    if slot not in choice_set.valid_slots():
+        return choice
+    reason = str(rl_candidate.get('reason', 'Local RL fallback selected an action.'))
+    if choice.reason:
+        reason = f'{reason} DeepSeek failure: {choice.reason}'
+    return AgentChoice(
+        departure_slot=slot,
+        decision_source='deepseek_fallback_rl',
+        fallback_used=True,
+        reason=reason,
+        latency_ms=choice.latency_ms,
+        raw_response_json=choice.raw_response_json,
+        context_json=str(rl_candidate.get('context_json', choice.context_json)),
+    )
+
+
+def group_slot_counts_for_rl(group, agent_records):
+    counts = {}
+    for player in group.get_players():
+        slot = player_departure_slot(player)
+        if slot is not None:
+            counts[str(int(slot))] = counts.get(str(int(slot)), 0) + 1
+    for record in agent_records:
+        slot = int(record['departure_slot'])
+        counts[str(slot)] = counts.get(str(slot), 0) + 1
+    return counts
+
+
+def update_rl_shadow_states(group, agent_records):
+    if not rl_fallback_enabled(group.session) or not agent_records:
+        return
+    config = parse_dynamic_capacity_config(group.session.config)
+    capacity_states = capacity_state_rows(config)
+    store, reference_player = rl_state_store_for_group(group)
+    if reference_player is None:
+        return
+    counts = group_slot_counts_for_rl(group, agent_records)
+    changed = False
+    for record in agent_records:
+        agent_id = str(record['agent_id'])
+        state = valid_or_initial_state(store.get(agent_id), capacity_states)
+        if int(state.get('rounds_observed', 0)) >= int(group.round_number):
+            continue
+        group_label = reference_player.participant.vars.get(
+            'assigned_group_label',
+            f'G{group.id_in_subsession:02d}',
+        )
+        persona = get_or_create_api_agent_persona(
+            group.session,
+            group_label,
+            agent_id,
+        )
+        store[agent_id] = observe_rl_outcome(
+            state,
+            revealed_capacity=group.dynamic_capacity,
+            departure_slot=record['departure_slot'],
+            total_cost=record['total_cost'],
+            anonymous_slot_counts=counts,
+            persona=persona,
+        )
+        record['rl_shadow_updated'] = True
+        changed = True
+    if changed:
+        reference_player.participant.vars[RL_AGENT_STATE_PARTICIPANT_VAR] = store
+
+
+def choose_api_agent_departures(config, choice_sets):
+    if not choice_sets:
+        return []
+
+    def choose_one(choice_set):
+        return choose_agent_departure(config=config, choice_set=choice_set)
+
+    with ThreadPoolExecutor(max_workers=len(choice_sets)) as executor:
+        return list(executor.map(choose_one, choice_sets))
+
+
+def api_agent_prefetch_key(group):
+    return (
+        str(group.session.code),
+        int(group.id_in_subsession),
+        int(group.round_number),
+    )
+
+
+def prepare_api_agent_requests_for_group(group):
+    players = group.get_players()
+    if not players:
+        return None, []
+    reference_player = players[0]
+    group_label = reference_player.participant.vars.get(
+        'assigned_group_label',
+        f'G{group.id_in_subsession:02d}',
+    )
+    prepared_agents = []
+    for index in range(1, api_agent_count_per_group(group.session) + 1):
+        agent_id = f'{group_label}_API_{index:02d}'
+        persona = get_or_create_api_agent_persona(
+            group.session,
+            group_label,
+            agent_id,
+        )
+        prepared_agents.append(
+            (
+                agent_id,
+                api_agent_choice_set_for_group(
+                    group,
+                    reference_player,
+                    agent_id,
+                    persona,
+                ),
+            )
+        )
+    return config_from_session(group.session.config), prepared_agents
+
+
+def build_api_agent_records_for_group(group, prepared_agents, choices):
+    players = group.get_players()
+    if not players:
+        return []
+    schedule = departure_schedule_for_player(players[0])
+    records = []
+    for (agent_id, _choice_set), choice in zip(prepared_agents, choices):
+        slot = int(choice.departure_slot)
+        departure_minute = departure_minute_for_slot(slot, schedule)
+        records.append(
+            {
+                'actor_type': 'api_agent',
+                'agent_id': agent_id,
+                'agent_type': API_AGENT_TYPE_DEEPSEEK,
+                'api_agent_mode': API_AGENT_MODE_ACTIVE,
+                'policy_version': str(
+                    group.session.config.get(
+                        'api_agent_policy_version',
+                        group.session.config.get('api_agent_model', ''),
+                    )
+                ),
+                'group_id': int(group.id_in_subsession),
+                'round_number': int(group.round_number),
+                'dynamic_capacity': int(group.dynamic_capacity),
+                'dynamic_capacity_state': str(group.dynamic_capacity_state),
+                'capacity_probability': float(group.capacity_probability),
+                'capacity_reveal_timing': str(
+                    group.session.config.get(
+                        'capacity_reveal_timing',
+                        REVEAL_BEFORE_DECISION,
+                    )
+                ),
+                'departure_slot': slot,
+                'departure_minute': round(departure_minute, 2),
+                'departure_time_label': minute_to_clock(departure_minute),
+                'decision_source': choice.decision_source,
+                'fallback_used': bool(choice.fallback_used),
+                'latency_ms': int(choice.latency_ms),
+                'reason': choice.reason,
+                'raw_response_json': choice.raw_response_json,
+                'context_json': choice.context_json,
+                'arrival_minute': 0,
+                'arrival_time_label': '',
+                'queue_delay_minutes': 0,
+                'travel_time_minutes': 0,
+                'early_minutes': 0,
+                'late_minutes': 0,
+                'slot_load': 0,
+                'reward_bonus': 0,
+                'coarse_toll_charge': 0,
+                'total_cost': 0,
+                'payoff': 0,
+            }
+        )
+    return records
+
+
+def _fallback_choices_for_prefetch_error(prepared_agents, exc):
+    reason = f'Agent prefetch worker failed: {exc}'
+    return [
+        AgentChoice(
+            departure_slot=fallback_lowest_schedule_cost(choice_set),
+            decision_source='fallback_lowest_schedule_cost',
+            fallback_used=True,
+            reason=reason,
+            context_json=json.dumps(
+                asdict(choice_set),
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        )
+        for _agent_id, choice_set in prepared_agents
+    ]
+
+
+def start_api_agent_prefetch(group):
+    if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
+        return None
+    if active_agent_decisions_for_group(group):
+        return None
+
+    key = api_agent_prefetch_key(group)
+    with _API_AGENT_PREFETCH_LOCK:
+        current = _API_AGENT_PREFETCH_TASKS.get(key)
+        if current:
+            return current['future']
+
+        config, prepared_agents = prepare_api_agent_requests_for_group(group)
+        if not prepared_agents:
+            return None
+        rl_candidates = prepare_rl_candidates_for_agents(group, prepared_agents)
+        future = _API_AGENT_PREFETCH_EXECUTOR.submit(
+            choose_api_agent_departures,
+            config,
+            [choice_set for _, choice_set in prepared_agents],
+        )
+        _API_AGENT_PREFETCH_TASKS[key] = {
+            'future': future,
+            'prepared_agents': prepared_agents,
+            'rl_candidates': rl_candidates,
+        }
+        return future
+
+
+def collect_api_agent_prefetch(group):
+    if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
+        return []
+    existing = active_agent_decisions_for_group(group)
+    if existing:
+        return existing
+
+    future = start_api_agent_prefetch(group)
+    if future is None:
+        return []
+    key = api_agent_prefetch_key(group)
+    with _API_AGENT_PREFETCH_LOCK:
+        task = _API_AGENT_PREFETCH_TASKS.get(key)
+    if not task or not future.done():
+        return API_AGENT_DECISIONS_PENDING
+
+    try:
+        choices = future.result()
+    except Exception as exc:
+        choices = _fallback_choices_for_prefetch_error(
+            task['prepared_agents'],
+            exc,
+        )
+    rl_candidates = task.get('rl_candidates', {})
+    if rl_candidates:
+        choices = [
+            apply_rl_fallback_to_choice(
+                choice,
+                choice_set,
+                rl_candidates.get(agent_id),
+            )
+            for (agent_id, choice_set), choice in zip(task['prepared_agents'], choices)
+        ]
+    records = build_api_agent_records_for_group(
+        group,
+        task['prepared_agents'],
+        choices,
+    )
+    save_agent_decisions_for_group(group, records)
+    with _API_AGENT_PREFETCH_LOCK:
+        if _API_AGENT_PREFETCH_TASKS.get(key) is task:
+            _API_AGENT_PREFETCH_TASKS.pop(key, None)
+    return deepcopy(records)
+
+
+def create_api_agent_decisions_for_group(group):
+    """Synchronous compatibility wrapper used by tests and offline tools."""
+    if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
+        return []
+    existing = active_agent_decisions_for_group(group)
+    if existing:
+        return existing
+
+    future = start_api_agent_prefetch(group)
+    if future is None:
+        return []
+    try:
+        future.result()
+    except Exception:
+        # The collector converts worker failures to the configured local fallback.
+        pass
+    records = collect_api_agent_prefetch(group)
+    if records is API_AGENT_DECISIONS_PENDING:
+        return []
+    return records
+
+
 def result_cost_components(player):
     return calculate_cost_components(
         queue_delay=player.queue_delay_minutes,
@@ -1485,6 +2150,10 @@ def group_departure_distribution(group):
     counts = {slot: 0 for slot in departure_slots(schedule)}
     for player in group.get_players():
         slot = player_departure_slot(player)
+        if slot in counts:
+            counts[slot] += 1
+    for record in active_agent_decisions_for_group(group):
+        slot = int(record.get('departure_slot', 0) or 0)
         if slot in counts:
             counts[slot] += 1
     maximum = max(counts.values() or [0])
@@ -1507,6 +2176,10 @@ def result_current_round_cost_snapshot(player):
         slot = player_departure_slot(group_player)
         if slot in costs_by_slot and player_has_departure_choice(group_player):
             costs_by_slot[slot].append(float(group_player.total_cost))
+    for record in active_agent_decisions_for_group(player.group):
+        slot = int(record.get('departure_slot', 0) or 0)
+        if slot in costs_by_slot:
+            costs_by_slot[slot].append(float(record.get('total_cost', 0)))
 
     averages = [
         sum(values) / len(values)
@@ -1596,12 +2269,87 @@ def export_row_for_player(player):
         participant_dropout_reason(player),
         bool(participant_var(player, 'has_recovered_after_disconnect', False)),
         bool(participant_var(player, 'has_recovered_after_timeout', False)),
+        'human',
+        '',
+        '',
+        api_agent_mode(player.session),
+        '',
+        '',
+        '',
+        '',
     ]
+
+
+def agent_decisions_for_players(players):
+    groups = {}
+    for player in players:
+        key = (
+            player.session.code,
+            player.round_number,
+            player.group.id_in_subsession,
+        )
+        groups.setdefault(key, player.group)
+    decisions = []
+    for key, group in sorted(groups.items()):
+        group_players = group.get_players()
+        if not group_players:
+            continue
+        reference_player = group_players[0]
+        for record in active_agent_decisions_for_group(group):
+            decisions.append((record, reference_player))
+    return decisions
+
+
+def export_row_for_agent_record(record, reference_player):
+    row = export_row_for_player(reference_player)
+    values = {
+        'participant_code': '',
+        'group_id': record.get('group_id', reference_player.group.id_in_subsession),
+        'round_number': record.get('round_number', reference_player.round_number),
+        'dynamic_capacity': record.get('dynamic_capacity', reference_player.dynamic_capacity),
+        'dynamic_capacity_state': record.get(
+            'dynamic_capacity_state',
+            reference_player.dynamic_capacity_state,
+        ),
+        'departure_slot': record.get('departure_slot', ''),
+        'departure_minute': record.get('departure_minute', ''),
+        'queue_delay_minutes': record.get('queue_delay_minutes', 0),
+        'arrival_minute': record.get('arrival_minute', 0),
+        'early_minutes': record.get('early_minutes', 0),
+        'late_minutes': record.get('late_minutes', 0),
+        'total_cost': record.get('total_cost', 0),
+        'payoff': record.get('payoff', 0),
+        'decision_source': record.get('decision_source', ''),
+        'timeout_happened': False,
+        'dropout_event': '',
+        'recovered_this_round': False,
+        'recovery_reason': '',
+        'historical_dropout': False,
+        'dropout_active_at_export': False,
+        'dropout_reason_at_export': '',
+        'has_recovered_after_disconnect': False,
+        'has_recovered_after_timeout': False,
+        'coarse_toll_charge': record.get('coarse_toll_charge', 0),
+        'actor_type': 'api_agent',
+        'agent_id': record.get('agent_id', ''),
+        'agent_type': record.get('agent_type', ''),
+        'api_agent_mode': record.get('api_agent_mode', API_AGENT_MODE_ACTIVE),
+        'agent_fallback_used': bool(record.get('fallback_used', False)),
+        'agent_latency_ms': int(record.get('latency_ms', 0)),
+        'agent_reason': record.get('reason', ''),
+        'agent_context_json': record.get('context_json', ''),
+    }
+    for field_name, value in values.items():
+        row[EXPORT_HEADERS.index(field_name)] = value
+    return row
 
 
 def build_admin_report_rows(players):
     groups = {}
     state_counts = {}
+    agent_record_count = 0
+    agent_fallback_count = 0
+    rl_fallback_count = 0
     for player in players:
         key = (player.round_number, player.group.id_in_subsession)
         groups.setdefault(key, []).append(player)
@@ -1612,21 +2360,55 @@ def build_admin_report_rows(players):
             state_counts.get(representative.dynamic_capacity_state, 0) + 1
         )
         completed = [player for player in group_players if player_has_departure_choice(player)]
+        agent_records = active_agent_decisions_for_group(representative.group)
+        agent_record_count += len(agent_records)
+        agent_fallback_count += sum(
+            bool(record.get('fallback_used'))
+            for record in agent_records
+        )
+        rl_fallback_count += sum(
+            record.get('decision_source') == 'deepseek_fallback_rl'
+            for record in agent_records
+        )
+        queue_values = [
+            float(player.queue_delay_minutes)
+            for player in completed
+        ] + [
+            float(record.get('queue_delay_minutes', 0))
+            for record in agent_records
+        ]
+        cost_values = [
+            float(player.total_cost)
+            for player in completed
+        ] + [
+            float(record.get('total_cost', 0))
+            for record in agent_records
+        ]
+        toll_values = [
+            float(player.coarse_toll_charge)
+            for player in completed
+        ] + [
+            float(record.get('coarse_toll_charge', 0))
+            for record in agent_records
+        ]
         average_queue = (
-            sum(player.queue_delay_minutes for player in completed) / len(completed)
-            if completed else 0
+            sum(queue_values) / len(queue_values)
+            if queue_values else 0
         )
         average_cost = (
-            sum(float(player.total_cost) for player in completed) / len(completed)
-            if completed else 0
+            sum(cost_values) / len(cost_values)
+            if cost_values else 0
         )
         average_toll = (
-            sum(float(player.coarse_toll_charge) for player in completed) / len(completed)
-            if completed else 0
+            sum(toll_values) / len(toll_values)
+            if toll_values else 0
         )
         distribution = {}
         for player in completed:
             label = minute_to_clock(player.departure_minute)
+            distribution[label] = distribution.get(label, 0) + 1
+        for record in agent_records:
+            label = minute_to_clock(record.get('departure_minute', 0))
             distribution[label] = distribution.get(label, 0) + 1
         round_rows.append(
             {
@@ -1640,6 +2422,15 @@ def build_admin_report_rows(players):
                 'coarse_toll_time_window_spec': representative.coarse_toll_time_window_spec or '无',
                 'coarse_toll_points': number_display(representative.coarse_toll_points),
                 'average_toll': number_display(average_toll),
+                'agent_count': len(agent_records),
+                'agent_fallback_count': sum(
+                    bool(record.get('fallback_used'))
+                    for record in agent_records
+                ),
+                'rl_fallback_count': sum(
+                    record.get('decision_source') == 'deepseek_fallback_rl'
+                    for record in agent_records
+                ),
                 'departure_distribution': ', '.join(
                     f'{time_label}: {count}' for time_label, count in sorted(distribution.items())
                 ) or '暂无决策',
@@ -1649,17 +2440,29 @@ def build_admin_report_rows(players):
         {'state': state, 'count': count}
         for state, count in sorted(state_counts.items())
     ]
-    return round_rows, state_rows
+    return round_rows, state_rows, {
+        'api_agent_mode': (
+            api_agent_mode(players[0].session)
+            if players else API_AGENT_MODE_OFF
+        ),
+        'agent_record_count': agent_record_count,
+        'agent_fallback_count': agent_fallback_count,
+        'rl_fallback_enabled': (
+            rl_fallback_enabled(players[0].session) if players else False
+        ),
+        'rl_fallback_count': rl_fallback_count,
+    }
 
 
 def vars_for_admin_report(subsession):
     players = []
     for round_subsession in subsession.in_all_rounds():
         players.extend(round_subsession.get_players())
-    round_rows, state_rows = build_admin_report_rows(players)
+    round_rows, state_rows, agent_summary = build_admin_report_rows(players)
     return {
         'round_rows': round_rows,
         'state_rows': state_rows,
+        'agent_summary': agent_summary,
         'export_headers': EXPORT_HEADERS,
         'session_code': subsession.session.code,
     }
@@ -1768,6 +2571,8 @@ class RoundStartSync(Page):
         group = player.group
         now_ts = time.time()
         maybe_start_round(group, now_ts=now_ts)
+        if group.round_started:
+            start_api_agent_prefetch(group)
         ready_count = sum(
             bool(group_player.round_start_ready)
             for group_player in group.get_players()
@@ -1801,6 +2606,7 @@ class Decision(Page):
             return False
         if not maybe_start_round(player.group):
             return False
+        start_api_agent_prefetch(player.group)
         maybe_prepare_results(player.group)
         if player.group.results_ready or player_has_departure_choice(player):
             return False
@@ -1965,6 +2771,8 @@ def custom_export(players):
     yield EXPORT_HEADERS
     for player in players:
         yield export_row_for_player(player)
+    for record, reference_player in agent_decisions_for_players(players):
+        yield export_row_for_agent_record(record, reference_player)
 
 
 page_sequence = [

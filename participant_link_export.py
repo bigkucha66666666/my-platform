@@ -264,7 +264,7 @@ def parse_args(argv=None):
     parser.add_argument('--room', default='prod_room', help='settings.ROOMS 中的 room 名称，默认 prod_room。')
     parser.add_argument(
         '--base-url',
-        default='http://127.0.0.1:8000',
+        default='http://127.0.0.1:8001',
         help='参与者访问实验的服务器地址，例如 https://example.com。',
     )
     parser.add_argument('--output', help='输出 .xlsx 路径；不填则写入 outputs/participant_links/。')

@@ -10,11 +10,33 @@ from typing import Mapping, Sequence
 RL_POLICY_VERSION = 'dynamic_rl_fallback_v1'
 
 
-def initial_rl_state(capacity_states: Sequence[Mapping[str, object]]) -> dict:
+def public_feedback_observation(snapshot) -> dict:
+    """Return the public fields used by RL after a completed round."""
+    feedback = dict(snapshot or {})
+    return {
+        'revealed_capacity': feedback.get('dynamic_capacity'),
+        'anonymous_slot_counts': {
+            str(int(row['slot'])): int(row.get('participant_count', 0))
+            for row in feedback.get('departure_outcomes', [])
+        },
+        'departure_average_costs': {
+            str(int(row['slot'])): float(row['average_cost'])
+            for row in feedback.get('departure_outcomes', [])
+            if row.get('average_cost') is not None
+        },
+        'group_average_cost': float(feedback.get('group_average_cost', 0)),
+    }
+
+
+def initial_rl_state(
+    capacity_states: Sequence[Mapping[str, object]],
+    *,
+    policy_version=RL_POLICY_VERSION,
+) -> dict:
     values = [int(item['capacity']) for item in capacity_states]
     probabilities = _normalized_probabilities(capacity_states)
     return {
-        'policy_version': RL_POLICY_VERSION,
+        'policy_version': policy_version,
         'capacity_values': values,
         'capacity_prior': probabilities,
         'observed_capacities': [],
@@ -26,18 +48,26 @@ def initial_rl_state(capacity_states: Sequence[Mapping[str, object]]) -> dict:
         'last_departure_slot': None,
         'last_total_cost': None,
         'last_anonymous_slot_counts': {},
+        'last_departure_average_costs': {},
+        'last_group_average_cost': None,
+        'last_own_public_result': None,
         'rounds_observed': 0,
     }
 
 
-def valid_or_initial_state(state, capacity_states) -> dict:
+def valid_or_initial_state(
+    state,
+    capacity_states,
+    *,
+    policy_version=RL_POLICY_VERSION,
+) -> dict:
     expected_values = [int(item['capacity']) for item in capacity_states]
     if not isinstance(state, dict):
-        return initial_rl_state(capacity_states)
-    if state.get('policy_version') != RL_POLICY_VERSION:
-        return initial_rl_state(capacity_states)
+        return initial_rl_state(capacity_states, policy_version=policy_version)
+    if state.get('policy_version') != policy_version:
+        return initial_rl_state(capacity_states, policy_version=policy_version)
     if state.get('capacity_values') != expected_values:
-        return initial_rl_state(capacity_states)
+        return initial_rl_state(capacity_states, policy_version=policy_version)
     return deepcopy(state)
 
 
@@ -48,6 +78,9 @@ def observe_rl_outcome(
     departure_slot,
     total_cost,
     anonymous_slot_counts,
+    departure_average_costs=None,
+    group_average_cost=None,
+    own_public_result=None,
     persona,
 ) -> dict:
     updated = deepcopy(state)
@@ -82,6 +115,16 @@ def observe_rl_outcome(
         str(int(slot)): int(count)
         for slot, count in dict(anonymous_slot_counts or {}).items()
     }
+    updated['last_departure_average_costs'] = {
+        str(int(slot)): float(cost)
+        for slot, cost in dict(departure_average_costs or {}).items()
+    }
+    updated['last_group_average_cost'] = (
+        round(float(group_average_cost), 4)
+        if group_average_cost is not None
+        else None
+    )
+    updated['last_own_public_result'] = deepcopy(own_public_result)
     next_state_key = rl_state_key(updated)
     next_values = q_values.get(next_state_key, {})
     next_best = max((float(value) for value in next_values.values()), default=0.0)
@@ -136,8 +179,14 @@ def choose_rl_departure(
     rewards,
     persona,
     known_current_capacity=None,
+    policy_version=RL_POLICY_VERSION,
+    decision_source='deepseek_fallback_rl',
 ) -> dict:
-    current = valid_or_initial_state(state, capacity_states)
+    current = valid_or_initial_state(
+        state,
+        capacity_states,
+        policy_version=policy_version,
+    )
     belief = capacity_belief(current)
     if known_current_capacity is not None:
         known = int(known_current_capacity)
@@ -202,11 +251,11 @@ def choose_rl_departure(
     belief_json = {str(capacity): round(probability, 6) for capacity, probability in belief.items()}
     return {
         'departure_slot': selected_slot,
-        'decision_source': 'deepseek_fallback_rl',
+        'decision_source': decision_source,
         'reason': 'Local shadow RL selected the lowest belief-adjusted cost action.',
         'belief': belief_json,
         'scores': detail,
-        'policy_version': RL_POLICY_VERSION,
+        'policy_version': policy_version,
         'rounds_observed': int(current.get('rounds_observed', 0)),
     }
 

@@ -1,9 +1,11 @@
+import json
 import unittest
 
 from dynamic_bottleneck_round.agents.rl_fallback import (
     choose_rl_departure,
     initial_rl_state,
     observe_rl_outcome,
+    public_feedback_observation,
     rl_state_key,
 )
 
@@ -132,6 +134,78 @@ class DynamicRLFallbackPolicyTests(unittest.TestCase):
 
         self.assertEqual(choice['belief'], {'1': 0.0, '2': 0.0, '3': 1.0})
         self.assertEqual(choice['rounds_observed'], 3)
+
+    def test_public_feedback_observation_uses_only_public_fields(self):
+        snapshot = {
+            'round_number': 2,
+            'dynamic_capacity': 3,
+            'departure_outcomes': [
+                {'slot': 1, 'participant_count': 2, 'average_cost': 14},
+                {'slot': 2, 'participant_count': 1, 'average_cost': 9},
+            ],
+            'group_average_cost': 35 / 3,
+        }
+
+        observation = public_feedback_observation(snapshot)
+
+        self.assertEqual(observation['revealed_capacity'], 3)
+        self.assertEqual(observation['anonymous_slot_counts'], {'1': 2, '2': 1})
+        self.assertEqual(
+            observation['departure_average_costs'],
+            {'1': 14.0, '2': 9.0},
+        )
+        self.assertAlmostEqual(observation['group_average_cost'], 35 / 3)
+        serialized = json.dumps(observation)
+        self.assertNotIn('agent_id', serialized)
+        self.assertNotIn('actor_type', serialized)
+
+    def test_observation_state_keeps_complete_previous_public_feedback(self):
+        state = initial_rl_state(self.capacity_states)
+
+        updated = observe_rl_outcome(
+            state,
+            revealed_capacity=3,
+            departure_slot=2,
+            total_cost=9,
+            anonymous_slot_counts={'1': 2, '2': 1},
+            departure_average_costs={'1': 14, '2': 9},
+            group_average_cost=35 / 3,
+            persona=self.persona,
+        )
+
+        self.assertEqual(updated['last_anonymous_slot_counts'], {'1': 2, '2': 1})
+        self.assertEqual(updated['last_departure_average_costs'], {'1': 14.0, '2': 9.0})
+        self.assertAlmostEqual(updated['last_group_average_cost'], 35 / 3, places=4)
+
+    def test_observation_state_keeps_own_previous_public_result(self):
+        state = initial_rl_state(self.capacity_states)
+        own_result = {
+            'round_number': 2,
+            'departure_slot': 2,
+            'departure_minute': 474,
+            'departure_time_label': '07:54',
+            'queue_delay_minutes': 1,
+            'arrival_minute': 481,
+            'arrival_time_label': '08:01',
+            'early_minutes': 0,
+            'late_minutes': 1,
+            'total_cost': 9,
+            'payoff': 91,
+            'coarse_toll_charge': 0,
+            'reward_bonus': 0,
+        }
+
+        updated = observe_rl_outcome(
+            state,
+            revealed_capacity=3,
+            departure_slot=2,
+            total_cost=9,
+            anonymous_slot_counts={'2': 1},
+            own_public_result=own_result,
+            persona=self.persona,
+        )
+
+        self.assertEqual(updated['last_own_public_result'], own_result)
 
 
 if __name__ == '__main__':

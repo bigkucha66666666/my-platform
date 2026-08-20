@@ -7,15 +7,17 @@
     <div>Session Code：<strong>{{ session_code }}</strong></div>
     <div class="agent-summary">
       <span>Agent 模式：<strong>{{ agent_summary.api_agent_mode }}</strong></span>
-      <span>Agent 轮次记录：<strong>{{ agent_summary.agent_record_count }}</strong></span>
+      <span>DeepSeek Agent 轮次记录：<strong>{{ agent_summary.api_agent_record_count }}</strong></span>
+      <span>独立 RL 参与者轮次记录：<strong>{{ agent_summary.independent_rl_agent_count }}</strong></span>
       <span>API 回退次数：<strong>{{ agent_summary.agent_fallback_count }}</strong></span>
       <span>RL 备用策略：<strong>{{ if agent_summary.rl_fallback_enabled }}开启{{ else }}关闭{{ endif }}</strong></span>
-      <span>RL 接管次数：<strong>{{ agent_summary.rl_fallback_count }}</strong></span>
+      <span>RL 备用接管次数：<strong>{{ agent_summary.rl_fallback_count }}</strong></span>
+      <span>LLM 受限记忆：<strong>{{ if agent_summary.limited_memory_enabled }}开启（最多 {{ agent_summary.limited_memory_max_chars }} 字）{{ else }}关闭{{ endif }}</strong></span>
     </div>
   </div>
   <div class="report-grid">
-    <section class="report-card"><h4>各轮小组结果</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>服务率</th><th>状态</th><th>目标比例/概率</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>Agent</th><th>回退</th><th>RL 接管</th><th>出发时间分布</th></tr></thead><tbody>
-      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.dynamic_capacity_state }}</td><td>{{ row.capacity_probability }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.agent_count }}</td><td>{{ row.agent_fallback_count }}</td><td>{{ row.rl_fallback_count }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
+    <section class="report-card"><h4>各轮小组结果</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>服务率</th><th>状态</th><th>目标比例/概率</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>DeepSeek Agent</th><th>独立 RL 参与者</th><th>API 回退</th><th>RL 备用接管</th><th>出发时间分布</th></tr></thead><tbody>
+      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.dynamic_capacity_state }}</td><td>{{ row.capacity_probability }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.api_agent_count }}</td><td>{{ row.independent_rl_agent_count }}</td><td>{{ row.agent_fallback_count }}</td><td>{{ row.rl_fallback_count }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
     </tbody></table></section>
     <section class="report-card"><h4>服务率状态出现次数</h4><table class="report-table"><thead><tr><th>状态</th><th>出现次数</th></tr></thead><tbody>
       {{ for row in state_rows }}<tr><td>{{ row.state }}</td><td>{{ row.count }}</td></tr>{{ endfor }}

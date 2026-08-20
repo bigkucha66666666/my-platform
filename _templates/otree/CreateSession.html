@@ -81,6 +81,35 @@
         </div>
         <input id="dynamic-agent-mode" type="hidden" value="off">
         <input id="dynamic-rl-fallback" type="hidden" value="0">
+        <div class="form-check form-switch mt-4">
+            <input
+                id="dynamic-independent-rl-enabled"
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+            >
+            <label class="form-check-label" for="dynamic-independent-rl-enabled">
+                是否加入独立 RL 参与者
+            </label>
+        </div>
+        <div id="dynamic-independent-rl-count-wrap" class="mt-2" hidden>
+            <label for="dynamic-independent-rl-count">
+                独立 RL 参与者数量（每组）
+            </label>
+            <input
+                id="dynamic-independent-rl-count"
+                class="form-control w-auto"
+                type="number"
+                min="1"
+                max="5"
+                step="1"
+                required
+            >
+            <p class="help-block">
+                每个参与者独立学习；本地运行，不会增加 API 等待时间。
+            </p>
+        </div>
+        <input id="dynamic-independent-rl-mode" type="hidden" value="0">
     </div>
 </div>
 
@@ -97,6 +126,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const countSuffix = ".api_agent_count_per_group";
     const modeSuffix = ".api_agent_mode";
     const rlFallbackSuffix = ".rl_fallback_enabled";
+    const rlAgentEnabledSuffix = ".rl_agent_enabled";
+    const rlAgentCountSuffix = ".rl_agent_count_per_group";
     const dropdown = document.querySelector('[name="session_config"]');
     const participantBlock = document
         .querySelector('label[for="num_participants"]')
@@ -110,10 +141,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const dynamicModeInput = document.getElementById("dynamic-agent-mode");
     const dynamicRlEnabled = document.getElementById("dynamic-rl-fallback-enabled");
     const dynamicRlInput = document.getElementById("dynamic-rl-fallback");
+    const independentRlEnabled = document.getElementById("dynamic-independent-rl-enabled");
+    const independentRlCountWrap = document.getElementById("dynamic-independent-rl-count-wrap");
+    const independentRlCountInput = document.getElementById("dynamic-independent-rl-count");
+    const independentRlModeInput = document.getElementById("dynamic-independent-rl-mode");
     const createButton = document.getElementById("btn-create-session");
     const countSources = new Map();
     const modeSources = new Map();
     const rlFallbackSources = new Map();
+    const rlAgentEnabledSources = new Map();
+    const rlAgentCountSources = new Map();
 
     document.querySelectorAll(`input[name$="${countSuffix}"]`).forEach((input) => {
         const configName = input.name.slice(0, -countSuffix.length);
@@ -127,15 +164,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const configName = input.name.slice(0, -rlFallbackSuffix.length);
         rlFallbackSources.set(configName, input);
     });
+    document.querySelectorAll(`input[name$="${rlAgentEnabledSuffix}"]`).forEach((input) => {
+        const configName = input.name.slice(0, -rlAgentEnabledSuffix.length);
+        rlAgentEnabledSources.set(configName, input);
+    });
+    document.querySelectorAll(`input[name$="${rlAgentCountSuffix}"]`).forEach((input) => {
+        const configName = input.name.slice(0, -rlAgentCountSuffix.length);
+        rlAgentCountSources.set(configName, input);
+    });
 
     if (!dropdown || !participantBlock || !control || !countInput || !createButton
             || !dynamicControl || !dynamicEnabled || !dynamicCountWrap
             || !dynamicCountInput || !dynamicModeInput
             || !dynamicRlEnabled || !dynamicRlInput
+            || !independentRlEnabled || !independentRlCountWrap
+            || !independentRlCountInput || !independentRlModeInput
             || Array.from(activeAgentConfigs).some((name) => !countSources.has(name))
             || Array.from(dynamicAgentConfigs).some(
                 (name) => !countSources.has(name) || !modeSources.has(name)
                     || !rlFallbackSources.has(name)
+                    || !rlAgentEnabledSources.has(name)
+                    || !rlAgentCountSources.has(name)
             )) {
         return;
     }
@@ -145,7 +194,12 @@ document.addEventListener("DOMContentLoaded", () => {
         input.removeAttribute("name");
     });
     dynamicAgentConfigs.forEach((configName) => {
-        [modeSources.get(configName), rlFallbackSources.get(configName)].forEach((input) => {
+        [
+            modeSources.get(configName),
+            rlFallbackSources.get(configName),
+            rlAgentEnabledSources.get(configName),
+            rlAgentCountSources.get(configName),
+        ].forEach((input) => {
             input.closest("tr")?.setAttribute("hidden", "hidden");
             input.removeAttribute("name");
         });
@@ -166,6 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
             countSources.get(currentConfig).value = dynamicCountInput.value;
             modeSources.get(currentConfig).value = dynamicEnabled.checked ? "active" : "off";
             rlFallbackSources.get(currentConfig).value = dynamicRlEnabled.checked ? "1" : "0";
+            rlAgentEnabledSources.get(currentConfig).value = independentRlEnabled.checked ? "1" : "0";
+            rlAgentCountSources.get(currentConfig).value = independentRlCountInput.value;
         }
     }
 
@@ -176,6 +232,13 @@ document.addEventListener("DOMContentLoaded", () => {
         dynamicModeInput.value = enabled ? "active" : "off";
         dynamicRlEnabled.disabled = !enabled;
         dynamicRlInput.value = enabled && dynamicRlEnabled.checked ? "1" : "0";
+    }
+
+    function syncIndependentRlState() {
+        const enabled = independentRlEnabled.checked;
+        independentRlCountWrap.hidden = !enabled;
+        independentRlCountInput.disabled = !enabled;
+        independentRlModeInput.value = enabled ? "1" : "0";
     }
 
     function syncControl() {
@@ -193,6 +256,8 @@ document.addEventListener("DOMContentLoaded", () => {
         dynamicCountInput.removeAttribute("name");
         dynamicModeInput.removeAttribute("name");
         dynamicRlInput.removeAttribute("name");
+        independentRlCountInput.removeAttribute("name");
+        independentRlModeInput.removeAttribute("name");
 
         if (singleVisible) {
             countInput.name = `${currentConfig}${countSuffix}`;
@@ -206,13 +271,19 @@ document.addEventListener("DOMContentLoaded", () => {
             dynamicModeInput.name = `${currentConfig}${modeSuffix}`;
             dynamicRlEnabled.checked = rlFallbackSources.get(currentConfig).value === "1";
             dynamicRlInput.name = `${currentConfig}${rlFallbackSuffix}`;
+            independentRlEnabled.checked = rlAgentEnabledSources.get(currentConfig).value === "1";
+            independentRlCountInput.value = rlAgentCountSources.get(currentConfig).value || "1";
+            independentRlCountInput.name = `${currentConfig}${rlAgentCountSuffix}`;
+            independentRlModeInput.name = `${currentConfig}${rlAgentEnabledSuffix}`;
             syncDynamicState();
+            syncIndependentRlState();
         }
     }
 
     dropdown.addEventListener("change", syncControl);
     dynamicEnabled.addEventListener("change", syncDynamicState);
     dynamicRlEnabled.addEventListener("change", syncDynamicState);
+    independentRlEnabled.addEventListener("change", syncIndependentRlState);
     createButton.addEventListener("click", (event) => {
         if (!control.hidden && !countInput.checkValidity()) {
             countInput.reportValidity();
@@ -222,6 +293,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!dynamicControl.hidden && dynamicEnabled.checked
                 && !dynamicCountInput.checkValidity()) {
             dynamicCountInput.reportValidity();
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+        if (!dynamicControl.hidden && independentRlEnabled.checked
+                && !independentRlCountInput.checkValidity()) {
+            independentRlCountInput.reportValidity();
             event.preventDefault();
             event.stopImmediatePropagation();
         }

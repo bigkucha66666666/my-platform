@@ -117,21 +117,31 @@ def _valid_persona(value):
     )
 
 
-def initialize_api_agent_personas(session, group_labels, agent_count):
+def _initialize_agent_personas(session, group_labels, agent_count, actor_code):
     stored = session.vars.get(API_AGENT_PERSONA_SESSION_VAR, {})
     personas = deepcopy(stored) if isinstance(stored, dict) else {}
+    selected = {}
     for group_label in sorted({str(label) for label in group_labels if label}):
         for index in range(1, max(0, int(agent_count)) + 1):
-            agent_id = f'{group_label}_API_{index:02d}'
+            agent_id = f'{group_label}_{actor_code}_{index:02d}'
             if not _valid_persona(personas.get(agent_id)):
                 personas[agent_id] = _persona_snapshot(
                     str(session.code),
                     group_label,
                     agent_id,
                 )
+            selected[agent_id] = deepcopy(personas[agent_id])
     if personas != stored:
         session.vars[API_AGENT_PERSONA_SESSION_VAR] = personas
-    return deepcopy(personas)
+    return selected
+
+
+def initialize_api_agent_personas(session, group_labels, agent_count):
+    return _initialize_agent_personas(session, group_labels, agent_count, 'API')
+
+
+def initialize_rl_agent_personas(session, group_labels, agent_count):
+    return _initialize_agent_personas(session, group_labels, agent_count, 'RL')
 
 
 def get_or_create_api_agent_persona(session, group_label, agent_id):
@@ -146,3 +156,7 @@ def get_or_create_api_agent_persona(session, group_label, agent_id):
     )
     session.vars[API_AGENT_PERSONA_SESSION_VAR] = personas
     return deepcopy(personas[agent_id])
+
+
+def get_or_create_rl_agent_persona(session, group_label, agent_id):
+    return get_or_create_api_agent_persona(session, group_label, agent_id)

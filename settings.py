@@ -43,6 +43,19 @@ DYNAMIC_BOTTLENECK_API_AGENT_MODE = str(
 DYNAMIC_BOTTLENECK_RL_FALLBACK_ENABLED = str(
     environ.get('DYNAMIC_BOTTLENECK_RL_FALLBACK_ENABLED', '0') or '0'
 ).strip()
+DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED = str(
+    environ.get('DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED', '0') or '0'
+).strip()
+DYNAMIC_BOTTLENECK_RL_AGENT_COUNT = str(
+    environ.get('DYNAMIC_BOTTLENECK_RL_AGENT_COUNT_PER_GROUP', '1') or '1'
+).strip()
+DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = 'dynamic_independent_rl_v1'
+DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_ENABLED = str(
+    environ.get('DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_ENABLED', '1') or '1'
+).strip()
+DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_MAX_CHARS = int(
+    environ.get('DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_MAX_CHARS', '400') or 400
+)
 
 
 SINGLE_BOTTLENECK_COMMON = dict(
@@ -108,7 +121,16 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     api_agent_timeout_seconds=DEEPSEEK_AGENT_TIMEOUT_SECONDS,
     api_agent_temperature=DEEPSEEK_AGENT_TEMPERATURE,
     api_agent_policy_version=DEEPSEEK_AGENT_MODEL,
+    api_agent_limited_memory_enabled=(
+        DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_ENABLED
+    ),
+    api_agent_limited_memory_max_chars=(
+        DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_MAX_CHARS
+    ),
     rl_fallback_enabled=DYNAMIC_BOTTLENECK_RL_FALLBACK_ENABLED,
+    rl_agent_enabled=DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED,
+    rl_agent_count_per_group=DYNAMIC_BOTTLENECK_RL_AGENT_COUNT,
+    rl_agent_policy_version=DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION,
     payoff_source_var='dynamic_bottleneck_round_total_payoff',
     final_payoff_label='整轮随机瓶颈服务率实验',
     payoff_source_label='dynamic_bottleneck_round 全 10 轮累计结果',

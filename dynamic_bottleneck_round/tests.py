@@ -1,9 +1,11 @@
 from collections import Counter
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from math import ceil
 from otree.api import Bot, Submission, expect
@@ -620,6 +622,153 @@ class DynamicCostExportTests(unittest.TestCase):
         self.assertTrue(required.issubset(set(EXPORT_HEADERS)))
 
 
+class PublicFeedbackSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.schedule = {
+            'enabled': True,
+            'num_slots': 3,
+            'slot_size_minutes': 1,
+            'first_departure_minute': 473,
+            'last_departure_minute': 475,
+        }
+        self.participant = SimpleNamespace(vars={})
+        self.players = [
+            SimpleNamespace(
+                participant=self.participant,
+                departure_slot=1,
+                departure_minute=473,
+                total_cost=12,
+            ),
+            SimpleNamespace(
+                participant=SimpleNamespace(vars={}),
+                departure_slot=2,
+                departure_minute=474,
+                total_cost=18,
+            ),
+        ]
+        for player in self.players:
+            player.field_maybe_none = lambda field_name, player=player: getattr(
+                player,
+                field_name,
+                None,
+            )
+        self.group = SimpleNamespace(
+            round_number=2,
+            dynamic_capacity=3,
+            get_players=lambda: self.players,
+        )
+        self.virtual_records = [
+            {
+                'actor_type': 'deepseek_api_agent',
+                'agent_id': 'G01_API_01',
+                'departure_slot': 1,
+                'total_cost': 14,
+            },
+            {
+                'actor_type': 'rl_agent',
+                'agent_id': 'G01_RL_01',
+                'departure_slot': 2,
+                'total_cost': 10,
+            },
+        ]
+
+    def test_public_feedback_snapshot_is_complete_and_anonymous(self):
+        with (
+            patch.object(
+                dynamic_app,
+                'departure_schedule_for_player',
+                return_value=self.schedule,
+            ),
+            patch.object(
+                dynamic_app,
+                'active_virtual_decisions_for_group',
+                return_value=self.virtual_records,
+            ),
+        ):
+            snapshot = dynamic_app.public_feedback_snapshot_for_group(self.group)
+
+        self.assertEqual(snapshot['round_number'], 2)
+        self.assertEqual(snapshot['dynamic_capacity'], 3)
+        self.assertEqual(
+            sum(row['participant_count'] for row in snapshot['departure_outcomes']),
+            4,
+        )
+        self.assertEqual(snapshot['group_average_cost'], 13.5)
+        serialized = json.dumps(snapshot)
+        self.assertNotIn('participant_code', serialized)
+        self.assertNotIn('agent_id', serialized)
+        self.assertNotIn('actor_type', serialized)
+
+    def test_public_feedback_snapshot_save_is_idempotent(self):
+        with (
+            patch.object(
+                dynamic_app,
+                'departure_schedule_for_player',
+                return_value=self.schedule,
+            ),
+            patch.object(
+                dynamic_app,
+                'active_virtual_decisions_for_group',
+                return_value=self.virtual_records,
+            ),
+        ):
+            first = dynamic_app.save_public_feedback_snapshot(self.group)
+            second = dynamic_app.save_public_feedback_snapshot(self.group)
+
+        stored = self.participant.vars[dynamic_app.PUBLIC_FEEDBACK_PARTICIPANT_VAR]
+        self.assertEqual(first, second)
+        self.assertEqual(list(stored), ['2'])
+        self.assertEqual(stored['2'], first)
+
+    def test_result_chart_uses_public_feedback_snapshot(self):
+        public_snapshot = {
+            'round_number': 2,
+            'dynamic_capacity': 3,
+            'departure_outcomes': [
+                {
+                    'slot': 1,
+                    'departure_minute': 473,
+                    'departure_time': '07:53',
+                    'participant_count': 3,
+                    'average_cost': 16,
+                },
+                {
+                    'slot': 2,
+                    'departure_minute': 474,
+                    'departure_time': '07:54',
+                    'participant_count': 1,
+                    'average_cost': 8,
+                },
+                {
+                    'slot': 3,
+                    'departure_minute': 475,
+                    'departure_time': '07:55',
+                    'participant_count': 0,
+                    'average_cost': None,
+                },
+            ],
+            'group_average_cost': 14,
+        }
+        self.participant.vars[dynamic_app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
+            '2': public_snapshot,
+        }
+        player = self.players[0]
+        player.group = self.group
+
+        with patch.object(
+            dynamic_app,
+            'departure_schedule_for_player',
+            return_value=self.schedule,
+        ):
+            chart = dynamic_app.result_current_round_cost_snapshot(player)
+
+        chart_by_slot = {row['slot']: row for row in chart['bars']}
+        self.assertEqual(chart_by_slot[1]['participant_count'], 3)
+        self.assertEqual(chart_by_slot[1]['average_cost_label'], '16')
+        self.assertEqual(chart_by_slot[2]['participant_count'], 1)
+        self.assertEqual(chart['average_cost_label'], '14')
+
+
 class RoundStartSynchronizationTests(unittest.TestCase):
     def test_first_round_waits_longer_than_later_rounds(self):
         self.assertEqual(round_start_wait_seconds(1), 120)
@@ -1110,6 +1259,24 @@ class PlayerBot(Bot):
             yield Submission(Decision, {'departure_minute': chosen_minute}, check_html=False)
         yield Submission(ResultsSync, check_html=False)
 
+        feedback_store = self.group.get_players()[0].participant.vars.get(
+            dynamic_app.PUBLIC_FEEDBACK_PARTICIPANT_VAR,
+            {},
+        )
+        feedback = feedback_store.get(str(self.round_number), {})
+        expect(feedback.get('round_number'), '==', self.round_number)
+        expect(feedback.get('dynamic_capacity'), '==', self.player.dynamic_capacity)
+        expect(
+            sum(
+                row['participant_count']
+                for row in feedback.get('departure_outcomes', [])
+            ),
+            '==',
+            dynamic_app.effective_group_actor_count(
+                self.session,
+                len(self.group.get_players()),
+            ),
+        )
         expect('上一轮服务率', 'in', self.html)
         expect('本轮成本与用时', 'in', self.html)
         expect('所有参与者的成本分布', 'in', self.html)
@@ -1131,11 +1298,6 @@ class PlayerBot(Bot):
             )
             expect(agent_records[0]['dynamic_capacity'], '==', self.player.dynamic_capacity)
             expect(agent_records[0]['total_cost'], '>=', 0)
-            expect(
-                self.player.coarse_toll_calibration_players,
-                '==',
-                len(self.group.get_players()) + len(agent_records),
-            )
             if dynamic_app.rl_fallback_enabled(self.session):
                 expect(agent_records[0]['decision_source'], '==', 'deepseek_fallback_rl')
                 rl_states = self.group.get_players()[0].participant.vars.get(
@@ -1144,6 +1306,34 @@ class PlayerBot(Bot):
                 )
                 rl_state = rl_states.get(agent_records[0]['agent_id'], {})
                 expect(rl_state.get('rounds_observed'), '==', self.round_number)
+        if dynamic_app.rl_agent_enabled(self.session):
+            rl_records = dynamic_app.independent_rl_records_for_group(self.group)
+            expect(
+                len(rl_records),
+                '==',
+                dynamic_app.rl_agent_count_per_group(self.session),
+            )
+            expect(rl_records[0]['decision_source'], 'in', {
+                'rl_policy',
+                'rl_fallback_lowest_schedule_cost',
+            })
+            rl_states = self.group.get_players()[0].participant.vars.get(
+                dynamic_app.INDEPENDENT_RL_STATE_PARTICIPANT_VAR,
+                {},
+            )
+            expect(
+                rl_states[rl_records[0]['agent_id']]['rounds_observed'],
+                '==',
+                self.round_number,
+            )
+        expect(
+            self.player.coarse_toll_calibration_players,
+            '==',
+            dynamic_app.effective_group_actor_count(
+                self.session,
+                len(self.group.get_players()),
+            ),
+        )
 
         expected_payoff = max(
             0,
@@ -1153,7 +1343,7 @@ class PlayerBot(Bot):
 
         if self.case == 'same_time':
             actors_by_minute = {chosen_minute: len(self.group.get_players())}
-            for record in dynamic_app.active_agent_decisions_for_group(self.group):
+            for record in dynamic_app.active_virtual_decisions_for_group(self.group):
                 minute = record['departure_minute']
                 actors_by_minute[minute] = actors_by_minute.get(minute, 0) + 1
             next_available = self.participant.vars[DEPARTURE_SCHEDULE_VAR][

@@ -15,6 +15,7 @@ DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
 DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_TEMPERATURE = 0.0
+DEFAULT_LIMITED_MEMORY_MAX_CHARS = 400
 
 
 class DeepSeekAgentError(Exception):
@@ -28,6 +29,8 @@ class DeepSeekAgentConfig:
     model: str = DEFAULT_DEEPSEEK_MODEL
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     temperature: float = DEFAULT_TEMPERATURE
+    limited_memory_enabled: bool = False
+    limited_memory_max_chars: int = DEFAULT_LIMITED_MEMORY_MAX_CHARS
 
     @property
     def chat_completions_url(self) -> str:
@@ -46,6 +49,7 @@ class AgentChoiceSet:
     history: Mapping[str, object] = field(default_factory=dict)
     agent_id: str = ''
     persona: Mapping[str, object] = field(default_factory=dict)
+    limited_memory: str = ''
 
     def valid_slots(self) -> set[int]:
         return {int(item['slot']) for item in self.available_slots}
@@ -60,6 +64,7 @@ class AgentChoice:
     latency_ms: int = 0
     raw_response_json: str = ''
     context_json: str = ''
+    memory_summary: str | None = None
 
 
 HttpPost = Callable[[DeepSeekAgentConfig, Mapping[str, object]], Mapping[str, object]]
@@ -70,6 +75,16 @@ def build_chat_completion_payload(
     choice_set: AgentChoiceSet,
 ) -> dict[str, object]:
     context = asdict(choice_set)
+    if not config.limited_memory_enabled or not choice_set.limited_memory:
+        context.pop('limited_memory', None)
+    memory_instruction = ''
+    if config.limited_memory_enabled:
+        memory_instruction = (
+            ' Also return memory_summary: a concise subjective memory for the next '
+            f'round, no more than {config.limited_memory_max_chars} characters. Base '
+            'it only on the supplied public feedback and your own result; do not '
+            'invent observations or reproduce a complete round-by-round history.'
+        )
     return {
         'model': config.model,
         'temperature': config.temperature,
@@ -79,10 +94,12 @@ def build_chat_completion_payload(
                 'content': (
                     'You are a virtual participant in a dynamic-capacity '
                     'single-bottleneck departure-time experiment. Treat the persona '
-                    'traits as stable preferences. Use only capacity information '
+                    'traits as stable preferences. Any limited_memory is your own '
+                    'fallible prior impression, not a system fact; revise it only from '
+                    'the public context supplied in this request. Use only capacity information '
                     'present in the context; an unrevealed current capacity is unknown. '
                     'Choose one legal departure slot. Return only valid JSON with keys '
-                    'departure_slot and reason. Do not include markdown.'
+                    f'departure_slot and reason.{memory_instruction} Do not include markdown.'
                 ),
             },
             {
@@ -110,7 +127,15 @@ def choose_agent_departure(
     try:
         raw_response = post(config, payload)
         latency_ms = int((time.monotonic() - started) * 1000)
-        choice = parse_deepseek_choice(raw_response, choice_set.valid_slots())
+        choice = parse_deepseek_choice(
+            raw_response,
+            choice_set.valid_slots(),
+            memory_max_chars=(
+                config.limited_memory_max_chars
+                if config.limited_memory_enabled
+                else 0
+            ),
+        )
         return AgentChoice(
             departure_slot=choice.departure_slot,
             decision_source=choice.decision_source,
@@ -123,6 +148,7 @@ def choose_agent_departure(
                 sort_keys=True,
             ),
             context_json=context_json,
+            memory_summary=choice.memory_summary,
         )
     except (
         DeepSeekAgentError,
@@ -145,6 +171,7 @@ def choose_agent_departure(
 def parse_deepseek_choice(
     raw_response: Mapping[str, object],
     valid_slots: Iterable[int],
+    memory_max_chars: int = 0,
 ) -> AgentChoice:
     choices = raw_response.get('choices')
     if not isinstance(choices, list) or not choices:
@@ -165,7 +192,20 @@ def parse_deepseek_choice(
         decision_source='deepseek_api',
         fallback_used=False,
         reason=str(parsed.get('reason', '')),
+        memory_summary=normalize_memory_summary(
+            parsed.get('memory_summary'),
+            memory_max_chars,
+        ),
     )
+
+
+def normalize_memory_summary(value, max_chars: int) -> str | None:
+    if not isinstance(value, str) or max_chars <= 0:
+        return None
+    normalized = ' '.join(value.split()).strip()
+    if not normalized:
+        return None
+    return normalized[:max_chars]
 
 
 def post_chat_completion(
@@ -252,6 +292,19 @@ def config_from_session(session_config) -> DeepSeekAgentConfig:
             ),
             DEFAULT_TEMPERATURE,
         ),
+        limited_memory_enabled=_parse_bool(
+            session_config.get('api_agent_limited_memory_enabled', 0)
+        ),
+        limited_memory_max_chars=max(
+            1,
+            _parse_int(
+                session_config.get(
+                    'api_agent_limited_memory_max_chars',
+                    DEFAULT_LIMITED_MEMORY_MAX_CHARS,
+                ),
+                DEFAULT_LIMITED_MEMORY_MAX_CHARS,
+            ),
+        ),
     )
 
 
@@ -292,3 +345,13 @@ def _parse_float(value, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return False

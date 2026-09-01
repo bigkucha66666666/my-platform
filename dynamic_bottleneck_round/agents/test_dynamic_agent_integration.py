@@ -1269,8 +1269,45 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
 
 class DynamicAgentAdminTemplateTests(unittest.TestCase):
+    def test_shared_create_session_form_includes_dynamic_controls(self):
+        html = Path('_templates/otree/includes/CreateSessionForm.html').read_text(
+            encoding='utf-8'
+        )
+
+        self.assertIn(
+            '{% include "otree/includes/DynamicSessionControls.html" %}',
+            html,
+        )
+
+    def test_dynamic_controls_define_four_presets_and_exact_b_values(self):
+        html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
+            encoding='utf-8'
+        )
+
+        for preset in ('A', 'B', 'C', 'D'):
+            with self.subTest(preset=preset):
+                self.assertIn(f'data-preset="{preset}"', html)
+
+        for value in (
+            'num_participants=35',
+            'cohort_size=20',
+            'grouping_enabled=0',
+            "manual_grouping_spec=''",
+            "group_agent_spec='G01:api=0,rl=0;G02:api=5,rl=0'",
+            "api_agent_mode='active'",
+            'api_agent_count_per_group=5',
+            'rl_fallback_enabled=0',
+            'rl_agent_enabled=0',
+            'rl_agent_count_per_group=0',
+            "dynamic_capacity_sequence_scope='session'",
+        ):
+            with self.subTest(value=value):
+                self.assertIn(value, html)
+
     def test_create_session_page_has_dynamic_agent_toggle(self):
-        html = Path('_templates/otree/CreateSession.html').read_text(encoding='utf-8')
+        html = Path(
+            '_templates/otree/includes/DynamicSessionControls.html'
+        ).read_text(encoding='utf-8')
 
         self.assertIn('是否加入 Agent', html)
         self.assertIn('dynamic_bottleneck_round_prod', html)
@@ -1282,7 +1319,9 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
         self.assertIn('DeepSeek 不可用时', html)
 
     def test_create_session_page_has_independent_rl_controls(self):
-        html = Path('_templates/otree/CreateSession.html').read_text(encoding='utf-8')
+        html = Path(
+            '_templates/otree/includes/DynamicSessionControls.html'
+        ).read_text(encoding='utf-8')
 
         self.assertIn('是否加入独立 RL 参与者', html)
         self.assertIn('独立 RL 参与者数量', html)

@@ -381,8 +381,8 @@
   <section class="capacity-panel">
     <div class="capacity-copy">
       <p class="capacity-kicker">本轮服务率将在提交后公布</p>
-      <p class="capacity-note">请根据候选状态和概率作出选择。</p>
-      <div class="state-strip">{{ for item in capacity_states }}<span class="state-chip">{{ item.capacity }} 人 / 1 分钟 · {{ item.probability_percent }}%</span>{{ endfor }}</div>
+      <p class="capacity-note">请根据已经公布的历史结果作出选择。</p>
+      <div class="state-strip">{{ for item in capacity_states }}<span class="state-chip">{{ item.capacity }} 人 / 1 分钟</span>{{ endfor }}</div>
     </div>
     <div class="capacity-road-scene" aria-hidden="true">
       <span class="road-dash"></span>

@@ -1,0 +1,50 @@
+\begin{thebibliography}{6}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Vickrey(1969)]{vickrey1969congestion}
+William~S. Vickrey.
+\newblock Congestion theory and transport investment.
+\newblock \emph{American Economic Review}, 59\penalty0 (2):\penalty0 251--260,
+  1969.
+
+\bibitem[Arnott et~al.(1990)Arnott, de~Palma, and Lindsey]{arnott1990economics}
+Richard Arnott, Andr\'e de~Palma, and Robin Lindsey.
+\newblock Economics of a bottleneck.
+\newblock \emph{Journal of Urban Economics}, 27\penalty0 (1):\penalty0
+  111--130, 1990.
+
+\bibitem[Arnott et~al.(1999)Arnott, de~Palma, and
+  Lindsey]{arnott1999information}
+Richard Arnott, Andr\'e de~Palma, and Robin Lindsey.
+\newblock Information and time-of-usage decisions in the bottleneck model with
+  stochastic capacity and demand.
+\newblock \emph{European Economic Review}, 43\penalty0 (3):\penalty0 525--548,
+  1999.
+
+\bibitem[Liu et~al.(2023)Liu, Lu, Jiang, Han, Liu, and Gao]{liu2023departure}
+Qiumin Liu, Dongxu Lu, Rui Jiang, Xiao Han, Ronghui Liu, and Ziyou Gao.
+\newblock Departure time choice behavior in commute problem with stochastic
+  bottleneck capacity: Experiments and modeling.
+\newblock \emph{Transportmetrica A: Transport Science}, 19\penalty0
+  (2):\penalty0 1978590, 2023.
+\newblock \doi{10.1080/23249935.2021.1978590}.
+
+\bibitem[Small(1982)]{small1982scheduling}
+Kenneth~A. Small.
+\newblock The scheduling of consumer activities: Work trips.
+\newblock \emph{American Economic Review}, 72\penalty0 (3):\penalty0 467--479,
+  1982.
+
+\bibitem[Tian et~al.(2022)Tian, Li, and Sun]{tian2022stick}
+Ye~Tian, Yudi Li, and Jian Sun.
+\newblock Stick or carrot for traffic demand management? evidence from
+  experimental economics.
+\newblock \emph{Transportation Research Part A: Policy and Practice},
+  160:\penalty0 235--254, 2022.
+\newblock \doi{10.1016/j.tra.2022.04.010}.
+
+\end{thebibliography}

@@ -1,0 +1,399 @@
+<style>
+  .session-shortcuts {
+    margin: 4px 0 22px;
+    padding: 18px;
+    border: 1px solid #b9cbc5;
+    border-left: 4px solid #176a5a;
+    border-radius: 6px;
+    background: #f7faf8;
+  }
+  .session-shortcuts__heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 13px;
+  }
+  .session-shortcuts__heading h4 { margin: 0; color: #18332d; font-size: 18px; }
+  .session-shortcuts__heading p { margin: 0; color: #66756f; font-size: 12px; }
+  .session-presets {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .session-preset {
+    min-height: 104px;
+    padding: 12px;
+    border: 1px solid #cbd7d3;
+    border-radius: 5px;
+    background: #fff;
+    color: #20312d;
+    text-align: left;
+  }
+  .session-preset:hover,
+  .session-preset:focus-visible {
+    border-color: #176a5a;
+    box-shadow: 0 0 0 2px rgba(23, 106, 90, .12);
+  }
+  .session-preset.is-selected { border-color: #176a5a; background: #eaf3ef; }
+  .session-preset__tag {
+    display: block;
+    margin-bottom: 7px;
+    color: #176a5a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .session-preset strong { display: block; margin-bottom: 5px; font-size: 14px; }
+  .session-preset small { display: block; color: #65736f; line-height: 1.45; }
+  .session-preset-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    margin-top: 13px;
+  }
+  .session-preset-summary__group {
+    padding: 11px 12px;
+    border: 1px solid #cfdbd7;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .session-preset-summary__group b,
+  .session-preset-summary__group span { display: block; }
+  .session-preset-summary__group b { margin-bottom: 3px; color: #263a35; font-size: 13px; }
+  .session-preset-summary__group span { color: #60706b; font-size: 12px; }
+  .session-preset-summary__note {
+    grid-column: 1 / -1;
+    margin: 1px 0 0;
+    color: #53645f;
+    font-size: 12px;
+  }
+  .session-agent-control {
+    margin: 0 0 20px;
+    padding: 15px 17px;
+    border: 1px solid #d3ddda;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .session-agent-control__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 820px) {
+    .session-presets, .session-agent-control__grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 520px) {
+    .session-shortcuts__heading { display: block; }
+    .session-shortcuts__heading p { margin-top: 5px; }
+    .session-presets, .session-preset-summary, .session-agent-control__grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<section id="dynamic-session-shortcuts" class="session-shortcuts" hidden>
+  <div class="session-shortcuts__heading">
+    <h4>快捷实验方案</h4>
+    <p>点击后自动填写；完整参数仍可在下方继续修改</p>
+  </div>
+  <div class="session-presets" role="group" aria-label="动态瓶颈快捷实验方案">
+    <button type="button" class="session-preset" data-preset="A">
+      <span class="session-preset__tag">A · 基准</span>
+      <strong>单组纯参与者</strong>
+      <small>20 Human，不加入 Agent</small>
+    </button>
+    <button type="button" class="session-preset" data-preset="B">
+      <span class="session-preset__tag">B · 推荐</span>
+      <strong>Human vs Human + LLM</strong>
+      <small>20 Human 对比 15 Human + 5 LLM</small>
+    </button>
+    <button type="button" class="session-preset" data-preset="C">
+      <span class="session-preset__tag">C · 学习</span>
+      <strong>Human vs Human + RL</strong>
+      <small>20 Human 对比 15 Human + 5 RL</small>
+    </button>
+    <button type="button" class="session-preset" data-preset="D">
+      <span class="session-preset__tag">D · 高级</span>
+      <strong>自定义结构</strong>
+      <small>不覆盖参数，使用完整配置表</small>
+    </button>
+  </div>
+  <div id="session-preset-summary" class="session-preset-summary" hidden></div>
+</section>
+
+<section id="agent-count-control" class="session-agent-control" hidden>
+  <label class="col-form-label" for="agent-count-per-group">每组 Agent 数量</label>
+  <input id="agent-count-per-group" class="form-control w-auto" type="number" min="1" max="5" step="1">
+  <p class="help-block">每个实验组加入的 Agent 数量。</p>
+</section>
+
+<section id="dynamic-agent-control" class="session-agent-control" hidden>
+  <div class="session-agent-control__grid">
+    <div>
+      <div class="form-check form-switch mb-2">
+        <input id="dynamic-agent-enabled" class="form-check-input" type="checkbox" role="switch">
+        <label class="form-check-label" for="dynamic-agent-enabled">是否加入 Agent</label>
+      </div>
+      <div id="dynamic-agent-count-wrap" hidden>
+        <label for="dynamic-agent-count-per-group">每组 Agent 数量</label>
+        <input id="dynamic-agent-count-per-group" class="form-control w-auto" type="number" min="1" max="5" step="1">
+        <p class="help-block">默认不分组时，该数量为整个 Session 的 Agent 总数。</p>
+        <p class="help-block text-warning">DeepSeek 不可用时，Agent 会使用所选备用策略。</p>
+        <div class="form-check form-switch mt-2">
+          <input id="dynamic-rl-fallback-enabled" class="form-check-input" type="checkbox" role="switch">
+          <label class="form-check-label" for="dynamic-rl-fallback-enabled">启用强化学习备用策略</label>
+        </div>
+        <p class="help-block">开启后，本地策略全程影子学习；仅在 DeepSeek 失败时接管选择。</p>
+      </div>
+    </div>
+    <div>
+      <div class="form-check form-switch mb-2">
+        <input id="dynamic-independent-rl-enabled" class="form-check-input" type="checkbox" role="switch">
+        <label class="form-check-label" for="dynamic-independent-rl-enabled">是否加入独立 RL 参与者</label>
+      </div>
+      <div id="dynamic-independent-rl-count-wrap" hidden>
+        <label for="dynamic-independent-rl-count">独立 RL 参与者数量（每组）</label>
+        <input id="dynamic-independent-rl-count" class="form-control w-auto" type="number" min="1" max="5" step="1">
+        <p class="help-block">每个参与者独立学习；本地运行，不会增加 API 等待时间。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const activeAgentConfigs = new Set([
+    'single_bottleneck_prod_agent_active',
+    'single_bottleneck_demo_agent_active',
+  ]);
+  const dynamicAgentConfigs = new Set([
+    'dynamic_bottleneck_round_prod',
+    'dynamic_bottleneck_round_demo',
+  ]);
+  const dropdown = document.querySelector('[name="session_config"]');
+  const participantInput = document.querySelector('[name="num_participants"]');
+  const createButton = document.getElementById('btn-create-session');
+  const shortcutPanel = document.getElementById('dynamic-session-shortcuts');
+  const summary = document.getElementById('session-preset-summary');
+  const singleControl = document.getElementById('agent-count-control');
+  const singleCountInput = document.getElementById('agent-count-per-group');
+  const dynamicControl = document.getElementById('dynamic-agent-control');
+  const dynamicEnabled = document.getElementById('dynamic-agent-enabled');
+  const dynamicCountWrap = document.getElementById('dynamic-agent-count-wrap');
+  const dynamicCountInput = document.getElementById('dynamic-agent-count-per-group');
+  const fallbackEnabled = document.getElementById('dynamic-rl-fallback-enabled');
+  const independentRlEnabled = document.getElementById('dynamic-independent-rl-enabled');
+  const independentRlCountWrap = document.getElementById('dynamic-independent-rl-count-wrap');
+  const independentRlCountInput = document.getElementById('dynamic-independent-rl-count');
+
+  if (!dropdown || !participantInput || !createButton || !shortcutPanel
+      || !singleControl || !singleCountInput || !dynamicControl
+      || !dynamicEnabled || !dynamicCountWrap || !dynamicCountInput
+      || !fallbackEnabled || !independentRlEnabled
+      || !independentRlCountWrap || !independentRlCountInput) {
+    return;
+  }
+
+  const fieldSuffixes = [
+    'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
+    'rl_agent_enabled', 'rl_agent_count_per_group', 'cohort_size',
+    'grouping_enabled', 'manual_grouping_spec', 'group_agent_spec',
+    'dynamic_capacity_sequence_scope',
+  ];
+  const replacedAgentFields = new Set([
+    'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
+    'rl_agent_enabled', 'rl_agent_count_per_group',
+  ]);
+  const sources = new Map();
+  const sourceKey = (configName, fieldName) => `${configName}.${fieldName}`;
+  const sourceFor = (configName, fieldName) => sources.get(sourceKey(configName, fieldName));
+
+  for (const configName of [...activeAgentConfigs, ...dynamicAgentConfigs]) {
+    for (const fieldName of fieldSuffixes) {
+      const source = document.querySelector(`[name="${configName}.${fieldName}"]`);
+      if (source) sources.set(sourceKey(configName, fieldName), source);
+    }
+  }
+  if ([...activeAgentConfigs, ...dynamicAgentConfigs].some(
+    configName => !sourceFor(configName, 'api_agent_count_per_group')
+  )) return;
+
+  for (const configName of [...activeAgentConfigs, ...dynamicAgentConfigs]) {
+    for (const fieldName of replacedAgentFields) {
+      sourceFor(configName, fieldName)?.closest('tr')?.setAttribute('hidden', 'hidden');
+    }
+  }
+
+  let currentConfig = '';
+  let applyingPreset = false;
+  const presets = {
+    A: {
+      fields: {
+        num_participants: 20, cohort_size: 0, grouping_enabled: 0,
+        manual_grouping_spec: '', group_agent_spec: '', api_agent_mode: 'off',
+        api_agent_count_per_group: 0, rl_fallback_enabled: 0,
+        rl_agent_enabled: 0, rl_agent_count_per_group: 0,
+        dynamic_capacity_sequence_scope: 'session',
+      },
+      groups: [['G01 · 纯参与者组', '20 Human']],
+    },
+    B: {
+      // Exact B contract:
+      // num_participants=35; cohort_size=20; grouping_enabled=0;
+      // manual_grouping_spec='';
+      // group_agent_spec='G01:api=0,rl=0;G02:api=5,rl=0';
+      // api_agent_mode='active'; api_agent_count_per_group=5;
+      // rl_fallback_enabled=0; rl_agent_enabled=0; rl_agent_count_per_group=0;
+      // dynamic_capacity_sequence_scope='session'.
+      fields: {
+        num_participants: 35, cohort_size: 20, grouping_enabled: 0,
+        manual_grouping_spec: '',
+        group_agent_spec: 'G01:api=0,rl=0;G02:api=5,rl=0',
+        api_agent_mode: 'active', api_agent_count_per_group: 5,
+        rl_fallback_enabled: 0, rl_agent_enabled: 0, rl_agent_count_per_group: 0,
+        dynamic_capacity_sequence_scope: 'session',
+      },
+      groups: [
+        ['G01 · 纯参与者组', '20 Human'],
+        ['G02 · 人机混合组', '15 Human + 5 LLM'],
+      ],
+    },
+    C: {
+      fields: {
+        num_participants: 35, cohort_size: 20, grouping_enabled: 0,
+        manual_grouping_spec: '',
+        group_agent_spec: 'G01:api=0,rl=0;G02:api=0,rl=5',
+        api_agent_mode: 'off', api_agent_count_per_group: 0,
+        rl_fallback_enabled: 0, rl_agent_enabled: 1, rl_agent_count_per_group: 5,
+        dynamic_capacity_sequence_scope: 'session',
+      },
+      groups: [
+        ['G01 · 纯参与者组', '20 Human'],
+        ['G02 · 学习型混合组', '15 Human + 5 RL'],
+      ],
+    },
+  };
+
+  function setSource(fieldName, value) {
+    const source = sourceFor(currentConfig, fieldName);
+    if (source) source.value = String(value);
+  }
+  function readSource(fieldName, fallback = '') {
+    return sourceFor(currentConfig, fieldName)?.value ?? fallback;
+  }
+  function syncVisibleControls() {
+    const dynamicVisible = dynamicAgentConfigs.has(currentConfig);
+    const singleVisible = activeAgentConfigs.has(currentConfig);
+    shortcutPanel.hidden = !dynamicVisible;
+    dynamicControl.hidden = !dynamicVisible;
+    singleControl.hidden = !singleVisible;
+    if (singleVisible) singleCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
+    if (dynamicVisible) {
+      dynamicEnabled.checked = readSource('api_agent_mode', 'off') === 'active';
+      dynamicCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
+      fallbackEnabled.checked = readSource('rl_fallback_enabled', '0') === '1';
+      independentRlEnabled.checked = readSource('rl_agent_enabled', '0') === '1';
+      independentRlCountInput.value = readSource('rl_agent_count_per_group', '1') || '1';
+      dynamicCountWrap.hidden = !dynamicEnabled.checked;
+      independentRlCountWrap.hidden = !independentRlEnabled.checked;
+    }
+  }
+  function storeVisibleControls() {
+    if (activeAgentConfigs.has(currentConfig)) {
+      setSource('api_agent_count_per_group', singleCountInput.value || 1);
+    }
+    if (!dynamicAgentConfigs.has(currentConfig)) return;
+    setSource('api_agent_mode', dynamicEnabled.checked ? 'active' : 'off');
+    setSource('api_agent_count_per_group', dynamicEnabled.checked ? (dynamicCountInput.value || 1) : 0);
+    setSource('rl_fallback_enabled', dynamicEnabled.checked && fallbackEnabled.checked ? 1 : 0);
+    setSource('rl_agent_enabled', independentRlEnabled.checked ? 1 : 0);
+    setSource('rl_agent_count_per_group', independentRlEnabled.checked ? (independentRlCountInput.value || 1) : 0);
+  }
+  function showPresetSummary(preset) {
+    summary.innerHTML = preset.groups.map(([name, members]) => (
+      `<div class="session-preset-summary__group"><b>${name}</b><span>${members}</span></div>`
+    )).join('') + '<p class="session-preset-summary__note">已自动填写真实参与者、分组、Agent 和服务率同步参数；可继续展开下方完整配置修改。</p>';
+    summary.hidden = false;
+  }
+  function markPresetSelected(code) {
+    shortcutPanel.querySelectorAll('[data-preset]').forEach(button => {
+      button.classList.toggle('is-selected', button.dataset.preset === code);
+    });
+  }
+  function applyPreset(code) {
+    if (code === 'D') {
+      markPresetSelected(code);
+      summary.innerHTML = '<p class="session-preset-summary__note">自定义模式不会覆盖当前参数，请展开下方完整配置。</p>';
+      summary.hidden = false;
+      return;
+    }
+    const preset = presets[code];
+    if (!preset || !dynamicAgentConfigs.has(currentConfig)) return;
+    applyingPreset = true;
+    participantInput.value = String(preset.fields.num_participants);
+    for (const [fieldName, value] of Object.entries(preset.fields)) {
+      if (fieldName !== 'num_participants') setSource(fieldName, value);
+    }
+    syncVisibleControls();
+    showPresetSummary(preset);
+    markPresetSelected(code);
+    applyingPreset = false;
+  }
+  function switchToCustomAgentConfiguration() {
+    if (applyingPreset || !dynamicAgentConfigs.has(currentConfig)) return;
+    setSource('group_agent_spec', '');
+    markPresetSelected('D');
+    summary.innerHTML = '<p class="session-preset-summary__note">Agent 设置已改为统一的自定义配置，请检查下方完整参数。</p>';
+    summary.hidden = false;
+  }
+
+  shortcutPanel.querySelectorAll('[data-preset]').forEach(button => {
+    button.addEventListener('click', () => applyPreset(button.dataset.preset));
+  });
+  dropdown.addEventListener('change', () => {
+    storeVisibleControls();
+    currentConfig = dropdown.value;
+    summary.hidden = true;
+    markPresetSelected('');
+    syncVisibleControls();
+  });
+  singleCountInput.addEventListener('input', storeVisibleControls);
+  dynamicEnabled.addEventListener('change', () => {
+    dynamicCountWrap.hidden = !dynamicEnabled.checked;
+    switchToCustomAgentConfiguration();
+    storeVisibleControls();
+  });
+  dynamicCountInput.addEventListener('input', () => {
+    switchToCustomAgentConfiguration();
+    storeVisibleControls();
+  });
+  fallbackEnabled.addEventListener('change', storeVisibleControls);
+  independentRlEnabled.addEventListener('change', () => {
+    independentRlCountWrap.hidden = !independentRlEnabled.checked;
+    switchToCustomAgentConfiguration();
+    storeVisibleControls();
+  });
+  independentRlCountInput.addEventListener('input', () => {
+    switchToCustomAgentConfiguration();
+    storeVisibleControls();
+  });
+  createButton.addEventListener('click', event => {
+    storeVisibleControls();
+    const activeCountInput = activeAgentConfigs.has(currentConfig)
+      ? singleCountInput : dynamicEnabled.checked ? dynamicCountInput : null;
+    if (activeCountInput && !activeCountInput.checkValidity()) {
+      activeCountInput.reportValidity();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    if (independentRlEnabled.checked && !independentRlCountInput.checkValidity()) {
+      independentRlCountInput.reportValidity();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
+  currentConfig = dropdown.value;
+  syncVisibleControls();
+});
+</script>

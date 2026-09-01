@@ -80,7 +80,10 @@ class AdminAgentCountValidationTests(unittest.TestCase):
 
 class AdminAgentCountTemplateTests(unittest.TestCase):
     def setUp(self):
-        self.template_path = Path('_templates/otree/CreateSession.html')
+        self.template_path = Path(
+            '_templates/otree/includes/DynamicSessionControls.html'
+        )
+        self.form_path = Path('_templates/otree/includes/CreateSessionForm.html')
 
     def test_template_exposes_prominent_agent_count_control(self):
         template = self.template_path.read_text(encoding='utf-8')
@@ -94,24 +97,25 @@ class AdminAgentCountTemplateTests(unittest.TestCase):
     def test_template_targets_only_active_agent_configs(self):
         template = self.template_path.read_text(encoding='utf-8')
 
-        self.assertIn('"single_bottleneck_prod_agent_active"', template)
-        self.assertIn('"single_bottleneck_demo_agent_active"', template)
-        self.assertNotIn('"single_bottleneck_prod"', template)
-        self.assertNotIn('"single_bottleneck_demo"', template)
+        self.assertIn('single_bottleneck_prod_agent_active', template)
+        self.assertIn('single_bottleneck_demo_agent_active', template)
+        self.assertNotIn("'single_bottleneck_prod'", template)
+        self.assertNotIn("'single_bottleneck_demo'", template)
 
     def test_template_keeps_standard_otree_form(self):
         template = self.template_path.read_text(encoding='utf-8')
+        form_template = self.form_path.read_text(encoding='utf-8')
 
-        self.assertIn('otree/includes/CreateSessionForm.html', template)
+        self.assertIn('otree/includes/DynamicSessionControls.html', form_template)
         self.assertIn('agent-count-control', template)
         self.assertIn('reportValidity', template)
 
     def test_template_keeps_standard_field_until_enhancement_is_ready(self):
         template = self.template_path.read_text(encoding='utf-8')
 
-        guard = template.index('if (!dropdown || !participantBlock')
-        remove_name = template.index('input.removeAttribute("name")')
-        self.assertLess(guard, remove_name)
+        self.assertNotIn('removeAttribute("name")', template)
+        self.assertIn("sourceFor(configName, fieldName)?.closest('tr')?.setAttribute('hidden', 'hidden')", template)
+        self.assertIn("const replacedAgentFields = new Set([", template)
 
     def test_template_uses_native_numeric_validation_message(self):
         template = self.template_path.read_text(encoding='utf-8')

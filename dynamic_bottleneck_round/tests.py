@@ -98,6 +98,45 @@ class DynamicCapacityConfigTests(unittest.TestCase):
                 }
             )
 
+    def test_phased_markov_config_parses_phase_and_transition_settings(self):
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
+                'dynamic_capacity_draw_mode': 'phased_markov',
+                'dynamic_capacity_random_rounds': 20,
+                'dynamic_capacity_transition_matrix': (
+                    '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8'
+                ),
+            }
+        )
+
+        self.assertEqual(config.random_rounds, 20)
+        self.assertEqual(
+            config.transition_matrix,
+            (
+                (0.8, 0.1, 0.1),
+                (0.1, 0.8, 0.1),
+                (0.1, 0.1, 0.8),
+            ),
+        )
+
+    def test_transition_matrix_rows_must_match_states_and_sum_to_one(self):
+        with self.assertRaisesRegex(
+            DynamicCapacityConfigError,
+            'dynamic_capacity_transition_matrix',
+        ):
+            parse_dynamic_capacity_config(
+                {
+                    'dynamic_capacity_values': '1,2,3',
+                    'dynamic_capacity_probabilities': '0.3,0.5,0.2',
+                    'dynamic_capacity_draw_mode': 'phased_markov',
+                    'dynamic_capacity_transition_matrix': (
+                        '0.8,0.2;0.1,0.8,0.1;0.1,0.1,0.8'
+                    ),
+                }
+            )
+
 
 class DynamicCapacitySequenceTests(unittest.TestCase):
     def setUp(self):
@@ -159,6 +198,264 @@ class DynamicCapacitySequenceTests(unittest.TestCase):
             )
             if index:
                 self.assertEqual(record['previous_capacity'], records[index - 1]['capacity'])
+
+    def test_session_scope_uses_the_same_sequence_for_every_group(self):
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
+                'dynamic_capacity_seed': 20260718,
+                'dynamic_capacity_draw_mode': 'balanced_shuffle',
+                'dynamic_capacity_sequence_scope': 'session',
+                'capacity_reveal_timing': 'before_decision',
+            }
+        )
+
+        group_one = generate_capacity_sequence(config, rounds=10, group_id=1)
+        group_two = generate_capacity_sequence(config, rounds=10, group_id=2)
+
+        self.assertEqual(group_one, group_two)
+
+    def test_invalid_capacity_sequence_scope_is_rejected(self):
+        with self.assertRaisesRegex(
+            DynamicCapacityConfigError,
+            'dynamic_capacity_sequence_scope',
+        ):
+            parse_dynamic_capacity_config(
+                {
+                    'dynamic_capacity_values': '1,2,3',
+                    'dynamic_capacity_probabilities': '0.3,0.5,0.2',
+                    'dynamic_capacity_sequence_scope': 'participant',
+                }
+            )
+
+    def test_group_scope_keeps_independent_group_sequences(self):
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
+                'dynamic_capacity_seed': 20260718,
+                'dynamic_capacity_draw_mode': 'balanced_shuffle',
+                'dynamic_capacity_sequence_scope': 'group',
+                'capacity_reveal_timing': 'before_decision',
+            }
+        )
+
+        group_one = generate_capacity_sequence(config, rounds=10, group_id=1)
+        group_two = generate_capacity_sequence(config, rounds=10, group_id=2)
+
+        self.assertNotEqual(group_one, group_two)
+
+    def test_phased_markov_switches_from_random_to_transition_rule_at_round_21(self):
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '1,0,0',
+                'dynamic_capacity_seed': 12,
+                'dynamic_capacity_draw_mode': 'phased_markov',
+                'dynamic_capacity_random_rounds': 20,
+                'dynamic_capacity_transition_matrix': (
+                    '0,1,0;0,0,1;0,0,1'
+                ),
+                'dynamic_capacity_sequence_scope': 'session',
+                'capacity_reveal_timing': 'after_decision',
+            }
+        )
+
+        sequence = generate_capacity_sequence(config, rounds=60, group_id=1)
+
+        self.assertEqual(sequence[:20], [1] * 20)
+        self.assertEqual(sequence[20], 2)
+        self.assertEqual(sequence[21:], [3] * 39)
+
+    def test_phased_markov_is_reproducible_and_shared_across_groups(self):
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
+                'dynamic_capacity_seed': 20260718,
+                'dynamic_capacity_draw_mode': 'phased_markov',
+                'dynamic_capacity_random_rounds': 20,
+                'dynamic_capacity_transition_matrix': (
+                    '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8'
+                ),
+                'dynamic_capacity_sequence_scope': 'session',
+                'capacity_reveal_timing': 'after_decision',
+            }
+        )
+
+        first = generate_capacity_sequence(config, rounds=60, group_id=1)
+        repeated = generate_capacity_sequence(config, rounds=60, group_id=1)
+        other_group = generate_capacity_sequence(config, rounds=60, group_id=2)
+
+        self.assertEqual(len(first), 60)
+        self.assertEqual(first, repeated)
+        self.assertEqual(first, other_group)
+        self.assertTrue(set(first).issubset({1, 2, 3}))
+
+    def test_manual_sequence_mode_uses_exact_60_round_sequence(self):
+        sequence = ([1, 2, 3] * 20)
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
+                'dynamic_capacity_draw_mode': 'manual_sequence',
+                'dynamic_capacity_manual_sequence': ','.join(map(str, sequence)),
+                'dynamic_capacity_sequence_scope': 'session',
+                'capacity_reveal_timing': 'after_decision',
+            }
+        )
+
+        self.assertEqual(
+            generate_capacity_sequence(config, rounds=60, group_id=99),
+            sequence,
+        )
+
+    def test_manual_sequence_rejects_wrong_length_and_unknown_capacity(self):
+        wrong_length = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
+                'dynamic_capacity_draw_mode': 'manual_sequence',
+                'dynamic_capacity_manual_sequence': '1,2,3',
+            }
+        )
+        with self.assertRaisesRegex(DynamicCapacityConfigError, '恰好包含 60 个'):
+            generate_capacity_sequence(wrong_length, rounds=60, group_id=1)
+
+        unknown_capacity = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
+                'dynamic_capacity_draw_mode': 'manual_sequence',
+                'dynamic_capacity_manual_sequence': ','.join(['4'] * 60),
+            }
+        )
+        with self.assertRaisesRegex(DynamicCapacityConfigError, '候选集合'):
+            generate_capacity_sequence(unknown_capacity, rounds=60, group_id=1)
+
+
+class GroupSpecificAgentConfigTests(unittest.TestCase):
+    def make_session(self, **overrides):
+        config = {
+            'api_agent_mode': 'active',
+            'api_agent_count_per_group': 1,
+            'rl_agent_enabled': '0',
+            'rl_agent_count_per_group': 1,
+            'group_agent_spec': 'G01:api=0,rl=0;G02:api=5,rl=0',
+        }
+        config.update(overrides)
+        return SimpleNamespace(config=config, vars={})
+
+    def test_group_spec_can_balance_human_and_agent_actor_counts(self):
+        session = self.make_session()
+        matrix = [[object() for _ in range(20)], [object() for _ in range(15)]]
+
+        dynamic_app.validate_group_agent_configuration(session, matrix)
+
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 1), 0)
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 2), 5)
+        self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 1), 0)
+        self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 2), 0)
+        self.assertEqual(dynamic_app.effective_group_actor_count(session, 20, 1), 20)
+        self.assertEqual(dynamic_app.effective_group_actor_count(session, 15, 2), 20)
+
+    def test_group_spec_must_cover_every_created_group(self):
+        session = self.make_session(group_agent_spec='G02:api=5,rl=0')
+        matrix = [[object()], [object()]]
+
+        with self.assertRaisesRegex(ValueError, '必须覆盖全部实验组'):
+            dynamic_app.validate_group_agent_configuration(session, matrix)
+
+    def test_group_spec_rejects_agent_count_above_limit(self):
+        session = self.make_session(
+            group_agent_spec='G01:api=0,rl=0;G02:api=6,rl=0'
+        )
+
+        with self.assertRaisesRegex(ValueError, '0 到 5'):
+            dynamic_app.validate_group_agent_configuration(
+                session,
+                [[object()], [object()]],
+            )
+
+    def test_group_spec_overrides_legacy_uniform_count_validation(self):
+        session = self.make_session(
+            api_agent_count_per_group=0,
+            rl_agent_enabled='1',
+            rl_agent_count_per_group=0,
+            group_agent_spec='G01:api=0,rl=0;G02:api=4,rl=1',
+        )
+
+        self.assertEqual(dynamic_app.validate_api_agent_count(session), 0)
+        self.assertEqual(dynamic_app.validate_rl_agent_count(session), 0)
+        dynamic_app.validate_group_agent_configuration(
+            session,
+            [[object()], [object()]],
+        )
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 2), 4)
+        self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 2), 1)
+
+    def test_group_spec_authoritatively_enables_needed_agent_types(self):
+        session = self.make_session(
+            api_agent_mode='off',
+            rl_agent_enabled='0',
+            group_agent_spec='G01:api=0,rl=0;G02:api=4,rl=1',
+        )
+
+        dynamic_app.validate_api_agent_count(session)
+        dynamic_app.validate_rl_agent_count(session)
+        dynamic_app.validate_group_agent_configuration(
+            session,
+            [[object()], [object()]],
+        )
+
+        self.assertEqual(dynamic_app.api_agent_mode(session), 'active')
+        self.assertTrue(dynamic_app.rl_agent_enabled(session))
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 1), 0)
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 2), 4)
+        self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 2), 1)
+
+    def test_api_request_preparation_uses_each_groups_configured_count(self):
+        session = self.make_session(api_agent_mode='off')
+        dynamic_app.validate_api_agent_count(session)
+        dynamic_app.validate_rl_agent_count(session)
+        dynamic_app.validate_group_agent_configuration(
+            session,
+            [[object()], [object()]],
+        )
+        player_one = SimpleNamespace(
+            participant=SimpleNamespace(vars={'assigned_group_label': 'G01'})
+        )
+        player_two = SimpleNamespace(
+            participant=SimpleNamespace(vars={'assigned_group_label': 'G02'})
+        )
+        group_one = SimpleNamespace(
+            session=session,
+            id_in_subsession=1,
+            get_players=lambda: [player_one],
+        )
+        group_two = SimpleNamespace(
+            session=session,
+            id_in_subsession=2,
+            get_players=lambda: [player_two],
+        )
+
+        with (
+            patch.object(dynamic_app, 'config_from_session', return_value='config'),
+            patch.object(dynamic_app, 'get_or_create_api_agent_persona', return_value={}),
+            patch.object(dynamic_app, 'api_agent_choice_set_for_group', return_value='choices'),
+        ):
+            _config_one, prepared_one = dynamic_app.prepare_api_agent_requests_for_group(
+                group_one
+            )
+            _config_two, prepared_two = dynamic_app.prepare_api_agent_requests_for_group(
+                group_two
+            )
+
+        self.assertEqual(prepared_one, [])
+        self.assertEqual(len(prepared_two), 5)
+        self.assertEqual(prepared_two[0][0], 'G02_API_01')
+        self.assertEqual(prepared_two[-1][0], 'G02_API_05')
 
 
 class DynamicCapacityQueueTests(unittest.TestCase):
@@ -1078,9 +1375,12 @@ class TemplateContractTests(unittest.TestCase):
             '瓶颈服务率',
         ):
             self.assertIn(text, html)
-        self.assertIn('目标比例', html)
+        self.assertIn('具体变化规律不会提前公布', html)
         self.assertIn('{{ for item in capacity_states }}', html)
         self.assertIn('{{ capacity_reveal_description }}', html)
+        self.assertNotIn('目标比例', html)
+        self.assertNotIn('每轮抽取概率', html)
+        self.assertNotIn('{{ item.probability_label }}', html)
         self.assertIn(
             '.intro-hero,\n'
             '        .route-demo-card,\n'
@@ -1107,6 +1407,8 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn('{{ if capacity_revealed }}', html)
         self.assertIn('本轮真实瓶颈服务率', html)
         self.assertIn('本轮服务率将在提交后公布', html)
+        self.assertIn('请根据已经公布的历史结果作出选择', html)
+        self.assertNotIn('{{ item.probability_percent }}%', html)
         self.assertIn('class="time-wheel"', html)
         self.assertIn('收费 {{ item.toll_charge_label }}', html)
         self.assertIn('class="capacity-road-scene"', html)
@@ -1173,7 +1475,7 @@ class TemplateContractTests(unittest.TestCase):
 
 
 class SettingsContractTests(unittest.TestCase):
-    def test_demo_and_prod_configs_enable_auto_toll_and_keep_rewards_off(self):
+    def test_demo_and_prod_configs_use_20_plus_40_after_decision_design(self):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
@@ -1181,15 +1483,31 @@ class SettingsContractTests(unittest.TestCase):
             self.assertIn(name, configs)
             config = configs[name]
             self.assertEqual(config['dynamic_capacity_values'], '1,2,3')
-            self.assertEqual(config['dynamic_capacity_probabilities'], '0.3,0.5,0.2')
+            probabilities = [
+                float(item)
+                for item in config['dynamic_capacity_probabilities'].split(',')
+            ]
+            self.assertAlmostEqual(probabilities[0], 1 / 3)
+            self.assertAlmostEqual(probabilities[1], 1 / 3)
+            self.assertAlmostEqual(probabilities[2], 1 / 3)
             self.assertEqual(config['dynamic_capacity_seed'], 20260718)
-            self.assertEqual(config['dynamic_capacity_draw_mode'], 'balanced_shuffle')
-            self.assertEqual(config['capacity_reveal_timing'], 'before_decision')
+            self.assertEqual(config['dynamic_capacity_draw_mode'], 'phased_markov')
+            self.assertEqual(config['dynamic_capacity_random_rounds'], 20)
+            self.assertEqual(
+                config['dynamic_capacity_transition_matrix'],
+                '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
+            )
+            self.assertEqual(config['dynamic_capacity_manual_sequence'], '')
+            self.assertEqual(config['dynamic_capacity_sequence_scope'], 'session')
+            self.assertEqual(config['capacity_reveal_timing'], 'after_decision')
+            self.assertEqual(config['group_agent_spec'], '')
             self.assertEqual(config['reward_treatment_enabled'], 0)
             self.assertEqual(config['departure_schedule_auto_enabled'], 1)
             self.assertEqual(config['departure_schedule_min_slots_each_side'], 10)
-            self.assertEqual(config['coarse_toll_auto_enabled'], 1)
+            self.assertEqual(config['coarse_toll_auto_enabled'], 0)
             self.assertEqual(config['coarse_toll_enabled'], 1)
+            self.assertEqual(config['payoff_rounds'], 60)
+        self.assertEqual(C.NUM_ROUNDS, 60)
 
     def test_export_headers_match_required_round_level_schema(self):
         required = {
@@ -1215,7 +1533,7 @@ class PlayerBot(Bot):
             expect('开始前最后提醒', 'in', self.html)
             expect('同一轮内保持不变', 'in', self.html)
             expect('固定行驶成本', 'in', self.html)
-            expect('目标比例', 'in', self.html)
+            expect('具体变化规律不会提前公布', 'in', self.html)
             yield Submission(Introduction, check_html=False)
             expect('同一小组、同一轮', 'in', self.html)
             yield Submission(ComprehensionCheck, check_html=False)
@@ -1232,8 +1550,12 @@ class PlayerBot(Bot):
         group_capacities = {player.dynamic_capacity for player in self.group.get_players()}
         expect(len(group_capacities), '==', 1)
         expect(self.player.dynamic_capacity, 'in', configured_values)
-        expect('本轮真实瓶颈服务率', 'in', self.html)
-        expect(f'{self.player.dynamic_capacity} 人 / 1 分钟', 'in', self.html)
+        if self.session.config['capacity_reveal_timing'] == 'after_decision':
+            expect('本轮服务率将在提交后公布', 'in', self.html)
+            expect('本轮真实瓶颈服务率', 'not in', self.html)
+        else:
+            expect('本轮真实瓶颈服务率', 'in', self.html)
+            expect(f'{self.player.dynamic_capacity} 人 / 1 分钟', 'in', self.html)
         expect('收费', 'in', self.html)
 
         if self.case == 'same_time':
@@ -1275,9 +1597,12 @@ class PlayerBot(Bot):
             dynamic_app.effective_group_actor_count(
                 self.session,
                 len(self.group.get_players()),
+                self.group.id_in_subsession,
             ),
         )
         expect('上一轮服务率', 'in', self.html)
+        expect('本轮真实瓶颈服务率', 'in', self.html)
+        expect(f'{self.player.dynamic_capacity} 人 / 1 分钟', 'in', self.html)
         expect('本轮成本与用时', 'in', self.html)
         expect('所有参与者的成本分布', 'in', self.html)
         expect('粗收费', 'in', self.html)
@@ -1291,47 +1616,58 @@ class PlayerBot(Bot):
         expect(self.player.coarse_toll_calibration_capacity, '==', self.player.dynamic_capacity)
         if dynamic_app.api_agent_mode(self.session) == 'active':
             agent_records = dynamic_app.active_agent_decisions_for_group(self.group)
+            group_api_count = dynamic_app.api_agent_count_per_group(
+                self.session,
+                self.group.id_in_subsession,
+            )
             expect(
                 len(agent_records),
                 '==',
-                dynamic_app.api_agent_count_per_group(self.session),
+                group_api_count,
             )
-            expect(agent_records[0]['dynamic_capacity'], '==', self.player.dynamic_capacity)
-            expect(agent_records[0]['total_cost'], '>=', 0)
-            if dynamic_app.rl_fallback_enabled(self.session):
-                expect(agent_records[0]['decision_source'], '==', 'deepseek_fallback_rl')
-                rl_states = self.group.get_players()[0].participant.vars.get(
-                    dynamic_app.RL_AGENT_STATE_PARTICIPANT_VAR,
-                    {},
-                )
-                rl_state = rl_states.get(agent_records[0]['agent_id'], {})
-                expect(rl_state.get('rounds_observed'), '==', self.round_number)
+            if group_api_count:
+                expect(agent_records[0]['dynamic_capacity'], '==', self.player.dynamic_capacity)
+                expect(agent_records[0]['total_cost'], '>=', 0)
+                if dynamic_app.rl_fallback_enabled(self.session):
+                    expect(agent_records[0]['decision_source'], '==', 'deepseek_fallback_rl')
+                    rl_states = self.group.get_players()[0].participant.vars.get(
+                        dynamic_app.RL_AGENT_STATE_PARTICIPANT_VAR,
+                        {},
+                    )
+                    rl_state = rl_states.get(agent_records[0]['agent_id'], {})
+                    expect(rl_state.get('rounds_observed'), '==', self.round_number)
         if dynamic_app.rl_agent_enabled(self.session):
             rl_records = dynamic_app.independent_rl_records_for_group(self.group)
+            group_rl_count = dynamic_app.rl_agent_count_per_group(
+                self.session,
+                self.group.id_in_subsession,
+            )
             expect(
                 len(rl_records),
                 '==',
-                dynamic_app.rl_agent_count_per_group(self.session),
+                group_rl_count,
             )
-            expect(rl_records[0]['decision_source'], 'in', {
-                'rl_policy',
-                'rl_fallback_lowest_schedule_cost',
-            })
-            rl_states = self.group.get_players()[0].participant.vars.get(
-                dynamic_app.INDEPENDENT_RL_STATE_PARTICIPANT_VAR,
-                {},
-            )
-            expect(
-                rl_states[rl_records[0]['agent_id']]['rounds_observed'],
-                '==',
-                self.round_number,
-            )
+            if group_rl_count:
+                expect(rl_records[0]['decision_source'], 'in', {
+                    'rl_policy',
+                    'rl_fallback_lowest_schedule_cost',
+                })
+                rl_states = self.group.get_players()[0].participant.vars.get(
+                    dynamic_app.INDEPENDENT_RL_STATE_PARTICIPANT_VAR,
+                    {},
+                )
+                expect(
+                    rl_states[rl_records[0]['agent_id']]['rounds_observed'],
+                    '==',
+                    self.round_number,
+                )
         expect(
             self.player.coarse_toll_calibration_players,
             '==',
             dynamic_app.effective_group_actor_count(
                 self.session,
                 len(self.group.get_players()),
+                self.group.id_in_subsession,
             ),
         )
 

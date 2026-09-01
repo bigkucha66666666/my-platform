@@ -599,13 +599,13 @@
             <section class="capacity-state-panel" aria-label="候选瓶颈服务率">
                 <div class="capacity-state-head">
                     <p class="capacity-state-title">候选瓶颈服务率</p>
-                    <p class="capacity-state-note">平衡随机模式显示目标比例；独立抽取模式显示每轮抽取概率。</p>
+                    <p class="capacity-state-note">服务率会随轮次变化，具体变化规律不会提前公布。</p>
                 </div>
                 <div class="capacity-state-grid">
                     {{ for item in capacity_states }}
                     <div class="capacity-state-item">
                         <strong>{{ item.capacity }} 车 / {{ capacity_window_minutes }} 分钟</strong>
-                        <span>{{ capacity_frequency_label }}：{{ item.probability_label }}</span>
+                        <span>本轮所有参与者面对相同服务率</span>
                     </div>
                     {{ endfor }}
                 </div>

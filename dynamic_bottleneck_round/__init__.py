@@ -42,13 +42,17 @@ from .agents.rl_fallback import (
 
 
 doc = """
-整轮随机瓶颈服务率实验。
-同一小组在同一轮面对相同的瓶颈服务率，不同轮次的服务率按 session config 随机确定。
+动态瓶颈服务率实验。
+同一小组在同一轮面对相同的瓶颈服务率，不同轮次的服务率按 session config 确定。
 """
 
 
 DRAW_MODE_BALANCED = 'balanced_shuffle'
 DRAW_MODE_IID = 'iid'
+DRAW_MODE_PHASED_MARKOV = 'phased_markov'
+DRAW_MODE_MANUAL_SEQUENCE = 'manual_sequence'
+CAPACITY_SEQUENCE_SCOPE_GROUP = 'group'
+CAPACITY_SEQUENCE_SCOPE_SESSION = 'session'
 REVEAL_BEFORE_DECISION = 'before_decision'
 REVEAL_AFTER_DECISION = 'after_decision'
 
@@ -82,6 +86,7 @@ INDEPENDENT_RL_DECISIONS_PARTICIPANT_VAR = (
     'dynamic_bottleneck_round_independent_rl_decisions_by_round_v1'
 )
 API_AGENT_MEMORY_PARTICIPANT_VAR = 'dynamic_bottleneck_round_api_agent_memory_v1'
+GROUP_AGENT_COUNTS_SESSION_VAR = 'dynamic_bottleneck_round_group_agent_counts_v1'
 RL_AGENT_STATE_PARTICIPANT_VAR = 'dynamic_bottleneck_round_rl_agent_state_v1'
 INDEPENDENT_RL_STATE_PARTICIPANT_VAR = (
     'dynamic_bottleneck_round_independent_rl_state_v1'
@@ -106,7 +111,11 @@ class DynamicCapacityConfig:
     probabilities: tuple[float, ...]
     seed: int
     draw_mode: str
+    sequence_scope: str
     reveal_timing: str
+    random_rounds: int
+    transition_matrix: tuple[tuple[float, ...], ...]
+    manual_sequence: tuple[int, ...]
 
 
 def _csv_items(value, field_name):
@@ -165,9 +174,94 @@ def parse_dynamic_capacity_config(session_config) -> DynamicCapacityConfig:
     draw_mode = str(
         session_config.get('dynamic_capacity_draw_mode', DRAW_MODE_BALANCED)
     ).strip().lower()
-    if draw_mode not in {DRAW_MODE_BALANCED, DRAW_MODE_IID}:
+    if draw_mode not in {
+        DRAW_MODE_BALANCED,
+        DRAW_MODE_IID,
+        DRAW_MODE_PHASED_MARKOV,
+        DRAW_MODE_MANUAL_SEQUENCE,
+    }:
         raise DynamicCapacityConfigError(
-            'dynamic_capacity_draw_mode 必须是 balanced_shuffle 或 iid。'
+            'dynamic_capacity_draw_mode 必须是 balanced_shuffle、iid、'
+            'phased_markov 或 manual_sequence。'
+        )
+
+    try:
+        random_rounds = int(session_config.get('dynamic_capacity_random_rounds', 20))
+    except (TypeError, ValueError) as exc:
+        raise DynamicCapacityConfigError(
+            'dynamic_capacity_random_rounds 必须是非负整数。'
+        ) from exc
+    if random_rounds < 0:
+        raise DynamicCapacityConfigError(
+            'dynamic_capacity_random_rounds 必须是非负整数。'
+        )
+
+    raw_matrix = str(
+        session_config.get(
+            'dynamic_capacity_transition_matrix',
+            '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
+        )
+        or ''
+    ).strip()
+    try:
+        transition_matrix = tuple(
+            tuple(float(item.strip()) for item in row.split(','))
+            for row in raw_matrix.split(';')
+            if row.strip()
+        )
+    except (TypeError, ValueError) as exc:
+        raise DynamicCapacityConfigError(
+            'dynamic_capacity_transition_matrix 必须是分号分行、逗号分列的概率矩阵。'
+        ) from exc
+    matrix_size_valid = (
+        len(transition_matrix) == len(values)
+        and all(len(row) == len(values) for row in transition_matrix)
+    )
+    matrix_probabilities_valid = all(
+        isfinite(probability) and 0 <= probability <= 1
+        for row in transition_matrix
+        for probability in row
+    )
+    matrix_rows_sum_to_one = all(
+        abs(sum(row) - 1.0) <= 1e-9
+        for row in transition_matrix
+    )
+    if not (
+        matrix_size_valid
+        and matrix_probabilities_valid
+        and matrix_rows_sum_to_one
+    ):
+        raise DynamicCapacityConfigError(
+            'dynamic_capacity_transition_matrix 必须与服务率状态数量一致，'
+            '且每行均由 0 到 1 的有限概率组成并且概率之和为 1。'
+        )
+
+    raw_manual_sequence = str(
+        session_config.get('dynamic_capacity_manual_sequence', '') or ''
+    ).strip()
+    try:
+        manual_sequence = tuple(
+            int(item.strip())
+            for item in raw_manual_sequence.split(',')
+            if item.strip()
+        )
+    except (TypeError, ValueError) as exc:
+        raise DynamicCapacityConfigError(
+            'dynamic_capacity_manual_sequence 必须是逗号分隔的整数。'
+        ) from exc
+
+    sequence_scope = str(
+        session_config.get(
+            'dynamic_capacity_sequence_scope',
+            CAPACITY_SEQUENCE_SCOPE_GROUP,
+        )
+    ).strip().lower()
+    if sequence_scope not in {
+        CAPACITY_SEQUENCE_SCOPE_GROUP,
+        CAPACITY_SEQUENCE_SCOPE_SESSION,
+    }:
+        raise DynamicCapacityConfigError(
+            'dynamic_capacity_sequence_scope 必须是 group 或 session。'
         )
 
     reveal_timing = str(
@@ -183,7 +277,11 @@ def parse_dynamic_capacity_config(session_config) -> DynamicCapacityConfig:
         probabilities=probabilities,
         seed=seed,
         draw_mode=draw_mode,
+        sequence_scope=sequence_scope,
         reveal_timing=reveal_timing,
+        random_rounds=random_rounds,
+        transition_matrix=transition_matrix,
+        manual_sequence=manual_sequence,
     )
 
 
@@ -208,9 +306,48 @@ def generate_capacity_sequence(
 ) -> list[int]:
     if rounds <= 0:
         return []
-    rng = random.Random(config.seed + int(group_id) * 1009)
+    if config.draw_mode == DRAW_MODE_MANUAL_SEQUENCE:
+        if len(config.manual_sequence) != rounds:
+            raise DynamicCapacityConfigError(
+                f'dynamic_capacity_manual_sequence 必须恰好包含 {rounds} 个服务率。'
+            )
+        unknown_values = sorted(set(config.manual_sequence) - set(config.values))
+        if unknown_values:
+            raise DynamicCapacityConfigError(
+                'dynamic_capacity_manual_sequence 中的服务率必须属于 '
+                f'dynamic_capacity_values 候选集合；非法值={unknown_values}。'
+            )
+        return list(config.manual_sequence)
+    sequence_id = (
+        0
+        if config.sequence_scope == CAPACITY_SEQUENCE_SCOPE_SESSION
+        else int(group_id)
+    )
+    rng = random.Random(config.seed + sequence_id * 1009)
     if config.draw_mode == DRAW_MODE_IID:
         return rng.choices(config.values, weights=config.probabilities, k=rounds)
+    if config.draw_mode == DRAW_MODE_PHASED_MARKOV:
+        if config.random_rounds < 1 or config.random_rounds > rounds:
+            raise DynamicCapacityConfigError(
+                'phased_markov 模式下 dynamic_capacity_random_rounds '
+                f'必须在 1 到总轮数 {rounds} 之间。'
+            )
+        sequence = rng.choices(
+            config.values,
+            weights=config.probabilities,
+            k=config.random_rounds,
+        )
+        value_index = {value: index for index, value in enumerate(config.values)}
+        while len(sequence) < rounds:
+            previous_index = value_index[sequence[-1]]
+            sequence.append(
+                rng.choices(
+                    config.values,
+                    weights=config.transition_matrix[previous_index],
+                    k=1,
+                )[0]
+            )
+        return sequence
 
     counts = _balanced_counts(config.probabilities, rounds)
     sequence = [
@@ -230,16 +367,31 @@ def build_capacity_round_records(
 ):
     sequence = generate_capacity_sequence(config, rounds=rounds, group_id=group_id)
     probability_by_capacity = dict(zip(config.values, config.probabilities))
-    return [
-        {
-            'round_number': index + 1,
-            'capacity': capacity,
-            'state': f'capacity_{capacity}',
-            'probability': probability_by_capacity[capacity],
-            'previous_capacity': sequence[index - 1] if index else None,
-        }
-        for index, capacity in enumerate(sequence)
-    ]
+    value_index = {value: index for index, value in enumerate(config.values)}
+    records = []
+    for index, capacity in enumerate(sequence):
+        previous_capacity = sequence[index - 1] if index else None
+        if config.draw_mode == DRAW_MODE_MANUAL_SEQUENCE:
+            probability = 0.0
+        elif (
+            config.draw_mode == DRAW_MODE_PHASED_MARKOV
+            and index >= config.random_rounds
+        ):
+            previous_index = value_index[previous_capacity]
+            capacity_index = value_index[capacity]
+            probability = config.transition_matrix[previous_index][capacity_index]
+        else:
+            probability = probability_by_capacity[capacity]
+        records.append(
+            {
+                'round_number': index + 1,
+                'capacity': capacity,
+                'state': f'capacity_{capacity}',
+                'probability': probability,
+                'previous_capacity': previous_capacity,
+            }
+        )
+    return records
 
 
 def service_batch_wait_minutes(
@@ -263,14 +415,7 @@ def decision_capacity_context(
     context = {
         'capacity_revealed': config.reveal_timing == REVEAL_BEFORE_DECISION,
         'capacity_reveal_timing': config.reveal_timing,
-        'capacity_states': [
-            {
-                'capacity': capacity,
-                'probability': probability,
-                'probability_percent': round(probability * 100, 2),
-            }
-            for capacity, probability in zip(config.values, config.probabilities)
-        ],
+        'capacity_states': [{'capacity': capacity} for capacity in config.values],
     }
     if context['capacity_revealed']:
         context['actual_capacity'] = int(actual_capacity)
@@ -316,7 +461,7 @@ def should_start_round(*, ready_count, group_size, now_ts, deadline_ts):
 class C(BaseConstants):
     NAME_IN_URL = 'dynamic_bottleneck_round'
     PLAYERS_PER_GROUP = None
-    NUM_ROUNDS = 10
+    NUM_ROUNDS = 60
 
     DECISION_TIMEOUT_SECONDS = 60
     RESULTS_TIMEOUT_SECONDS = 50
@@ -496,9 +641,106 @@ def rl_fallback_enabled(session) -> bool:
     )
 
 
-def api_agent_count_per_group(session) -> int:
+def _canonical_group_label(group_id) -> str:
+    if isinstance(group_id, str):
+        value = group_id.strip().upper()
+        if value.startswith('G'):
+            value = value[1:]
+    else:
+        value = group_id
+    try:
+        numeric_id = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('实验组编号必须为 G01 这样的正整数编号。') from exc
+    if numeric_id <= 0:
+        raise ValueError('实验组编号必须为 G01 这样的正整数编号。')
+    return f'G{numeric_id:02d}'
+
+
+def parse_group_agent_spec(spec):
+    parsed = {}
+    for raw_group in str(spec or '').replace('\n', ';').split(';'):
+        raw_group = raw_group.strip()
+        if not raw_group:
+            continue
+        if ':' not in raw_group:
+            raise ValueError(
+                'group_agent_spec 格式应为 G01:api=0,rl=0;G02:api=5,rl=0。'
+            )
+        raw_label, raw_counts = raw_group.split(':', 1)
+        label = _canonical_group_label(raw_label)
+        if label in parsed:
+            raise ValueError(f'group_agent_spec 中的 {label} 重复配置。')
+        counts = {}
+        for raw_item in raw_counts.split(','):
+            raw_item = raw_item.strip()
+            if not raw_item or '=' not in raw_item:
+                raise ValueError(
+                    'group_agent_spec 格式应为 G01:api=0,rl=0;G02:api=5,rl=0。'
+                )
+            raw_key, raw_value = raw_item.split('=', 1)
+            key = raw_key.strip().lower()
+            if key not in {'api', 'rl'} or key in counts:
+                raise ValueError('group_agent_spec 每组只能配置一个 api 和一个 rl 数量。')
+            try:
+                count = int(raw_value.strip())
+            except ValueError as exc:
+                raise ValueError('group_agent_spec 中 Agent 数量必须是整数。') from exc
+            if not 0 <= count <= API_AGENT_COUNT_MAX:
+                raise ValueError('group_agent_spec 中 Agent 数量必须在 0 到 5 之间。')
+            counts[key] = count
+        if set(counts) != {'api', 'rl'}:
+            raise ValueError('group_agent_spec 每组必须同时配置 api 和 rl 数量。')
+        parsed[label] = counts
+    return parsed
+
+
+def validate_group_agent_configuration(session, matrix):
+    raw_spec = str(session.config.get('group_agent_spec', '') or '').strip()
+    if not raw_spec:
+        session.vars.pop(GROUP_AGENT_COUNTS_SESSION_VAR, None)
+        return {}
+
+    parsed = parse_group_agent_spec(raw_spec)
+    expected_labels = {f'G{index:02d}' for index in range(1, len(matrix) + 1)}
+    configured_labels = set(parsed)
+    if configured_labels != expected_labels:
+        missing = sorted(expected_labels - configured_labels)
+        unknown = sorted(configured_labels - expected_labels)
+        raise ValueError(
+            'group_agent_spec 必须覆盖全部实验组。'
+            f' 缺失={missing}，未知={unknown}。'
+        )
+    if api_agent_mode(session) != API_AGENT_MODE_ACTIVE and any(
+        counts['api'] for counts in parsed.values()
+    ):
+        raise ValueError('group_agent_spec 配置了 API Agent，请将 api_agent_mode 设为 active。')
+    if not rl_agent_enabled(session) and any(
+        counts['rl'] for counts in parsed.values()
+    ):
+        raise ValueError('group_agent_spec 配置了 RL Agent，请将 rl_agent_enabled 设为 1。')
+    session.vars[GROUP_AGENT_COUNTS_SESSION_VAR] = deepcopy(parsed)
+    return parsed
+
+
+def _configured_group_agent_count(session, group_id, actor_key):
+    if group_id is None:
+        return None
+    stored = session.vars.get(GROUP_AGENT_COUNTS_SESSION_VAR, {})
+    if not isinstance(stored, dict):
+        return None
+    counts = stored.get(_canonical_group_label(group_id))
+    if not isinstance(counts, dict):
+        return None
+    return max(0, config_int(counts.get(actor_key, 0), 0))
+
+
+def api_agent_count_per_group(session, group_id=None) -> int:
     if api_agent_mode(session) == API_AGENT_MODE_OFF:
         return 0
+    configured_count = _configured_group_agent_count(session, group_id, 'api')
+    if configured_count is not None:
+        return configured_count
     return max(0, config_int(session.config.get('api_agent_count_per_group', 0), 0))
 
 
@@ -520,9 +762,12 @@ def rl_agent_enabled(session) -> bool:
     return config_flag(session.config.get('rl_agent_enabled', 0))
 
 
-def rl_agent_count_per_group(session) -> int:
+def rl_agent_count_per_group(session, group_id=None) -> int:
     if not rl_agent_enabled(session):
         return 0
+    configured_count = _configured_group_agent_count(session, group_id, 'rl')
+    if configured_count is not None:
+        return configured_count
     return max(0, config_int(session.config.get('rl_agent_count_per_group', 0), 0))
 
 
@@ -532,6 +777,16 @@ def validate_api_agent_count(session) -> int:
     ).strip().lower()
     if raw_mode not in {API_AGENT_MODE_OFF, API_AGENT_MODE_ACTIVE}:
         raise ValueError('api_agent_mode 必须是 off 或 active。')
+    raw_group_spec = str(session.config.get('group_agent_spec', '') or '').strip()
+    if raw_group_spec:
+        parsed = parse_group_agent_spec(raw_group_spec)
+        mode = (
+            API_AGENT_MODE_ACTIVE
+            if any(counts['api'] for counts in parsed.values())
+            else API_AGENT_MODE_OFF
+        )
+        session.config = {**session.config, 'api_agent_mode': mode}
+        return 0
     if raw_mode == API_AGENT_MODE_OFF:
         return 0
 
@@ -559,6 +814,12 @@ def validate_api_agent_count(session) -> int:
 
 
 def validate_rl_agent_count(session) -> int:
+    raw_group_spec = str(session.config.get('group_agent_spec', '') or '').strip()
+    if raw_group_spec:
+        parsed = parse_group_agent_spec(raw_group_spec)
+        enabled = '1' if any(counts['rl'] for counts in parsed.values()) else '0'
+        session.config = {**session.config, 'rl_agent_enabled': enabled}
+        return 0
     if not rl_agent_enabled(session):
         session.config = {**session.config, 'rl_agent_enabled': '0'}
         return 0
@@ -586,11 +847,11 @@ def validate_rl_agent_count(session) -> int:
     return count
 
 
-def effective_group_actor_count(session, human_count) -> int:
+def effective_group_actor_count(session, human_count, group_id=None) -> int:
     return (
         int(human_count)
-        + api_agent_count_per_group(session)
-        + rl_agent_count_per_group(session)
+        + api_agent_count_per_group(session, group_id)
+        + rl_agent_count_per_group(session, group_id)
     )
 
 
@@ -709,8 +970,12 @@ def apply_dynamic_departure_schedules(session, matrix, config):
         0,
         config_int(session.config.get('departure_schedule_min_slots_each_side', 10), 10),
     )
-    for group_players in matrix:
-        actor_count = effective_group_actor_count(session, len(group_players))
+    for group_id, group_players in enumerate(matrix, start=1):
+        actor_count = effective_group_actor_count(
+            session,
+            len(group_players),
+            group_id,
+        )
         if auto_enabled:
             schedule = build_dynamic_departure_schedule(
                 players_count=actor_count,
@@ -1237,10 +1502,14 @@ def apply_dynamic_toll_calibrations(session, matrix, config):
     result_cache = {}
     file_cache = load_toll_calibration_cache()
     settings_signature = tuple(sorted(toll_calibration_settings(session.config).items()))
-    for group_players in matrix:
+    for group_id, group_players in enumerate(matrix, start=1):
         if not group_players:
             continue
-        actor_count = effective_group_actor_count(session, len(group_players))
+        actor_count = effective_group_actor_count(
+            session,
+            len(group_players),
+            group_id,
+        )
         schedule = departure_schedule_for_player(group_players[0])
         cache_key = (
             actor_count,
@@ -1300,6 +1569,7 @@ def _manual_round_toll(player):
         'calibration_players': effective_group_actor_count(
             session,
             len(player.group.get_players()),
+            player.group.id_in_subsession,
         ),
         'calibration_mode': '',
         'calibration_source': '',
@@ -1384,8 +1654,8 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll)
 def creating_session(subsession):
     config = parse_dynamic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
-        agent_count = validate_api_agent_count(subsession.session)
-        rl_agent_count = validate_rl_agent_count(subsession.session)
+        validate_api_agent_count(subsession.session)
+        validate_rl_agent_count(subsession.session)
         validate_toll_reveal_compatibility(subsession.session.config)
         validate_optional_treatments(subsession.session)
         players = subsession.get_players()
@@ -1409,22 +1679,27 @@ def creating_session(subsession):
             if cohort_size < 0:
                 raise ValueError('cohort_size 必须是非负整数。')
             matrix = build_auto_group_matrix(players, cohort_size)
+        validate_group_agent_configuration(subsession.session, matrix)
         apply_dynamic_departure_schedules(subsession.session, matrix, config)
         apply_dynamic_toll_calibrations(subsession.session, matrix, config)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
-        if agent_count:
-            initialize_api_agent_personas(
-                subsession.session,
-                [f'G{index:02d}' for index in range(1, len(matrix) + 1)],
-                agent_count,
-            )
-        if rl_agent_count:
-            initialize_rl_agent_personas(
-                subsession.session,
-                [f'G{index:02d}' for index in range(1, len(matrix) + 1)],
-                rl_agent_count,
-            )
+        for group_id in range(1, len(matrix) + 1):
+            group_label = f'G{group_id:02d}'
+            api_count = api_agent_count_per_group(subsession.session, group_id)
+            if api_count:
+                initialize_api_agent_personas(
+                    subsession.session,
+                    [group_label],
+                    api_count,
+                )
+            rl_count = rl_agent_count_per_group(subsession.session, group_id)
+            if rl_count:
+                initialize_rl_agent_personas(
+                    subsession.session,
+                    [group_label],
+                    rl_count,
+                )
         initialize_group_capacity_sequences(subsession, config)
     else:
         subsession.group_like_round(1)
@@ -2060,7 +2335,10 @@ def prepare_independent_rl_decisions_for_group(group):
     )
     states, _reference_player = independent_rl_state_store_for_group(group)
     records = []
-    for index in range(1, rl_agent_count_per_group(group.session) + 1):
+    for index in range(
+        1,
+        rl_agent_count_per_group(group.session, group.id_in_subsession) + 1,
+    ):
         agent_id = f'{group_label}_RL_{index:02d}'
         persona = get_or_create_rl_agent_persona(
             group.session,
@@ -2355,7 +2633,10 @@ def prepare_api_agent_requests_for_group(group):
         f'G{group.id_in_subsession:02d}',
     )
     prepared_agents = []
-    for index in range(1, api_agent_count_per_group(group.session) + 1):
+    for index in range(
+        1,
+        api_agent_count_per_group(group.session, group.id_in_subsession) + 1,
+    ):
         agent_id = f'{group_label}_API_{index:02d}'
         persona = get_or_create_api_agent_persona(
             group.session,
@@ -3007,7 +3288,6 @@ class Introduction(Page):
         schedule = departure_schedule_for_player(player)
         return {
             'capacity_states': capacity_state_rows(config),
-            'draw_mode': config.draw_mode,
             'total_rounds': C.NUM_ROUNDS,
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'preferred_arrival_time': minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
@@ -3019,9 +3299,6 @@ class Introduction(Page):
             'departure_time_min': schedule['first_departure_time'],
             'departure_time_max': schedule['last_departure_time'],
             'coarse_toll_description': coarse_toll_description_for_player(player),
-            'capacity_frequency_label': (
-                '目标比例' if config.draw_mode == DRAW_MODE_BALANCED else '每轮抽取概率'
-            ),
             'capacity_reveal_description': capacity_reveal_description(config),
         }
 

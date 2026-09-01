@@ -95,16 +95,20 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     grouping_enabled=0,
     manual_grouping_spec='',
     dynamic_capacity_values='1,2,3',
-    dynamic_capacity_probabilities='0.3,0.5,0.2',
+    dynamic_capacity_probabilities='0.3333333333333333,0.3333333333333333,0.3333333333333334',
     dynamic_capacity_seed=20260718,
-    dynamic_capacity_draw_mode='balanced_shuffle',
-    capacity_reveal_timing='before_decision',
+    dynamic_capacity_draw_mode='phased_markov',
+    dynamic_capacity_random_rounds=20,
+    dynamic_capacity_transition_matrix='0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
+    dynamic_capacity_manual_sequence='',
+    dynamic_capacity_sequence_scope='session',
+    capacity_reveal_timing='after_decision',
     reward_treatment_enabled=0,
     rewarded_slot_spec='',
     reward_bonus_points=0,
     departure_schedule_auto_enabled=1,
     departure_schedule_min_slots_each_side=10,
-    coarse_toll_auto_enabled=1,
+    coarse_toll_auto_enabled=0,
     coarse_toll_auto_min_toll=0,
     coarse_toll_auto_max_toll=40,
     coarse_toll_auto_toll_step=1,
@@ -117,6 +121,7 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     coarse_toll_points=3,
     api_agent_mode=DYNAMIC_BOTTLENECK_API_AGENT_MODE,
     api_agent_count_per_group=DYNAMIC_BOTTLENECK_API_AGENT_COUNT,
+    group_agent_spec='',
     api_agent_model=DEEPSEEK_AGENT_MODEL,
     api_agent_timeout_seconds=DEEPSEEK_AGENT_TIMEOUT_SECONDS,
     api_agent_temperature=DEEPSEEK_AGENT_TEMPERATURE,
@@ -132,9 +137,9 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     rl_agent_count_per_group=DYNAMIC_BOTTLENECK_RL_AGENT_COUNT,
     rl_agent_policy_version=DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION,
     payoff_source_var='dynamic_bottleneck_round_total_payoff',
-    final_payoff_label='整轮随机瓶颈服务率实验',
-    payoff_source_label='dynamic_bottleneck_round 全 10 轮累计结果',
-    payoff_rounds=10,
+    final_payoff_label='动态瓶颈服务率实验',
+    payoff_source_label='dynamic_bottleneck_round 全 60 轮累计结果',
+    payoff_rounds=60,
 )
 
 SESSION_CONFIGS = [
@@ -216,12 +221,13 @@ SESSION_CONFIGS = [
     ),
     dict(
         name='dynamic_bottleneck_round_prod',
-        display_name="正式实验 · 整轮随机瓶颈服务率",
+        display_name="正式实验 · 动态瓶颈服务率",
         app_sequence=['access_gate', 'dynamic_bottleneck_round', 'payment_info'],
         doc=(
-            "用于真实被试的整轮随机瓶颈服务率实验。\n"
-            "同一小组在同一轮面对相同服务率，不同轮次按配置概率变化。\n"
-            "默认不分组、关闭奖励，并按实际人数和各候选服务率自动校准粗收费。\n"
+            "用于真实被试的动态瓶颈服务率实验。\n"
+            "正式实验共 60 轮：前 20 轮独立随机，后 40 轮按 Markov 规律变化。\n"
+            "默认各组共用同一条逐轮服务率序列；group_agent_spec 可按组配置 API/RL Agent。\n"
+            "本轮服务率在提交后公布；默认关闭奖励并使用统一手动粗收费。\n"
             "创建 Session 时可选择是否加入 Agent，并设置每组 Agent 数量。"
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
@@ -230,12 +236,13 @@ SESSION_CONFIGS = [
     ),
     dict(
         name='dynamic_bottleneck_round_demo',
-        display_name="演示测试 · 整轮随机瓶颈服务率",
+        display_name="演示测试 · 动态瓶颈服务率",
         app_sequence=['dynamic_bottleneck_round'],
         doc=(
-            "用于整轮随机瓶颈服务率实验的流程走查。\n"
-            "默认使用 1、2、3 人/分钟三种状态，概率分别为 30%、50%、20%，"
-            "并启用与服务率匹配的自动粗收费；创建时可选择是否加入 Agent。"
+            "用于动态瓶颈服务率 20+40 轮实验的流程走查。\n"
+            "默认使用 1、2、3 人/分钟三种状态，各组共用同一条逐轮服务率序列；"
+            "本轮服务率在提交后公布，并使用不随服务率变化的统一手动粗收费；"
+            "创建时可选择是否加入 Agent。"
         ),
         **DYNAMIC_BOTTLENECK_ROUND_COMMON,
         num_demo_participants=5,

@@ -20,11 +20,13 @@ from . import (
     ComprehensionCheck,
     Decision,
     EXPORT_HEADERS,
+    FormalStart,
     Introduction,
     RecoveryGate,
     Results,
     ResultsSync,
     RoundStartSync,
+    WarmupStart,
     build_capacity_round_records,
     capacity_reveal_description,
     comprehension_queue_example,
@@ -228,7 +230,6 @@ class DynamicCapacitySequenceTests(unittest.TestCase):
                     'dynamic_capacity_sequence_scope': 'participant',
                 }
             )
-
     def test_group_scope_keeps_independent_group_sequences(self):
         config = parse_dynamic_capacity_config(
             {
@@ -335,6 +336,126 @@ class DynamicCapacitySequenceTests(unittest.TestCase):
             generate_capacity_sequence(unknown_capacity, rounds=60, group_id=1)
 
 
+class WarmupRoundPhaseTests(unittest.TestCase):
+    def test_two_warmup_rounds_precede_sixty_formal_rounds(self):
+        self.assertEqual(getattr(C, 'WARMUP_ROUNDS', None), 2)
+        self.assertEqual(getattr(C, 'FORMAL_ROUNDS', None), 60)
+        self.assertEqual(C.NUM_ROUNDS, 62)
+
+    def test_raw_rounds_map_to_warmup_and_formal_round_numbers(self):
+        is_warmup_round = getattr(dynamic_app, 'is_warmup_round', None)
+        formal_round_number = getattr(dynamic_app, 'formal_round_number', None)
+
+        self.assertIsNotNone(is_warmup_round)
+        self.assertIsNotNone(formal_round_number)
+        self.assertTrue(is_warmup_round(1))
+        self.assertTrue(is_warmup_round(2))
+        self.assertFalse(is_warmup_round(3))
+        self.assertIsNone(formal_round_number(1))
+        self.assertIsNone(formal_round_number(2))
+        self.assertEqual(formal_round_number(3), 1)
+        self.assertEqual(formal_round_number(62), 60)
+
+    def test_warmup_capacity_must_be_a_configured_positive_state(self):
+        parse_warmup_capacity = getattr(dynamic_app, 'parse_warmup_capacity', None)
+        self.assertIsNotNone(parse_warmup_capacity)
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
+            }
+        )
+
+        self.assertEqual(
+            parse_warmup_capacity({'dynamic_warmup_capacity': 2}, config),
+            2,
+        )
+        with self.assertRaisesRegex(DynamicCapacityConfigError, 'dynamic_warmup_capacity'):
+            parse_warmup_capacity({'dynamic_warmup_capacity': 0}, config)
+        with self.assertRaisesRegex(DynamicCapacityConfigError, '候选'):
+            parse_warmup_capacity({'dynamic_warmup_capacity': 4}, config)
+
+    def test_phase_context_uses_participant_facing_round_numbers(self):
+        round_phase_context = getattr(dynamic_app, 'round_phase_context', None)
+        self.assertIsNotNone(round_phase_context)
+
+        self.assertEqual(
+            round_phase_context(2),
+            {
+                'is_warmup': True,
+                'phase_name': 'warmup',
+                'display_round_number': 2,
+                'display_total_rounds': 2,
+                'round_label': '热身第 2 轮',
+            },
+        )
+        self.assertEqual(
+            round_phase_context(3),
+            {
+                'is_warmup': False,
+                'phase_name': 'formal',
+                'display_round_number': 1,
+                'display_total_rounds': 60,
+                'round_label': '正式第 1 轮',
+            },
+        )
+
+    def test_transition_pages_display_only_at_phase_boundaries(self):
+        warmup_start = getattr(dynamic_app, 'WarmupStart', None)
+        formal_start = getattr(dynamic_app, 'FormalStart', None)
+        self.assertIsNotNone(warmup_start)
+        self.assertIsNotNone(formal_start)
+
+        with patch.object(dynamic_app, 'access_allowed', return_value=True):
+            self.assertTrue(warmup_start.is_displayed(SimpleNamespace(round_number=1)))
+            self.assertFalse(warmup_start.is_displayed(SimpleNamespace(round_number=2)))
+            self.assertTrue(formal_start.is_displayed(SimpleNamespace(round_number=3)))
+            self.assertFalse(formal_start.is_displayed(SimpleNamespace(round_number=4)))
+
+    def test_formal_payoff_total_excludes_warmup_rounds(self):
+        formal_payoff_total = getattr(dynamic_app, 'formal_payoff_total', None)
+        self.assertIsNotNone(formal_payoff_total)
+        rounds = [
+            SimpleNamespace(round_number=1, payoff=99),
+            SimpleNamespace(round_number=2, payoff=98),
+            SimpleNamespace(round_number=3, payoff=10),
+            SimpleNamespace(round_number=4, payoff=20),
+        ]
+        player = SimpleNamespace(in_all_rounds=lambda: rounds)
+
+        self.assertEqual(float(formal_payoff_total(player)), 30)
+
+    def test_custom_export_omits_warmup_and_renumbers_formal_rounds(self):
+        players = [SimpleNamespace(round_number=value) for value in (1, 2, 3, 4)]
+
+        with (
+            patch.object(
+                dynamic_app,
+                'export_row_for_player',
+                side_effect=lambda player: [
+                    dynamic_app.formal_round_number(player.round_number)
+                ],
+            ),
+            patch.object(dynamic_app, 'agent_decisions_for_players', return_value=[]),
+        ):
+            rows = list(dynamic_app.custom_export(players))
+
+        self.assertEqual(rows, [EXPORT_HEADERS, [1], [2]])
+
+    def test_admin_report_omits_warmup_only_input(self):
+        session = SimpleNamespace(config={}, vars={})
+        group = SimpleNamespace(id_in_subsession=1, session=session)
+        players = [
+            SimpleNamespace(round_number=round_number, group=group)
+            for round_number in (1, 2)
+        ]
+
+        rows, states, _summary = dynamic_app.build_admin_report_rows(players)
+
+        self.assertEqual(rows, [])
+        self.assertEqual(states, [])
+
+
 class GroupSpecificAgentConfigTests(unittest.TestCase):
     def make_session(self, **overrides):
         config = {
@@ -346,6 +467,44 @@ class GroupSpecificAgentConfigTests(unittest.TestCase):
         }
         config.update(overrides)
         return SimpleNamespace(config=config, vars={})
+
+    def test_group_treatment_metadata_uses_actual_agent_counts(self):
+        assign_treatment = getattr(
+            dynamic_app,
+            'assign_group_treatment_metadata',
+            None,
+        )
+        self.assertIsNotNone(assign_treatment)
+        session = self.make_session()
+        human = SimpleNamespace(participant=SimpleNamespace(vars={}))
+        human_agent = SimpleNamespace(participant=SimpleNamespace(vars={}))
+
+        with (
+            patch.object(
+                dynamic_app,
+                'api_agent_count_per_group',
+                side_effect=lambda _session, group_id: 0 if group_id == 1 else 3,
+            ),
+            patch.object(
+                dynamic_app,
+                'rl_agent_count_per_group',
+                return_value=0,
+            ),
+        ):
+            assign_treatment(session, [[human], [human_agent]])
+
+        self.assertEqual(
+            human.participant.vars['dynamic_bottleneck_treatment_group'],
+            'H',
+        )
+        self.assertEqual(
+            human_agent.participant.vars['dynamic_bottleneck_treatment_group'],
+            'HA',
+        )
+        self.assertEqual(
+            human_agent.participant.vars['dynamic_bottleneck_api_agent_count'],
+            3,
+        )
 
     def test_group_spec_can_balance_human_and_agent_actor_counts(self):
         session = self.make_session()
@@ -1111,7 +1270,14 @@ class RoundStartSynchronizationTests(unittest.TestCase):
             round_started=False,
             decision_deadline_ts=0,
         )
-        players = [SimpleNamespace(group=group, round_start_ready=False) for _ in range(size)]
+        players = [
+            SimpleNamespace(
+                group=group,
+                round_start_ready=False,
+                participant=SimpleNamespace(vars={}),
+            )
+            for _ in range(size)
+        ]
         group.get_players = lambda: players
         return group, players
 
@@ -1261,8 +1427,144 @@ class DropoutRecoveryTests(unittest.TestCase):
             'recovery_reason',
             'historical_dropout',
             'dropout_active_at_export',
+            'consecutive_missed_decisions',
+            'dropout_suspended',
+            'automatic_choice_strategy',
         ):
             self.assertIn(field, EXPORT_HEADERS)
+
+
+class PersistentDropoutSuspensionTests(unittest.TestCase):
+    @staticmethod
+    def make_player(round_number=3, participant_vars=None):
+        participant = SimpleNamespace(vars=dict(participant_vars or {}))
+        return SimpleNamespace(
+            participant=participant,
+            round_number=round_number,
+            departure_minute=474,
+            departure_time_label='07:54',
+            recovered_this_round=False,
+            recovery_reason='',
+        )
+
+    def test_second_consecutive_miss_suspends_participant_idempotently(self):
+        record_missed = getattr(dynamic_app, 'record_missed_decision', None)
+        self.assertIsNotNone(record_missed)
+        player = self.make_player(round_number=3)
+
+        record_missed(player, reason='disconnect')
+
+        self.assertEqual(player.participant.vars['consecutive_missed_decisions'], 1)
+        self.assertFalse(player.participant.vars['dropout_suspended'])
+
+        player.round_number = 4
+        record_missed(player, reason='disconnect')
+        record_missed(player, reason='disconnect')
+
+        self.assertEqual(player.participant.vars['consecutive_missed_decisions'], 2)
+        self.assertTrue(player.participant.vars['dropout_suspended'])
+
+    def test_manual_choice_resets_streak_and_becomes_proxy_baseline(self):
+        record_manual = getattr(dynamic_app, 'record_manual_decision', None)
+        self.assertIsNotNone(record_manual)
+        player = self.make_player(
+            participant_vars={
+                'consecutive_missed_decisions': 2,
+                'dropout_suspended': True,
+            }
+        )
+        player.departure_minute = 472
+
+        record_manual(player)
+
+        self.assertEqual(player.participant.vars['consecutive_missed_decisions'], 0)
+        self.assertFalse(player.participant.vars['dropout_suspended'])
+        self.assertEqual(player.participant.vars['last_manual_departure_minute'], 472)
+
+    def test_proxy_choice_uses_last_manual_choice_then_neutral_baseline(self):
+        choose_automatic = getattr(dynamic_app, 'automatic_departure_for_player', None)
+        self.assertIsNotNone(choose_automatic)
+        schedule = dynamic_app.static_departure_schedule()
+        player = self.make_player(
+            participant_vars={
+                DEPARTURE_SCHEDULE_VAR: schedule,
+                'last_manual_departure_minute': 472,
+            }
+        )
+
+        minute, strategy = choose_automatic(player)
+
+        self.assertEqual(minute, 472)
+        self.assertEqual(strategy, 'last_manual_choice')
+
+        player.participant.vars.pop('last_manual_departure_minute')
+        minute, strategy = choose_automatic(player)
+
+        self.assertEqual(minute, C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES)
+        self.assertEqual(strategy, 'neutral_baseline')
+
+    def test_suspended_participant_does_not_delay_round_start(self):
+        active_participant = SimpleNamespace(vars={'dropout_suspended': False})
+        suspended_participant = SimpleNamespace(vars={'dropout_suspended': True})
+        group = SimpleNamespace(
+            round_number=4,
+            round_start_deadline_ts=0,
+            round_started_at_ts=0,
+            round_started=False,
+            decision_deadline_ts=0,
+        )
+        active = SimpleNamespace(
+            group=group,
+            participant=active_participant,
+            round_start_ready=True,
+        )
+        suspended = SimpleNamespace(
+            group=group,
+            participant=suspended_participant,
+            round_start_ready=False,
+        )
+        group.get_players = lambda: [active, suspended]
+
+        with patch.object(dynamic_app, 'fill_suspended_choices', create=True):
+            started = maybe_start_round(group, now_ts=100)
+
+        self.assertTrue(started)
+        self.assertEqual(group.round_started_at_ts, 100)
+
+    def test_suspended_proxy_is_prefilled_and_audited(self):
+        schedule = dynamic_app.static_departure_schedule()
+        participant = SimpleNamespace(
+            vars={
+                DEPARTURE_SCHEDULE_VAR: schedule,
+                dynamic_app.DROPOUT_AUDIT_PARTICIPANT_VAR: {},
+                'dropout_active': True,
+                'dropout_reason': 'disconnect',
+                'dropout_suspended': True,
+                'consecutive_missed_decisions': 2,
+                'last_manual_departure_minute': 472,
+            }
+        )
+        player = SimpleNamespace(
+            participant=participant,
+            round_number=5,
+            departure_slot=None,
+            departure_minute=None,
+            departure_time_label='',
+            decision_source='',
+            dropout_event='',
+        )
+        player.field_maybe_none = lambda field_name: getattr(player, field_name, None)
+        group = SimpleNamespace(get_players=lambda: [player])
+
+        dynamic_app.fill_suspended_choices(group)
+
+        self.assertEqual(player.departure_minute, 472)
+        self.assertEqual(player.decision_source, 'suspended_auto')
+        self.assertEqual(player.dropout_event, 'suspended_proxy')
+        audit = dynamic_app.dropout_audit_for_player_round(player)
+        self.assertEqual(audit['consecutive_missed_decisions'], 2)
+        self.assertTrue(audit['dropout_suspended'])
+        self.assertEqual(audit['automatic_choice_strategy'], 'last_manual_choice')
 
 
 class CapacityRevealTests(unittest.TestCase):
@@ -1427,10 +1729,11 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn('role="option" tabindex="-1"', html)
         self.assertIn('wheel.focus({preventScroll:true});', html)
 
-    def test_round_start_sync_shows_arrivals_and_uses_three_second_polling(self):
+    def test_round_start_sync_shows_arrivals_and_uses_short_polling(self):
         html = self.template_text('RoundStartSync.html')
 
-        self.assertIn('等待同组参与者进入本轮', html)
+        self.assertIn('等待本轮参与者进入', html)
+        self.assertIn('处于暂停状态的参与者由系统代理', html)
         self.assertIn('{{ ready_count }} / {{ group_size }}', html)
         self.assertIn('data-poll="{{ poll_interval_ms }}"', html)
         self.assertIn(
@@ -1439,11 +1742,29 @@ class TemplateContractTests(unittest.TestCase):
         )
         self.assertIn("panel.dataset.ready === '1'", html)
 
+    def test_warmup_transition_templates_have_explicit_start_and_end_messages(self):
+        warmup_path = self.app_dir / 'WarmupStart.html'
+        formal_path = self.app_dir / 'FormalStart.html'
+
+        self.assertTrue(warmup_path.exists())
+        self.assertTrue(formal_path.exists())
+        self.assertIn('热身环节开始', warmup_path.read_text(encoding='utf-8'))
+        self.assertIn('热身已结束', formal_path.read_text(encoding='utf-8'))
+        self.assertIn('正式实验共 60 轮', formal_path.read_text(encoding='utf-8'))
+
+    def test_round_pages_use_phase_labels_instead_of_raw_round_numbers(self):
+        round_sync = self.template_text('RoundStartSync.html')
+        decision = self.template_text('Decision.html')
+
+        self.assertIn('{{ round_label }}', round_sync)
+        self.assertIn('R{{ display_round_number }} / {{ display_total_rounds }}', round_sync)
+        self.assertIn('R{{ display_round_number }} / {{ display_total_rounds }}', decision)
+
     def test_results_sync_uses_shared_poll_interval(self):
         html = self.template_text('ResultsSync.html')
 
         self.assertIn('data-poll="{{ poll_interval_ms }}"', html)
-        self.assertIn('Number(panel.dataset.poll)||3000', html)
+        self.assertIn('Number(panel.dataset.poll)||1500', html)
         self.assertIn(
             'data-ready="{{ if results_ready }}1{{ else }}0{{ endif }}"',
             html,
@@ -1483,6 +1804,7 @@ class SettingsContractTests(unittest.TestCase):
             self.assertIn(name, configs)
             config = configs[name]
             self.assertEqual(config['dynamic_capacity_values'], '1,2,3')
+            self.assertEqual(config['dynamic_warmup_capacity'], 2)
             probabilities = [
                 float(item)
                 for item in config['dynamic_capacity_probabilities'].split(',')
@@ -1501,13 +1823,25 @@ class SettingsContractTests(unittest.TestCase):
             self.assertEqual(config['dynamic_capacity_sequence_scope'], 'session')
             self.assertEqual(config['capacity_reveal_timing'], 'after_decision')
             self.assertEqual(config['group_agent_spec'], '')
+            self.assertEqual(config['api_agent_timeout_seconds'], 12)
+            self.assertIn(
+                str(config['api_agent_thinking_enabled']).lower(),
+                {'0', 'false', 'off'},
+            )
+            self.assertEqual(config['api_agent_max_tokens'], 512)
             self.assertEqual(config['reward_treatment_enabled'], 0)
             self.assertEqual(config['departure_schedule_auto_enabled'], 1)
             self.assertEqual(config['departure_schedule_min_slots_each_side'], 10)
             self.assertEqual(config['coarse_toll_auto_enabled'], 0)
             self.assertEqual(config['coarse_toll_enabled'], 1)
             self.assertEqual(config['payoff_rounds'], 60)
-        self.assertEqual(C.NUM_ROUNDS, 60)
+        self.assertEqual(C.WARMUP_ROUNDS, 2)
+        self.assertEqual(C.FORMAL_ROUNDS, 60)
+        self.assertEqual(C.NUM_ROUNDS, 62)
+        self.assertEqual(C.SYNC_POLL_INTERVAL_SECONDS, 1.5)
+
+        for name in ('single_bottleneck_demo', 'single_bottleneck_prod'):
+            self.assertEqual(configs[name]['api_agent_timeout_seconds'], 30)
 
     def test_export_headers_match_required_round_level_schema(self):
         required = {
@@ -1538,9 +1872,19 @@ class PlayerBot(Bot):
             expect('同一小组、同一轮', 'in', self.html)
             yield Submission(ComprehensionCheck, check_html=False)
             expect(self.participant.vars.get(COMPREHENSION_SEEN_VAR), '==', True)
+            expect('热身环节开始', 'in', self.html)
+            expect('不计入正式实验数据', 'in', self.html)
+            yield Submission(WarmupStart, check_html=False)
 
-        expect('等待同组参与者进入本轮', 'in', self.html)
-        expect('data-poll="3000"', 'in', self.html)
+        if self.round_number == C.WARMUP_ROUNDS + 1:
+            expect('热身已结束', 'in', self.html)
+            expect('正式实验共 60 轮', 'in', self.html)
+            yield Submission(FormalStart, check_html=False)
+
+        expect('等待本轮参与者进入', 'in', self.html)
+        phase = dynamic_app.round_phase_context(self.round_number)
+        expect(phase['round_label'], 'in', self.html)
+        expect('data-poll="1500"', 'in', self.html)
         yield Submission(RoundStartSync, check_html=False)
 
         configured_values = {
@@ -1550,7 +1894,10 @@ class PlayerBot(Bot):
         group_capacities = {player.dynamic_capacity for player in self.group.get_players()}
         expect(len(group_capacities), '==', 1)
         expect(self.player.dynamic_capacity, 'in', configured_values)
-        if self.session.config['capacity_reveal_timing'] == 'after_decision':
+        if phase['is_warmup']:
+            expect('本轮真实瓶颈服务率', 'in', self.html)
+            expect(self.player.dynamic_capacity, '==', 2)
+        elif self.session.config['capacity_reveal_timing'] == 'after_decision':
             expect('本轮服务率将在提交后公布', 'in', self.html)
             expect('本轮真实瓶颈服务率', 'not in', self.html)
         else:
@@ -1586,7 +1933,7 @@ class PlayerBot(Bot):
             {},
         )
         feedback = feedback_store.get(str(self.round_number), {})
-        expect(feedback.get('round_number'), '==', self.round_number)
+        expect(feedback.get('round_number'), '==', phase['display_round_number'])
         expect(feedback.get('dynamic_capacity'), '==', self.player.dynamic_capacity)
         expect(
             sum(
@@ -1628,14 +1975,18 @@ class PlayerBot(Bot):
             if group_api_count:
                 expect(agent_records[0]['dynamic_capacity'], '==', self.player.dynamic_capacity)
                 expect(agent_records[0]['total_cost'], '>=', 0)
-                if dynamic_app.rl_fallback_enabled(self.session):
+                if dynamic_app.rl_fallback_enabled(self.session) and not phase['is_warmup']:
                     expect(agent_records[0]['decision_source'], '==', 'deepseek_fallback_rl')
                     rl_states = self.group.get_players()[0].participant.vars.get(
                         dynamic_app.RL_AGENT_STATE_PARTICIPANT_VAR,
                         {},
                     )
                     rl_state = rl_states.get(agent_records[0]['agent_id'], {})
-                    expect(rl_state.get('rounds_observed'), '==', self.round_number)
+                    expect(
+                        rl_state.get('rounds_observed'),
+                        '==',
+                        phase['display_round_number'],
+                    )
         if dynamic_app.rl_agent_enabled(self.session):
             rl_records = dynamic_app.independent_rl_records_for_group(self.group)
             group_rl_count = dynamic_app.rl_agent_count_per_group(
@@ -1647,7 +1998,7 @@ class PlayerBot(Bot):
                 '==',
                 group_rl_count,
             )
-            if group_rl_count:
+            if group_rl_count and not phase['is_warmup']:
                 expect(rl_records[0]['decision_source'], 'in', {
                     'rl_policy',
                     'rl_fallback_lowest_schedule_cost',
@@ -1659,7 +2010,7 @@ class PlayerBot(Bot):
                 expect(
                     rl_states[rl_records[0]['agent_id']]['rounds_observed'],
                     '==',
-                    self.round_number,
+                    phase['display_round_number'],
                 )
         expect(
             self.player.coarse_toll_calibration_players,
@@ -1671,9 +2022,18 @@ class PlayerBot(Bot):
             ),
         )
 
-        expected_payoff = max(
-            0,
-            round(C.BASE_POINTS - float(self.player.total_cost) + float(self.player.reward_bonus), 2),
+        expected_payoff = (
+            0
+            if phase['is_warmup']
+            else max(
+                0,
+                round(
+                    C.BASE_POINTS
+                    - float(self.player.total_cost)
+                    + float(self.player.reward_bonus),
+                    2,
+                ),
+            )
         )
         expect(float(self.player.payoff), '==', expected_payoff)
 
@@ -1712,8 +2072,21 @@ class PlayerBot(Bot):
         yield Submission(Results, check_html=False)
 
         if self.round_number == C.NUM_ROUNDS:
-            capacities = [round_player.dynamic_capacity for round_player in self.player.in_all_rounds()]
+            capacities = [
+                round_player.dynamic_capacity
+                for round_player in self.player.in_all_rounds()
+                if not dynamic_app.is_warmup_round(round_player.round_number)
+            ]
             expect(len(set(capacities)), '>', 1)
+            expect(
+                float(self.participant.vars[dynamic_app.TOTAL_PAYOFF_VAR]),
+                '==',
+                sum(
+                    float(round_player.payoff)
+                    for round_player in self.player.in_all_rounds()
+                    if not dynamic_app.is_warmup_round(round_player.round_number)
+                ),
+            )
 
 
 if __name__ == '__main__':

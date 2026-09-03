@@ -59,6 +59,10 @@ REVEAL_AFTER_DECISION = 'after_decision'
 DECISION_SOURCE_MANUAL = 'manual'
 DECISION_SOURCE_TIMEOUT_AUTO = 'timeout_auto'
 DECISION_SOURCE_DISCONNECT_AUTO = 'disconnect_auto'
+DECISION_SOURCE_SUSPENDED_AUTO = 'suspended_auto'
+
+AUTO_CHOICE_LAST_MANUAL = 'last_manual_choice'
+AUTO_CHOICE_NEUTRAL_BASELINE = 'neutral_baseline'
 
 CAPACITY_SEQUENCE_VAR = 'dynamic_bottleneck_round_capacity_sequence'
 TOTAL_PAYOFF_VAR = 'dynamic_bottleneck_round_total_payoff'
@@ -88,6 +92,7 @@ INDEPENDENT_RL_DECISIONS_PARTICIPANT_VAR = (
 API_AGENT_MEMORY_PARTICIPANT_VAR = 'dynamic_bottleneck_round_api_agent_memory_v1'
 GROUP_AGENT_COUNTS_SESSION_VAR = 'dynamic_bottleneck_round_group_agent_counts_v1'
 RL_AGENT_STATE_PARTICIPANT_VAR = 'dynamic_bottleneck_round_rl_agent_state_v1'
+DROPOUT_AUDIT_PARTICIPANT_VAR = 'dynamic_bottleneck_round_dropout_audit_v1'
 INDEPENDENT_RL_STATE_PARTICIPANT_VAR = (
     'dynamic_bottleneck_round_independent_rl_state_v1'
 )
@@ -461,12 +466,15 @@ def should_start_round(*, ready_count, group_size, now_ts, deadline_ts):
 class C(BaseConstants):
     NAME_IN_URL = 'dynamic_bottleneck_round'
     PLAYERS_PER_GROUP = None
-    NUM_ROUNDS = 60
+    WARMUP_ROUNDS = 2
+    FORMAL_ROUNDS = 60
+    NUM_ROUNDS = WARMUP_ROUNDS + FORMAL_ROUNDS
 
     DECISION_TIMEOUT_SECONDS = 60
     RESULTS_TIMEOUT_SECONDS = 50
     DROPOUT_TIMEOUT_SECONDS = 1
-    SYNC_POLL_INTERVAL_SECONDS = 3
+    DROPOUT_SUSPEND_AFTER_MISSES = 2
+    SYNC_POLL_INTERVAL_SECONDS = 1.5
     AUTO_CONTINUE_DELAY_MS = 200
 
     PREFERRED_ARRIVAL_MINUTE = 8 * 60
@@ -482,6 +490,70 @@ class C(BaseConstants):
     QUEUE_COST_PER_MINUTE = 2
     EARLY_COST_PER_MINUTE = 1
     LATE_COST_PER_MINUTE = 3
+
+
+def is_warmup_round(round_number):
+    return 1 <= int(round_number) <= C.WARMUP_ROUNDS
+
+
+def formal_round_number(round_number):
+    raw_round = int(round_number)
+    if is_warmup_round(raw_round):
+        return None
+    return raw_round - C.WARMUP_ROUNDS
+
+
+def round_phase_context(round_number):
+    raw_round = int(round_number)
+    if is_warmup_round(raw_round):
+        display_round = raw_round
+        return {
+            'is_warmup': True,
+            'phase_name': 'warmup',
+            'display_round_number': display_round,
+            'display_total_rounds': C.WARMUP_ROUNDS,
+            'round_label': f'热身第 {display_round} 轮',
+        }
+    display_round = formal_round_number(raw_round)
+    return {
+        'is_warmup': False,
+        'phase_name': 'formal',
+        'display_round_number': display_round,
+        'display_total_rounds': C.FORMAL_ROUNDS,
+        'round_label': f'正式第 {display_round} 轮',
+    }
+
+
+def formal_payoff_total(player):
+    return sum(
+        round_player.payoff
+        for round_player in player.in_all_rounds()
+        if not is_warmup_round(round_player.round_number)
+    )
+
+
+def parse_warmup_capacity(session_config, dynamic_config):
+    raw_capacity = session_config.get('dynamic_warmup_capacity', 2)
+    if isinstance(raw_capacity, bool):
+        raise DynamicCapacityConfigError(
+            'dynamic_warmup_capacity 必须是正整数。'
+        )
+    try:
+        capacity = int(str(raw_capacity).strip())
+    except (TypeError, ValueError) as exc:
+        raise DynamicCapacityConfigError(
+            'dynamic_warmup_capacity 必须是正整数。'
+        ) from exc
+    if capacity <= 0:
+        raise DynamicCapacityConfigError(
+            'dynamic_warmup_capacity 必须是正整数。'
+        )
+    if capacity not in dynamic_config.values:
+        raise DynamicCapacityConfigError(
+            'dynamic_warmup_capacity 必须属于 '
+            'dynamic_capacity_values 候选集合。'
+        )
+    return capacity
 
 
 DEPARTURE_SLOT_CHOICES = [
@@ -602,6 +674,9 @@ EXPORT_HEADERS = [
     'dropout_reason_at_export',
     'has_recovered_after_disconnect',
     'has_recovered_after_timeout',
+    'consecutive_missed_decisions',
+    'dropout_suspended',
+    'automatic_choice_strategy',
     'actor_type',
     'agent_id',
     'agent_type',
@@ -1109,11 +1184,24 @@ def assign_group_metadata(matrix, grouping_enabled):
             player.participant.vars['grouping_enabled'] = grouping_enabled
 
 
+def assign_group_treatment_metadata(session, matrix):
+    for group_id, group_players in enumerate(matrix, start=1):
+        api_count = api_agent_count_per_group(session, group_id)
+        rl_count = rl_agent_count_per_group(session, group_id)
+        treatment_group = 'HA' if api_count + rl_count > 0 else 'H'
+        for player in group_players:
+            player.participant.vars['dynamic_bottleneck_treatment_group'] = (
+                treatment_group
+            )
+            player.participant.vars['dynamic_bottleneck_api_agent_count'] = api_count
+            player.participant.vars['dynamic_bottleneck_rl_agent_count'] = rl_count
+
+
 def initialize_group_capacity_sequences(subsession, config):
     for group in subsession.get_groups():
         records = build_capacity_round_records(
             config,
-            rounds=C.NUM_ROUNDS,
+            rounds=C.FORMAL_ROUNDS,
             group_id=group.id_in_subsession,
         )
         for player in group.get_players():
@@ -1124,16 +1212,25 @@ def apply_round_capacity(group, config):
     players = group.get_players()
     if not players:
         return
-    records = players[0].participant.vars.get(CAPACITY_SEQUENCE_VAR)
-    if not isinstance(records, list) or len(records) != C.NUM_ROUNDS:
-        records = build_capacity_round_records(
-            config,
-            rounds=C.NUM_ROUNDS,
-            group_id=group.id_in_subsession,
-        )
-        for player in players:
-            player.participant.vars[CAPACITY_SEQUENCE_VAR] = records
-    record = records[group.round_number - 1]
+    if is_warmup_round(group.round_number):
+        capacity = parse_warmup_capacity(group.session.config, config)
+        record = {
+            'capacity': capacity,
+            'state': f'warmup_capacity_{capacity}',
+            'probability': 1.0,
+            'previous_capacity': capacity if int(group.round_number) > 1 else None,
+        }
+    else:
+        records = players[0].participant.vars.get(CAPACITY_SEQUENCE_VAR)
+        if not isinstance(records, list) or len(records) != C.FORMAL_ROUNDS:
+            records = build_capacity_round_records(
+                config,
+                rounds=C.FORMAL_ROUNDS,
+                group_id=group.id_in_subsession,
+            )
+            for player in players:
+                player.participant.vars[CAPACITY_SEQUENCE_VAR] = records
+        record = records[formal_round_number(group.round_number) - 1]
     group.dynamic_capacity = record['capacity']
     group.dynamic_capacity_state = record['state']
     group.capacity_probability = record['probability']
@@ -1142,7 +1239,11 @@ def apply_round_capacity(group, config):
         player.dynamic_capacity_state = record['state']
         player.previous_round_capacity = record['previous_capacity'] or 0
         player.capacity_probability = record['probability']
-        player.capacity_reveal_timing = config.reveal_timing
+        player.capacity_reveal_timing = (
+            REVEAL_BEFORE_DECISION
+            if is_warmup_round(group.round_number)
+            else config.reveal_timing
+        )
         player.dynamic_capacity_seed = config.seed
         player.dynamic_capacity_draw_mode = config.draw_mode
 
@@ -1654,6 +1755,7 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll)
 def creating_session(subsession):
     config = parse_dynamic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
+        parse_warmup_capacity(subsession.session.config, config)
         validate_api_agent_count(subsession.session)
         validate_rl_agent_count(subsession.session)
         validate_toll_reveal_compatibility(subsession.session.config)
@@ -1663,9 +1765,14 @@ def creating_session(subsession):
             player.participant.is_dropout = False
             player.participant.dropout_active = False
             player.participant.dropout_reason = ''
+            player.participant.vars['dropout_suspended'] = False
+            player.participant.vars['consecutive_missed_decisions'] = 0
+            player.participant.vars['last_missed_round_number'] = 0
+            player.participant.vars['last_manual_departure_minute'] = None
             player.participant.has_recovered_after_disconnect = False
             player.participant.has_recovered_after_timeout = False
             player.participant.finished = False
+            player.participant.vars[DROPOUT_AUDIT_PARTICIPANT_VAR] = {}
 
         grouping_enabled = config_flag(subsession.session.config.get('grouping_enabled', 0))
         manual_spec = str(subsession.session.config.get('manual_grouping_spec', '') or '').strip()
@@ -1684,6 +1791,7 @@ def creating_session(subsession):
         apply_dynamic_toll_calibrations(subsession.session, matrix, config)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
+        assign_group_treatment_metadata(subsession.session, matrix)
         for group_id in range(1, len(matrix) + 1):
             group_label = f'G{group_id:02d}'
             api_count = api_agent_count_per_group(subsession.session, group_id)
@@ -1716,11 +1824,12 @@ def creating_session(subsession):
 
 def maybe_start_round(group, now_ts=None):
     if group.round_started:
+        fill_suspended_choices(group)
         return True
     now_ts = time.time() if now_ts is None else float(now_ts)
     if not group.round_start_deadline_ts:
         group.round_start_deadline_ts = now_ts + round_start_wait_seconds(group.round_number)
-    players = group.get_players()
+    players = round_waiting_players(group)
     ready_count = sum(bool(player.round_start_ready) for player in players)
     all_ready = ready_count >= len(players)
     if not should_start_round(
@@ -1734,11 +1843,13 @@ def maybe_start_round(group, now_ts=None):
     group.round_started = True
     group.round_started_at_ts = effective_start_ts
     group.decision_deadline_ts = effective_start_ts + C.DECISION_TIMEOUT_SECONDS
+    fill_suspended_choices(group)
     return True
 
 
 def mark_round_ready(player, now_ts=None):
-    player.round_start_ready = True
+    if not participant_dropout_suspended(player):
+        player.round_start_ready = True
     return maybe_start_round(player.group, now_ts=now_ts)
 
 
@@ -1769,8 +1880,16 @@ def set_participant_var(player, field_name, value):
     player.participant.vars[field_name] = value
 
 
+def set_dropout_runtime_var(player, field_name, value):
+    player.participant.vars[field_name] = value
+
+
 def participant_dropout_active(player):
     return bool(participant_var(player, 'dropout_active', False))
+
+
+def participant_dropout_suspended(player):
+    return bool(participant_var(player, 'dropout_suspended', False))
 
 
 def participant_dropout_reason(player):
@@ -1778,20 +1897,111 @@ def participant_dropout_reason(player):
     return reason if reason in {'timeout', 'disconnect'} else ''
 
 
-def mark_timeout(player):
+def dropout_audit_for_player_round(player):
+    audit = participant_var(player, DROPOUT_AUDIT_PARTICIPANT_VAR, {})
+    if not isinstance(audit, dict):
+        return {}
+    return audit.get(str(player.round_number), audit.get(player.round_number, {})) or {}
+
+
+def save_dropout_audit(player, *, automatic_choice_strategy='', reason=''):
+    audit = participant_var(player, DROPOUT_AUDIT_PARTICIPANT_VAR, {})
+    if not isinstance(audit, dict):
+        audit = {}
+    audit[str(player.round_number)] = {
+        'consecutive_missed_decisions': int(
+            participant_var(player, 'consecutive_missed_decisions', 0) or 0
+        ),
+        'dropout_suspended': participant_dropout_suspended(player),
+        'automatic_choice_strategy': str(automatic_choice_strategy or ''),
+        'reason': str(reason or ''),
+    }
+    set_dropout_runtime_var(player, DROPOUT_AUDIT_PARTICIPANT_VAR, audit)
+
+
+def record_missed_decision(player, *, reason, automatic_choice_strategy=''):
+    current_round = int(player.round_number)
+    last_missed_round = int(
+        participant_var(player, 'last_missed_round_number', 0) or 0
+    )
+    streak = int(participant_var(player, 'consecutive_missed_decisions', 0) or 0)
+    if last_missed_round != current_round:
+        streak += 1
+        set_dropout_runtime_var(player, 'last_missed_round_number', current_round)
+    suspended = streak >= C.DROPOUT_SUSPEND_AFTER_MISSES
+    set_dropout_runtime_var(player, 'consecutive_missed_decisions', streak)
+    set_dropout_runtime_var(player, 'dropout_suspended', suspended)
+    save_dropout_audit(
+        player,
+        automatic_choice_strategy=automatic_choice_strategy,
+        reason=reason,
+    )
+    return suspended
+
+
+def record_manual_decision(player):
+    set_dropout_runtime_var(
+        player,
+        'last_manual_departure_minute',
+        float(player.departure_minute),
+    )
+    set_dropout_runtime_var(player, 'consecutive_missed_decisions', 0)
+    set_dropout_runtime_var(player, 'dropout_suspended', False)
+    save_dropout_audit(player)
+
+
+def automatic_departure_for_player(player):
+    schedule = departure_schedule_for_player(player)
+    last_manual = participant_var(player, 'last_manual_departure_minute')
+    if departure_slot_for_minute(last_manual, schedule) is not None:
+        return float(last_manual), AUTO_CHOICE_LAST_MANUAL
+
+    neutral_minute = C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES
+    if departure_slot_for_minute(neutral_minute, schedule) is not None:
+        return float(neutral_minute), AUTO_CHOICE_NEUTRAL_BASELINE
+
+    closest_slot = min(
+        departure_slots(schedule),
+        key=lambda slot: abs(
+            departure_minute_for_slot(slot, schedule) - neutral_minute
+        ),
+    )
+    return (
+        departure_minute_for_slot(closest_slot, schedule),
+        AUTO_CHOICE_NEUTRAL_BASELINE,
+    )
+
+
+def set_automatic_departure_choice(player, decision_source):
+    departure_minute, strategy = automatic_departure_for_player(player)
+    set_player_departure_choice(player, departure_minute, decision_source)
+    return strategy
+
+
+def mark_timeout(player, automatic_choice_strategy=''):
     player.timeout_happened = True
     player.dropout_event = 'timeout'
     set_participant_var(player, 'is_dropout', True)
     set_participant_var(player, 'dropout_active', True)
     set_participant_var(player, 'dropout_reason', 'timeout')
+    record_missed_decision(
+        player,
+        reason='timeout',
+        automatic_choice_strategy=automatic_choice_strategy,
+    )
 
 
-def mark_disconnect(player):
+def mark_disconnect(player, automatic_choice_strategy=''):
     set_participant_var(player, 'is_dropout', True)
     set_participant_var(player, 'dropout_active', True)
     if participant_dropout_reason(player) != 'timeout':
         player.dropout_event = 'disconnect'
         set_participant_var(player, 'dropout_reason', 'disconnect')
+    record_missed_decision(
+        player,
+        reason='disconnect',
+        automatic_choice_strategy=automatic_choice_strategy,
+    )
 
 
 def confirm_dropout_recovery(player):
@@ -1801,8 +2011,12 @@ def confirm_dropout_recovery(player):
     if not reason:
         return False
 
+    was_suspended = participant_dropout_suspended(player)
     set_participant_var(player, 'dropout_active', False)
     set_participant_var(player, 'dropout_reason', '')
+    set_dropout_runtime_var(player, 'dropout_suspended', False)
+    if was_suspended:
+        set_dropout_runtime_var(player, 'consecutive_missed_decisions', 0)
     if reason == 'timeout':
         set_participant_var(player, 'has_recovered_after_timeout', True)
     else:
@@ -1816,18 +2030,39 @@ def all_players_have_choice(group):
     return all(player_has_departure_choice(player) for player in group.get_players())
 
 
+def round_waiting_players(group):
+    return [
+        player
+        for player in group.get_players()
+        if not participant_dropout_suspended(player)
+    ]
+
+
+def fill_suspended_choices(group):
+    for player in group.get_players():
+        if not participant_dropout_suspended(player) or player_has_departure_choice(player):
+            continue
+        strategy = set_automatic_departure_choice(
+            player,
+            DECISION_SOURCE_SUSPENDED_AUTO,
+        )
+        player.dropout_event = 'suspended_proxy'
+        save_dropout_audit(
+            player,
+            automatic_choice_strategy=strategy,
+            reason=participant_dropout_reason(player) or 'disconnect',
+        )
+
+
 def fill_missing_choices(group):
     for player in group.get_players():
         if player_has_departure_choice(player):
             continue
-        schedule = departure_schedule_for_player(player)
-        slot = random.choice(departure_slots(schedule))
-        set_player_departure_choice(
+        strategy = set_automatic_departure_choice(
             player,
-            departure_minute_for_slot(slot, schedule),
             DECISION_SOURCE_DISCONNECT_AUTO,
         )
-        mark_disconnect(player)
+        mark_disconnect(player, strategy)
 
 
 def service_batch_clear_minute(first_service_start_minute, load, capacity):
@@ -1887,13 +2122,12 @@ def _set_results_locked(group):
         schedule = departure_schedule_for_player(player)
         slot = player_departure_slot(player)
         if slot is None:
-            slot = random.choice(departure_slots(schedule))
-            set_player_departure_choice(
+            strategy = set_automatic_departure_choice(
                 player,
-                departure_minute_for_slot(slot, schedule),
                 DECISION_SOURCE_DISCONNECT_AUTO,
             )
-            mark_disconnect(player)
+            mark_disconnect(player, strategy)
+            slot = player_departure_slot(player)
         else:
             set_player_departure_choice(player, departure_minute_for_slot(slot, schedule))
         actors_by_minute.setdefault(player.departure_minute, []).append(
@@ -1951,7 +2185,11 @@ def _set_results_locked(group):
                 toll=toll,
             )
             total_cost = cost_components['total_cost']
-            payoff = max(0, round(C.BASE_POINTS - total_cost + reward_bonus, 2))
+            payoff = (
+                0
+                if is_warmup_round(group.round_number)
+                else max(0, round(C.BASE_POINTS - total_cost + reward_bonus, 2))
+            )
             result_values = {
                 'slot_load': load,
                 'arrival_minute': round(arrival_minute, 2),
@@ -1985,18 +2223,16 @@ def _set_results_locked(group):
         next_available_minute = service_batch_clear_minute(first_service_start, load, capacity)
 
     save_public_feedback_snapshot(group, virtual_records=virtual_records)
-    if api_agent_records:
+    if api_agent_records and not is_warmup_round(group.round_number):
         update_rl_shadow_states(group, api_agent_records)
-    if rl_agent_records:
+    if rl_agent_records and not is_warmup_round(group.round_number):
         update_independent_rl_states(group, rl_agent_records)
     if virtual_records:
         save_virtual_decisions_for_group(group, virtual_records)
 
     if group.round_number == C.NUM_ROUNDS:
         for player in players:
-            player.participant.vars[TOTAL_PAYOFF_VAR] = sum(
-                round_player.payoff for round_player in player.in_all_rounds()
-            )
+            player.participant.vars[TOTAL_PAYOFF_VAR] = formal_payoff_total(player)
     group.results_ready = True
     return True
 
@@ -2150,7 +2386,10 @@ def limited_memory_for_agent(group, agent_id):
 
 
 def save_api_agent_memory_updates(group, records):
-    if not api_agent_limited_memory_enabled(group.session):
+    if (
+        is_warmup_round(group.round_number)
+        or not api_agent_limited_memory_enabled(group.session)
+    ):
         return
     players = group.get_players()
     if not players:
@@ -2192,9 +2431,14 @@ def virtual_decisions_for_group_round(group, round_number):
 
 
 def previous_public_feedback_for_group(group):
-    previous_round = int(group.round_number) - 1
+    current_formal_round = formal_round_number(group.round_number)
+    previous_round = (
+        int(group.round_number) - 1
+        if current_formal_round is not None and current_formal_round > 1
+        else None
+    )
     players = group.get_players()
-    if previous_round < 1 or not players:
+    if previous_round is None or not players:
         return None
     stored = players[0].participant.vars.get(PUBLIC_FEEDBACK_PARTICIPANT_VAR, {})
     snapshot = stored.get(str(previous_round)) if isinstance(stored, dict) else None
@@ -2218,10 +2462,15 @@ def public_personal_result_from_record(record):
 
 
 def agent_history_for_group(group, agent_id):
-    previous_round = int(group.round_number) - 1
+    current_formal_round = formal_round_number(group.round_number)
+    previous_round = (
+        int(group.round_number) - 1
+        if current_formal_round is not None and current_formal_round > 1
+        else None
+    )
     public_feedback = previous_public_feedback_for_group(group)
     own_result = None
-    if previous_round >= 1 and public_feedback is not None:
+    if previous_round is not None and public_feedback is not None:
         for record in virtual_decisions_for_group_round(group, previous_round):
             if record.get('agent_id') == agent_id:
                 own_result = public_personal_result_from_record(record)
@@ -2236,14 +2485,26 @@ def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
     config = parse_dynamic_capacity_config(group.session.config)
     schedule = departure_schedule_for_player(reference_player)
     preview = choice_preview(reference_player)
+    phase = round_phase_context(group.round_number)
     previous_capacity = (
         reference_player.previous_round_capacity
-        if group.round_number > 1
+        if not phase['is_warmup'] and phase['display_round_number'] > 1
         else None
     )
+    capacity_context = agent_capacity_context(
+        config,
+        actual_capacity=group.dynamic_capacity,
+        previous_capacity=previous_capacity,
+    )
+    capacity_context['experiment_phase'] = phase['phase_name']
+    capacity_context['round_label'] = phase['round_label']
+    if phase['is_warmup']:
+        capacity_context['actual_capacity'] = group.dynamic_capacity
+        capacity_context['capacity_revealed'] = True
+        capacity_context['capacity_reveal_timing'] = REVEAL_BEFORE_DECISION
     return AgentChoiceSet(
-        round_number=group.round_number,
-        total_rounds=C.NUM_ROUNDS,
+        round_number=phase['display_round_number'],
+        total_rounds=phase['display_total_rounds'],
         available_slots=[
             {
                 'slot': item['slot'],
@@ -2264,11 +2525,7 @@ def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
             'last_departure_minute': schedule['last_departure_minute'],
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
         },
-        capacity_context=agent_capacity_context(
-            config,
-            actual_capacity=group.dynamic_capacity,
-            previous_capacity=previous_capacity,
-        ),
+        capacity_context=capacity_context,
         tolls=[
             {'slot': item['slot'], 'charge': item['toll']}
             for item in preview
@@ -2335,6 +2592,7 @@ def prepare_independent_rl_decisions_for_group(group):
     )
     states, _reference_player = independent_rl_state_store_for_group(group)
     records = []
+    phase = round_phase_context(group.round_number)
     for index in range(
         1,
         rl_agent_count_per_group(group.session, group.id_in_subsession) + 1,
@@ -2392,15 +2650,17 @@ def prepare_independent_rl_decisions_for_group(group):
                 'persona_id': str(persona['persona_id']),
                 'persona_label': str(persona['label']),
                 'group_id': int(group.id_in_subsession),
-                'round_number': int(group.round_number),
+                'round_number': phase['display_round_number'],
                 'dynamic_capacity': int(group.dynamic_capacity),
                 'dynamic_capacity_state': str(group.dynamic_capacity_state),
                 'capacity_probability': float(group.capacity_probability),
-                'capacity_reveal_timing': str(
-                    group.session.config.get(
+                'capacity_reveal_timing': (
+                    REVEAL_BEFORE_DECISION
+                    if phase['is_warmup']
+                    else str(group.session.config.get(
                         'capacity_reveal_timing',
                         REVEAL_BEFORE_DECISION,
-                    )
+                    ))
                 ),
                 'departure_slot': slot,
                 'departure_minute': round(departure_minute, 2),
@@ -2413,7 +2673,7 @@ def prepare_independent_rl_decisions_for_group(group):
                 'context_json': json.dumps(
                     {
                         'agent_id': agent_id,
-                        'round_number': int(group.round_number),
+                        'round_number': phase['display_round_number'],
                         'capacity_context': choice_set.capacity_context,
                         'belief': choice.get('belief', {}),
                         'rounds_observed': int(
@@ -2443,7 +2703,11 @@ def prepare_independent_rl_decisions_for_group(group):
 
 
 def update_independent_rl_states(group, records):
-    if not rl_agent_enabled(group.session) or not records:
+    if (
+        is_warmup_round(group.round_number)
+        or not rl_agent_enabled(group.session)
+        or not records
+    ):
         return
     feedback = current_public_feedback_for_group(group)
     if feedback is None:
@@ -2467,7 +2731,7 @@ def update_independent_rl_states(group, records):
             states.get(agent_id),
             capacity_states,
         )
-        if int(state.get('rounds_observed', 0)) >= int(group.round_number):
+        if int(state.get('rounds_observed', 0)) >= formal_round_number(group.round_number):
             continue
         persona = get_or_create_rl_agent_persona(
             group.session,
@@ -2561,7 +2825,11 @@ def apply_rl_fallback_to_choice(choice, choice_set, rl_candidate):
 
 
 def update_rl_shadow_states(group, agent_records):
-    if not rl_fallback_enabled(group.session) or not agent_records:
+    if (
+        is_warmup_round(group.round_number)
+        or not rl_fallback_enabled(group.session)
+        or not agent_records
+    ):
         return
     feedback = current_public_feedback_for_group(group)
     if feedback is None:
@@ -2576,7 +2844,7 @@ def update_rl_shadow_states(group, agent_records):
     for record in agent_records:
         agent_id = str(record['agent_id'])
         state = valid_or_initial_state(store.get(agent_id), capacity_states)
-        if int(state.get('rounds_observed', 0)) >= int(group.round_number):
+        if int(state.get('rounds_observed', 0)) >= formal_round_number(group.round_number):
             continue
         group_label = reference_player.participant.vars.get(
             'assigned_group_label',
@@ -2663,6 +2931,7 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
         return []
     schedule = departure_schedule_for_player(players[0])
     records = []
+    phase = round_phase_context(group.round_number)
     for (agent_id, choice_set), choice in zip(prepared_agents, choices):
         slot = int(choice.departure_slot)
         departure_minute = departure_minute_for_slot(slot, schedule)
@@ -2682,15 +2951,17 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
                 'persona_id': str(persona.get('persona_id', '')),
                 'persona_label': str(persona.get('label', '')),
                 'group_id': int(group.id_in_subsession),
-                'round_number': int(group.round_number),
+                'round_number': phase['display_round_number'],
                 'dynamic_capacity': int(group.dynamic_capacity),
                 'dynamic_capacity_state': str(group.dynamic_capacity_state),
                 'capacity_probability': float(group.capacity_probability),
-                'capacity_reveal_timing': str(
-                    group.session.config.get(
+                'capacity_reveal_timing': (
+                    REVEAL_BEFORE_DECISION
+                    if phase['is_warmup']
+                    else str(group.session.config.get(
                         'capacity_reveal_timing',
                         REVEAL_BEFORE_DECISION,
-                    )
+                    ))
                 ),
                 'departure_slot': slot,
                 'departure_minute': round(departure_minute, 2),
@@ -2892,7 +3163,7 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
 
     all_costs = [cost for values in costs_by_slot.values() for cost in values]
     return {
-        'round_number': int(group.round_number),
+        'round_number': round_phase_context(group.round_number)['display_round_number'],
         'dynamic_capacity': int(group.dynamic_capacity),
         'departure_outcomes': [
             {
@@ -2994,14 +3265,20 @@ def result_current_round_cost_snapshot(player):
 
 def export_row_for_player(player):
     schedule = departure_schedule_for_player(player)
+    exported_round_number = formal_round_number(player.round_number)
+    dropout_audit = dropout_audit_for_player_round(player)
     return [
         player.session.code,
         player.participant.code,
         player.group.id_in_subsession,
-        player.round_number,
+        exported_round_number,
         player.dynamic_capacity,
         player.dynamic_capacity_state,
-        player.previous_round_capacity if player.round_number > 1 else '',
+        (
+            player.previous_round_capacity
+            if exported_round_number is not None and exported_round_number > 1
+            else ''
+        ),
         player.capacity_probability,
         player.capacity_reveal_timing,
         player.dynamic_capacity_seed,
@@ -3045,6 +3322,9 @@ def export_row_for_player(player):
         participant_dropout_reason(player),
         bool(participant_var(player, 'has_recovered_after_disconnect', False)),
         bool(participant_var(player, 'has_recovered_after_timeout', False)),
+        int(dropout_audit.get('consecutive_missed_decisions', 0) or 0),
+        bool(dropout_audit.get('dropout_suspended', False)),
+        dropout_audit.get('automatic_choice_strategy', ''),
         'human',
         '',
         '',
@@ -3065,6 +3345,8 @@ def export_row_for_player(player):
 def agent_decisions_for_players(players):
     groups = {}
     for player in players:
+        if is_warmup_round(player.round_number):
+            continue
         key = (
             player.session.code,
             player.round_number,
@@ -3087,7 +3369,7 @@ def export_row_for_agent_record(record, reference_player):
     values = {
         'participant_code': '',
         'group_id': record.get('group_id', reference_player.group.id_in_subsession),
-        'round_number': record.get('round_number', reference_player.round_number),
+        'round_number': formal_round_number(reference_player.round_number),
         'dynamic_capacity': record.get('dynamic_capacity', reference_player.dynamic_capacity),
         'dynamic_capacity_state': record.get(
             'dynamic_capacity_state',
@@ -3111,6 +3393,9 @@ def export_row_for_agent_record(record, reference_player):
         'dropout_reason_at_export': '',
         'has_recovered_after_disconnect': False,
         'has_recovered_after_timeout': False,
+        'consecutive_missed_decisions': 0,
+        'dropout_suspended': False,
+        'automatic_choice_strategy': '',
         'coarse_toll_charge': record.get('coarse_toll_charge', 0),
         'actor_type': record.get('actor_type', API_AGENT_TYPE_DEEPSEEK),
         'agent_id': record.get('agent_id', ''),
@@ -3133,6 +3418,10 @@ def export_row_for_agent_record(record, reference_player):
 
 
 def build_admin_report_rows(players):
+    players = [
+        player for player in players
+        if not is_warmup_round(player.round_number)
+    ]
     groups = {}
     state_counts = {}
     api_agent_record_count = 0
@@ -3211,7 +3500,7 @@ def build_admin_report_rows(players):
             distribution[label] = distribution.get(label, 0) + 1
         round_rows.append(
             {
-                'round_number': round_number,
+                'round_number': formal_round_number(round_number),
                 'group_id': group_id,
                 'dynamic_capacity': representative.dynamic_capacity,
                 'dynamic_capacity_state': representative.dynamic_capacity_state,
@@ -3288,7 +3577,8 @@ class Introduction(Page):
         schedule = departure_schedule_for_player(player)
         return {
             'capacity_states': capacity_state_rows(config),
-            'total_rounds': C.NUM_ROUNDS,
+            'total_rounds': C.FORMAL_ROUNDS,
+            'warmup_rounds': C.WARMUP_ROUNDS,
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'preferred_arrival_time': minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             'free_flow_travel_minutes': C.FREE_FLOW_TRAVEL_MINUTES,
@@ -3362,6 +3652,34 @@ class ComprehensionCheck(Page):
         player.participant.vars[COMPREHENSION_SEEN_VAR] = True
 
 
+class WarmupStart(Page):
+    @staticmethod
+    def is_displayed(player):
+        return player.round_number == 1 and access_allowed(player)
+
+    @staticmethod
+    def vars_for_template(player):
+        config = parse_dynamic_capacity_config(player.session.config)
+        return {
+            'warmup_rounds': C.WARMUP_ROUNDS,
+            'warmup_capacity': parse_warmup_capacity(player.session.config, config),
+            'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
+        }
+
+
+class FormalStart(Page):
+    @staticmethod
+    def is_displayed(player):
+        return (
+            player.round_number == C.WARMUP_ROUNDS + 1
+            and access_allowed(player)
+        )
+
+    @staticmethod
+    def vars_for_template(player):
+        return {'formal_rounds': C.FORMAL_ROUNDS}
+
+
 class RoundStartSync(Page):
     @staticmethod
     def is_displayed(player):
@@ -3381,19 +3699,19 @@ class RoundStartSync(Page):
             prepare_independent_rl_decisions_for_group(group)
         ready_count = sum(
             bool(group_player.round_start_ready)
-            for group_player in group.get_players()
+            for group_player in round_waiting_players(group)
         )
+        waiting_players = round_waiting_players(group)
         return {
-            'round_number': player.round_number,
-            'total_rounds': C.NUM_ROUNDS,
+            **round_phase_context(player.round_number),
             'round_started': group.round_started,
             'ready_count': ready_count,
-            'group_size': len(group.get_players()),
+            'group_size': len(waiting_players),
             'remaining_seconds': max(
                 0,
                 ceil(group.round_start_deadline_ts - now_ts),
             ),
-            'poll_interval_ms': C.SYNC_POLL_INTERVAL_SECONDS * 1000,
+            'poll_interval_ms': int(C.SYNC_POLL_INTERVAL_SECONDS * 1000),
             'auto_continue_delay_ms': C.AUTO_CONTINUE_DELAY_MS,
         }
 
@@ -3429,13 +3747,23 @@ class Decision(Page):
     @staticmethod
     def vars_for_template(player):
         config = parse_dynamic_capacity_config(player.session.config)
-        context = decision_capacity_context(config, actual_capacity=player.dynamic_capacity)
+        if is_warmup_round(player.round_number):
+            context = {
+                'capacity_revealed': True,
+                'capacity_reveal_timing': REVEAL_BEFORE_DECISION,
+                'capacity_states': capacity_state_rows(config),
+                'actual_capacity': player.dynamic_capacity,
+            }
+        else:
+            context = decision_capacity_context(
+                config,
+                actual_capacity=player.dynamic_capacity,
+            )
         schedule = departure_schedule_for_player(player)
         preview = choice_preview(player)
         return {
             **context,
-            'round_number': player.round_number,
-            'total_rounds': C.NUM_ROUNDS,
+            **round_phase_context(player.round_number),
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'departure_time_min': schedule['first_departure_time'],
             'departure_time_max': schedule['last_departure_time'],
@@ -3469,20 +3797,19 @@ class Decision(Page):
             maybe_prepare_results(player.group)
             return
         if timeout_happened and not player_has_departure_choice(player):
-            schedule = departure_schedule_for_player(player)
-            slot = random.choice(departure_slots(schedule))
-            set_player_departure_choice(
+            strategy = set_automatic_departure_choice(
                 player,
-                departure_minute_for_slot(slot, schedule),
                 DECISION_SOURCE_TIMEOUT_AUTO,
             )
-            mark_timeout(player)
+            mark_timeout(player, strategy)
             return
-        set_player_departure_choice(
+        choice_saved = set_player_departure_choice(
             player,
             player.field_maybe_none('departure_minute'),
             DECISION_SOURCE_MANUAL,
         )
+        if choice_saved:
+            record_manual_decision(player)
         player.timeout_happened = False
 
 
@@ -3495,7 +3822,7 @@ class RecoveryGate(Page):
     def vars_for_template(player):
         reason = participant_dropout_reason(player)
         return {
-            'round_number': player.round_number,
+            **round_phase_context(player.round_number),
             'recovery_reason_label': '决策超时' if reason == 'timeout' else '未按时提交',
             'automatic_departure_time': player.departure_time_label or '等待系统补选',
         }
@@ -3516,7 +3843,7 @@ class ResultsSync(Page):
         return {
             'results_ready': player.group.results_ready,
             'remaining_seconds': max(0, ceil(player.group.decision_deadline_ts - time.time())),
-            'poll_interval_ms': C.SYNC_POLL_INTERVAL_SECONDS * 1000,
+            'poll_interval_ms': int(C.SYNC_POLL_INTERVAL_SECONDS * 1000),
             'auto_continue_delay_ms': C.AUTO_CONTINUE_DELAY_MS,
         }
 
@@ -3541,13 +3868,20 @@ class Results(Page):
         maybe_prepare_results(player.group)
         components = result_cost_components(player)
         snapshot = result_current_round_cost_snapshot(player)
+        phase = round_phase_context(player.round_number)
+        has_previous_capacity = (
+            player.round_number > 1
+            if phase['is_warmup']
+            else phase['display_round_number'] > 1
+        )
         return {
+            **phase,
             'dynamic_capacity': player.dynamic_capacity,
             'dynamic_capacity_state': player.dynamic_capacity_state,
             'capacity_probability': probability_display(player.capacity_probability),
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'previous_capacity_label': (
-                str(player.previous_round_capacity) if player.round_number > 1 else '无'
+                str(player.previous_round_capacity) if has_previous_capacity else '无'
             ),
             'departure_time': player.departure_time_label,
             'arrival_time': player.arrival_time_label,
@@ -3576,15 +3910,21 @@ class Results(Page):
 
 def custom_export(players):
     yield EXPORT_HEADERS
-    for player in players:
+    formal_players = [
+        player for player in players
+        if not is_warmup_round(player.round_number)
+    ]
+    for player in formal_players:
         yield export_row_for_player(player)
-    for record, reference_player in agent_decisions_for_players(players):
+    for record, reference_player in agent_decisions_for_players(formal_players):
         yield export_row_for_agent_record(record, reference_player)
 
 
 page_sequence = [
     Introduction,
     ComprehensionCheck,
+    WarmupStart,
+    FormalStart,
     RoundStartSync,
     Decision,
     RecoveryGate,

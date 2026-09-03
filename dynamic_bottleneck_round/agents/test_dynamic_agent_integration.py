@@ -199,6 +199,24 @@ class DynamicAgentRevealTests(unittest.TestCase):
         self.assertNotIn('actual_capacity', prompt)
         self.assertNotIn('dynamic_capacity', prompt)
 
+    def test_chat_payload_uses_fast_bounded_json_output(self):
+        choice_set = AgentChoiceSet(
+            round_number=1,
+            total_rounds=60,
+            available_slots=({'slot': 1, 'departure_minute': 474},),
+            cost_parameters={},
+            capacity_context={'capacity_revealed': False},
+        )
+
+        payload = build_chat_completion_payload(
+            DeepSeekAgentConfig(model='test-model'),
+            choice_set,
+        )
+
+        self.assertEqual(payload['thinking'], {'type': 'disabled'})
+        self.assertEqual(payload['response_format'], {'type': 'json_object'})
+        self.assertEqual(payload['max_tokens'], 512)
+
     def test_first_round_prompt_omits_empty_limited_memory(self):
         choice_set = AgentChoiceSet(
             round_number=1,
@@ -386,16 +404,16 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_agent_history_exposes_only_previous_public_feedback(self):
         group, participant = self.make_record_group()
-        group.round_number = 3
+        group.round_number = 4
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '1': {
-                'round_number': 1,
+            '2': {
+                'round_number': 2,
                 'dynamic_capacity': 1,
                 'departure_outcomes': [],
                 'group_average_cost': 18,
             },
-            '2': {
-                'round_number': 2,
+            '3': {
+                'round_number': 1,
                 'dynamic_capacity': 3,
                 'departure_outcomes': [
                     {'slot': 2, 'participant_count': 2, 'average_cost': 10},
@@ -404,11 +422,11 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             },
         }
         participant.vars[app.AGENT_DECISIONS_PARTICIPANT_VAR] = {
-            '1': [{'agent_id': 'G01_API_01', 'round_number': 1, 'total_cost': 18}],
-            '2': [
+            '2': [{'agent_id': 'G01_API_01', 'round_number': 2, 'total_cost': 18}],
+            '3': [
                 {
                     'agent_id': 'G01_API_01',
-                    'round_number': 2,
+                    'round_number': 1,
                     'departure_slot': 2,
                     'departure_minute': 474,
                     'departure_time_label': '07:54',
@@ -427,10 +445,10 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
         history = app.agent_history_for_group(group, 'G01_API_01')
 
-        self.assertEqual(history['public_feedback']['round_number'], 2)
-        self.assertEqual(history['own_previous_result']['round_number'], 2)
+        self.assertEqual(history['public_feedback']['round_number'], 1)
+        self.assertEqual(history['own_previous_result']['round_number'], 1)
         self.assertNotIn('previous_rounds', history)
-        self.assertNotIn('"round_number": 1', json.dumps(history))
+        self.assertNotIn('"round_number": 2', json.dumps(history))
         self.assertNotIn('payoff', history['own_previous_result'])
         self.assertNotIn('reward_bonus', history['own_previous_result'])
         self.assertNotIn('early_minutes', history['own_previous_result'])
@@ -465,6 +483,21 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
         self.assertEqual(
             history,
+            {'public_feedback': None, 'own_previous_result': None},
+        )
+
+    def test_first_formal_round_does_not_receive_warmup_history(self):
+        group, participant = self.make_record_group()
+        group.round_number = 3
+        participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
+            '2': {'round_number': 2, 'dynamic_capacity': 2},
+        }
+        participant.vars[app.AGENT_DECISIONS_PARTICIPANT_VAR] = {
+            '2': [{'agent_id': 'G01_API_01', 'round_number': 2}],
+        }
+
+        self.assertEqual(
+            app.agent_history_for_group(group, 'G01_API_01'),
             {'public_feedback': None, 'own_previous_result': None},
         )
 
@@ -516,6 +549,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_valid_memory_update_replaces_only_its_agent_memory(self):
         group, participant = self.make_record_group()
+        group.round_number = 3
         group.session.config.update({
             'api_agent_limited_memory_enabled': 1,
             'api_agent_limited_memory_max_chars': 400,
@@ -543,6 +577,25 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                 'G01_API_02': '另一人的判断',
             },
         )
+
+    def test_warmup_does_not_update_limited_memory(self):
+        group, participant = self.make_record_group()
+        group.round_number = 1
+        group.session.config.update({
+            'api_agent_limited_memory_enabled': 1,
+            'api_agent_limited_memory_max_chars': 400,
+        })
+
+        app.save_api_agent_memory_updates(
+            group,
+            [{
+                'agent_id': 'G01_API_01',
+                'decision_source': 'deepseek_api',
+                'memory_output': '不应保存的热身记忆',
+            }],
+        )
+
+        self.assertNotIn(app.API_AGENT_MEMORY_PARTICIPANT_VAR, participant.vars)
 
     def test_agent_export_contains_memory_audit_fields(self):
         reference_player = SimpleNamespace(
@@ -698,7 +751,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         group = SimpleNamespace(
             results_ready=False,
             dynamic_capacity=2,
-            round_number=1,
+            round_number=3,
             session=SimpleNamespace(config={'reward_treatment_enabled': 0}),
             get_players=lambda: [player],
         )
@@ -890,7 +943,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         group = SimpleNamespace(
             session=session,
-            round_number=1,
+            round_number=3,
             id_in_subsession=1,
             dynamic_capacity=3,
             get_players=lambda: [player],
@@ -902,7 +955,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'decision_source': 'deepseek_api',
         }
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '1': {
+            '3': {
                 'round_number': 1,
                 'dynamic_capacity': 3,
                 'departure_outcomes': [
@@ -945,7 +998,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'rl_fallback_enabled': 1,
         })
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '1': {
+            '3': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -986,7 +1039,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'departure_slot': 2,
         }
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '1': {
+            '3': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1052,7 +1105,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         player.field_maybe_none = lambda field_name: getattr(player, field_name, None)
         group = SimpleNamespace(
             session=session,
-            round_number=1,
+            round_number=3,
             id_in_subsession=1,
             dynamic_capacity=2,
             dynamic_capacity_state='capacity_2',
@@ -1060,6 +1113,28 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             get_players=lambda: [player],
         )
         return group, participant
+
+    def test_warmup_does_not_update_api_shadow_or_independent_rl(self):
+        group, _participant = self.make_independent_rl_group()
+        group.round_number = 1
+        group.session.config.update({
+            'api_agent_mode': 'active',
+            'rl_fallback_enabled': 1,
+        })
+        api_record = {
+            'actor_type': 'deepseek_api_agent',
+            'agent_id': 'G01_API_01',
+        }
+        rl_record = {
+            'actor_type': 'rl_agent',
+            'agent_id': 'G01_RL_01',
+        }
+
+        with patch.object(app, 'current_public_feedback_for_group') as feedback:
+            app.update_rl_shadow_states(group, [api_record])
+            app.update_independent_rl_states(group, [rl_record])
+
+        feedback.assert_not_called()
 
     def test_independent_rl_records_are_created_once_without_capacity_leak(self):
         group, _participant = self.make_independent_rl_group()
@@ -1093,7 +1168,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         records[0]['total_cost'] = 5
         records[1]['total_cost'] = 17
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '1': {
+            '3': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1122,7 +1197,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         records[0]['total_cost'] = 5
         records[1]['total_cost'] = 17
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '1': {
+            '3': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [

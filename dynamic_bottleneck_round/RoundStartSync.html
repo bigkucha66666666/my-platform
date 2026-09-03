@@ -1,4 +1,4 @@
-{{ block title }}第 {{ round_number }} 轮准备{{ endblock }}
+{{ block title }}{{ round_label }}准备{{ endblock }}
 
 {{ block content }}
 <style>
@@ -19,13 +19,13 @@
   <div class="round-sync-head">
     <div>
       <p class="round-sync-kicker">ROUND READY CHECK</p>
-      <h3 class="round-sync-title">等待同组参与者进入本轮</h3>
-      <p class="round-sync-copy">全组到齐后，系统会统一开始本轮 60 秒决策计时。若有人未及时到达，最长等待到期后也会自动开始。</p>
+      <h3 class="round-sync-title">等待本轮参与者进入</h3>
+      <p class="round-sync-copy">需要人工决策的参与者到齐后，系统会统一开始本轮 60 秒计时。处于暂停状态的参与者由系统代理，不会继续拖延本轮开始。</p>
     </div>
-    <div class="round-sync-round">R{{ round_number }} / {{ total_rounds }}</div>
+    <div class="round-sync-round">R{{ display_round_number }} / {{ display_total_rounds }}</div>
   </div>
   <div class="round-sync-status">
-    <div class="round-sync-metric"><span>已进入本轮</span><strong>{{ ready_count }} / {{ group_size }} 人</strong></div>
+    <div class="round-sync-metric"><span>已进入 / 本轮需等待</span><strong>{{ ready_count }} / {{ group_size }} 人</strong></div>
     <div class="round-sync-metric"><span>最长剩余等待</span><strong>{{ remaining_seconds }} 秒</strong></div>
   </div>
   <div class="round-sync-track"><span></span></div>
@@ -45,7 +45,7 @@
     }
     window.setTimeout(function () {
       window.location.reload();
-    }, Number(panel.dataset.poll) || 3000);
+    }, Number(panel.dataset.poll) || 1500);
   })();
 </script>
 {{ endblock }}

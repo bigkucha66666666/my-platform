@@ -132,7 +132,7 @@
 
         .process-card {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 1px;
             overflow: hidden;
             border-radius: 16px;
@@ -485,6 +485,10 @@
             </div>
             <div class="process-step">
                 <span class="process-kicker">Step 4</span>
+                <p class="process-text">{{ warmup_rounds }} 轮热身</p>
+            </div>
+            <div class="process-step">
+                <span class="process-kicker">Step 5</span>
                 <p class="process-text">正式选择</p>
             </div>
         </section>
@@ -635,7 +639,7 @@
         <div class="confirm-card">
             <input id="rules-read-confirmation" type="checkbox" required>
             <label for="rules-read-confirmation">
-                我已阅读实验前发放的详细说明，并理解下一页会进行规则测试；测试后进入正式实验。
+                我已阅读实验前发放的详细说明，并理解规则测试后先完成 {{ warmup_rounds }} 轮热身，再进入正式实验。
             </label>
         </div>
 

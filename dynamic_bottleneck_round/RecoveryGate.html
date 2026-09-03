@@ -17,7 +17,7 @@
   <div class="recovery-body">
     <p class="recovery-copy">系统检测到本轮未完成有效提交。为避免无人操作的页面持续自动进入后续轮次，请确认你已经返回实验。</p>
     <div class="recovery-facts">
-      <div class="recovery-fact"><span>当前轮次</span><strong>第 {{ round_number }} 轮</strong></div>
+      <div class="recovery-fact"><span>当前轮次</span><strong>{{ round_label }}</strong></div>
       <div class="recovery-fact"><span>记录原因</span><strong>{{ recovery_reason_label }}</strong></div>
     </div>
     <p class="recovery-note">本轮自动选择为 <strong>{{ automatic_departure_time }}</strong>，该选择已经进入组内计算，恢复后不能修改。下一轮开始时，你将重新获得完整决策时间。</p>

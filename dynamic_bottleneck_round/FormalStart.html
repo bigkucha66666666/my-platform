@@ -1,0 +1,17 @@
+{{ block title }}热身结束{{ endblock }}
+
+{{ block content }}
+<style>
+  .formal-notice{--ink:#172e3a;--muted:#62757d;--line:#c8d9dc;--accent:#d56b4d;position:relative;overflow:hidden;padding:34px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#fffaf5,#f7fbfa);color:var(--ink);box-shadow:0 14px 34px rgba(40,72,78,.09)}
+  .formal-notice::after{content:"60";position:absolute;right:24px;bottom:-24px;color:rgba(23,125,134,.07);font-size:150px;font-weight:950;line-height:1;pointer-events:none}.formal-kicker{margin:0 0 8px;color:var(--accent);font-size:12px;font-weight:900;letter-spacing:.08em}.formal-title{margin:0;font-size:30px;font-weight:950}.formal-copy{position:relative;z-index:1;max-width:700px;margin:13px 0 12px;color:var(--muted);line-height:1.75}.formal-reminder{position:relative;z-index:1;margin:0 0 25px;padding:13px 15px;border-left:4px solid #177d86;background:#fff;color:#294850;font-weight:800}.formal-notice .btn{position:relative;z-index:1}
+  @media(max-width:650px){.formal-notice{padding:26px 20px}.formal-notice::after{font-size:110px}}
+</style>
+
+<section class="formal-notice">
+  <p class="formal-kicker">FORMAL EXPERIMENT</p>
+  <h2 class="formal-title">热身已结束</h2>
+  <p class="formal-copy">下一页开始进入正式实验。正式实验共 60 轮，后续选择和结果将进入正式数据。</p>
+  <p class="formal-reminder">请根据每轮可见信息独立作决策，并留意历史结果中的变化。</p>
+  <button class="otree-btn-next btn btn-primary">进入正式实验</button>
+</section>
+{{ endblock }}

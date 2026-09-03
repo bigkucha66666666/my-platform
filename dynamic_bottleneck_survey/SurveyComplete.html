@@ -1,0 +1,25 @@
+{{ block title }}问卷已完成{{ endblock }}
+
+{{ block content }}
+<style>
+  .survey-complete{--ink:#1f2f3a;--muted:#62717a;--navy:#234253;--teal:#2d7780;--line:#cbd7db;max-width:700px;margin:25px auto 0;border:1px solid var(--line);background:#fff;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .complete-top{height:5px;background:var(--navy)}.complete-body{padding:32px 36px}.complete-mark{display:grid;place-items:center;width:44px;height:44px;margin-bottom:18px;border:1px solid var(--teal);border-radius:3px;background:#edf5f4;color:var(--teal);font-size:23px;font-weight:800}.complete-body h2{margin:0;font-size:27px;line-height:1.35;font-weight:750}.complete-body p{margin:11px 0 0;color:var(--muted);line-height:1.75}.complete-summary{display:grid;grid-template-columns:1fr 1fr;margin:24px 0;border:1px solid var(--line);background:#f7f9f9}.summary-item{padding:15px 17px}.summary-item+ .summary-item{border-left:1px solid var(--line)}.summary-item span{display:block;color:var(--muted);font-size:12px}.summary-item strong{display:block;margin-top:4px;font-size:18px}.complete-action{display:flex;justify-content:flex-end}.complete-action .btn{min-width:170px;border-radius:2px;background:var(--navy);border-color:var(--navy);font-weight:700}
+  @media(max-width:600px){.survey-complete{margin-top:10px}.complete-body{padding:27px 20px}.complete-summary{grid-template-columns:1fr}.summary-item+ .summary-item{border-left:0;border-top:1px solid var(--line)}.complete-action .btn{width:100%}}
+</style>
+
+<section class="survey-complete">
+  <div class="complete-top"></div>
+  <div class="complete-body">
+    <div class="complete-mark" aria-hidden="true">✓</div>
+    <h2>问卷已完成</h2>
+    <p>感谢你的认真回答。问卷结果只用于解释整体实验行为，不影响你在实验中获得的结果。</p>
+    <div class="complete-summary">
+      <div class="summary-item"><span>已回答</span><strong>{{ answered_questions }} 个问题</strong></div>
+      <div class="summary-item"><span>数据状态</span><strong>已保存</strong></div>
+    </div>
+    <div class="complete-action">
+      <button class="otree-btn-next btn btn-primary">{{ if has_payment_page }}查看最终奖励{{ else }}结束实验{{ endif }}</button>
+    </div>
+  </div>
+</section>
+{{ endblock }}

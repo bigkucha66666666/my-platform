@@ -17,7 +17,7 @@
     const panel=document.getElementById('sync-panel');
     const ready=panel.dataset.ready==='1';
     if(ready){setTimeout(function(){document.getElementById('sync-next').click();},Number(panel.dataset.delay)||200);return;}
-    setTimeout(function(){window.location.reload();},Number(panel.dataset.poll)||3000);
+    setTimeout(function(){window.location.reload();},Number(panel.dataset.poll)||1500);
   })();
 </script>
 {{ endblock }}

@@ -13,8 +13,9 @@ from typing import Callable, Iterable, Mapping, Sequence
 
 DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
 DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
-DEFAULT_TIMEOUT_SECONDS = 30
+DEFAULT_TIMEOUT_SECONDS = 12
 DEFAULT_TEMPERATURE = 0.0
+DEFAULT_MAX_TOKENS = 512
 DEFAULT_LIMITED_MEMORY_MAX_CHARS = 400
 
 
@@ -29,6 +30,8 @@ class DeepSeekAgentConfig:
     model: str = DEFAULT_DEEPSEEK_MODEL
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     temperature: float = DEFAULT_TEMPERATURE
+    thinking_enabled: bool = False
+    max_tokens: int = DEFAULT_MAX_TOKENS
     limited_memory_enabled: bool = False
     limited_memory_max_chars: int = DEFAULT_LIMITED_MEMORY_MAX_CHARS
 
@@ -88,6 +91,11 @@ def build_chat_completion_payload(
     return {
         'model': config.model,
         'temperature': config.temperature,
+        'thinking': {
+            'type': 'enabled' if config.thinking_enabled else 'disabled',
+        },
+        'response_format': {'type': 'json_object'},
+        'max_tokens': config.max_tokens,
         'messages': [
             {
                 'role': 'system',
@@ -291,6 +299,25 @@ def config_from_session(session_config) -> DeepSeekAgentConfig:
                 os.environ.get('DEEPSEEK_AGENT_TEMPERATURE', DEFAULT_TEMPERATURE),
             ),
             DEFAULT_TEMPERATURE,
+        ),
+        thinking_enabled=_parse_bool(
+            session_config.get(
+                'api_agent_thinking_enabled',
+                os.environ.get('DEEPSEEK_AGENT_THINKING_ENABLED', '0'),
+            )
+        ),
+        max_tokens=max(
+            1,
+            _parse_int(
+                session_config.get(
+                    'api_agent_max_tokens',
+                    os.environ.get(
+                        'DEEPSEEK_AGENT_MAX_TOKENS',
+                        DEFAULT_MAX_TOKENS,
+                    ),
+                ),
+                DEFAULT_MAX_TOKENS,
+            ),
         ),
         limited_memory_enabled=_parse_bool(
             session_config.get('api_agent_limited_memory_enabled', 0)

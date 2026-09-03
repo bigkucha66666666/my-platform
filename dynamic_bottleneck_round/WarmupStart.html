@@ -1,0 +1,23 @@
+{{ block title }}热身环节开始{{ endblock }}
+
+{{ block content }}
+<style>
+  .phase-notice{--ink:#17333c;--muted:#64777d;--line:#cbdcdd;--accent:#1b7d86;position:relative;overflow:hidden;padding:32px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#f4faf8,#fff);color:var(--ink);box-shadow:0 14px 34px rgba(27,79,84,.09)}
+  .phase-notice::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--accent)}
+  .phase-kicker{margin:0 0 8px;color:var(--accent);font-size:12px;font-weight:900;letter-spacing:.08em}.phase-title{margin:0;font-size:29px;font-weight:950}.phase-copy{max-width:720px;margin:12px 0 22px;color:var(--muted);line-height:1.75}
+  .phase-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:24px}.phase-fact{padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}.phase-fact span{display:block;color:var(--muted);font-size:12px}.phase-fact strong{display:block;margin-top:5px;font-size:17px}
+  @media(max-width:650px){.phase-notice{padding:25px 20px}.phase-facts{grid-template-columns:1fr}}
+</style>
+
+<section class="phase-notice">
+  <p class="phase-kicker">PRACTICE</p>
+  <h2 class="phase-title">热身环节开始</h2>
+  <p class="phase-copy">你将先完成 {{ warmup_rounds }} 轮热身，熟悉出发时间选择、收费标记和结果页。热身结果不计入正式实验数据和最终收益。</p>
+  <div class="phase-facts">
+    <div class="phase-fact"><span>热身轮数</span><strong>{{ warmup_rounds }} 轮</strong></div>
+    <div class="phase-fact"><span>固定瓶颈服务率</span><strong>{{ warmup_capacity }} 人 / {{ capacity_window_minutes }} 分钟</strong></div>
+    <div class="phase-fact"><span>数据处理</span><strong>不计入正式数据</strong></div>
+  </div>
+  <button class="otree-btn-next btn btn-primary">开始热身</button>
+</section>
+{{ endblock }}

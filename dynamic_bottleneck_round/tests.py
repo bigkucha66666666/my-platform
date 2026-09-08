@@ -2022,6 +2022,126 @@ class AccidentExperimentContractTests(unittest.TestCase):
         self.assertEqual(result, 'demo')
 
 
+class DynamicAccidentLifecycleTests(unittest.TestCase):
+    @staticmethod
+    def make_session(name='dynamic_bottleneck_round_demo', preset='auto'):
+        return SimpleNamespace(
+            config={
+                'name': name,
+                'accident_normal_capacity': 4.0,
+                'accident_probability': 0.20,
+                'accident_loss_alpha': 6.83057,
+                'accident_loss_beta': 4.05907,
+                'accident_sequence_seed': 2026090801,
+                'accident_information_condition': 'I1',
+                'dynamic_capacity_sequence_preset': preset,
+            },
+            vars={},
+        )
+
+    @staticmethod
+    def make_player():
+        return SimpleNamespace(participant=SimpleNamespace(vars={}))
+
+    def test_production_rejects_auto_sequence(self):
+        session = self.make_session('dynamic_bottleneck_round_prod', 'auto')
+
+        with self.assertRaisesRegex(ValueError, '正式.*S01-S05'):
+            dynamic_app.accident_sequence_for_session(session)
+
+    def test_named_sequence_loads_frozen_bank_records(self):
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+
+        records = dynamic_app.accident_sequence_for_session(session)
+
+        self.assertEqual(len(records), 60)
+        self.assertEqual(records[0]['sequence_id'], 'S01')
+        self.assertEqual(records[-1]['formal_round_number'], 60)
+
+    def test_initialization_stores_one_session_sequence_for_all_groups(self):
+        session = self.make_session()
+        group_one = SimpleNamespace(
+            id_in_subsession=1,
+            session=session,
+            get_players=lambda: [self.make_player()],
+        )
+        group_two = SimpleNamespace(
+            id_in_subsession=2,
+            session=session,
+            get_players=lambda: [self.make_player()],
+        )
+        subsession = SimpleNamespace(
+            session=session,
+            get_groups=lambda: [group_one, group_two],
+        )
+
+        dynamic_app.initialize_group_capacity_sequences(subsession)
+
+        stored = session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR]
+        self.assertEqual(len(stored), 60)
+        self.assertNotIn(
+            dynamic_app.CAPACITY_SEQUENCE_VAR,
+            group_one.get_players()[0].participant.vars,
+        )
+        self.assertNotIn(
+            dynamic_app.CAPACITY_SEQUENCE_VAR,
+            group_two.get_players()[0].participant.vars,
+        )
+
+    def test_warmup_uses_normal_capacity_without_consuming_formal_sequence(self):
+        session = self.make_session()
+        session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR] = [
+            {
+                'formal_round_number': 1,
+                'incident_occurred': True,
+                'capacity_loss_ratio': 0.75,
+                'remaining_capacity_ratio': 0.25,
+                'actual_capacity': 1.0,
+                'sequence_id': 'auto',
+                'sequence_seed': 2026090801,
+            }
+        ] * 60
+        player = self.make_player()
+        group = SimpleNamespace(
+            round_number=5,
+            session=session,
+            get_players=lambda: [player],
+        )
+
+        dynamic_app.apply_round_capacity(group)
+
+        self.assertEqual(group.dynamic_capacity, 4.0)
+        self.assertFalse(group.incident_occurred)
+        self.assertEqual(group.capacity_loss_ratio, 0.0)
+        self.assertEqual(group.accident_sequence_id, 'warmup')
+        self.assertEqual(player.dynamic_capacity, 4.0)
+
+    def test_formal_round_reads_corresponding_frozen_record(self):
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+        records = dynamic_app.accident_sequence_for_session(session)
+        session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR] = records
+        player = self.make_player()
+        group = SimpleNamespace(
+            round_number=C.WARMUP_ROUNDS + 1,
+            session=session,
+            get_players=lambda: [player],
+        )
+
+        dynamic_app.apply_round_capacity(group)
+
+        expected = records[0]
+        self.assertEqual(group.dynamic_capacity, expected['actual_capacity'])
+        self.assertEqual(group.incident_occurred, expected['incident_occurred'])
+        self.assertEqual(group.capacity_loss_ratio, expected['capacity_loss_ratio'])
+        self.assertEqual(group.accident_sequence_id, 'S01')
+        self.assertEqual(player.information_condition, 'I1')
+
+    def test_capacity_model_fields_are_float_columns(self):
+        for model in (dynamic_app.Group, dynamic_app.Player):
+            column = model.__dict__['dynamic_capacity'].property.columns[0]
+            self.assertEqual(str(column.type), 'FLOAT')
+
+
 class PlayerBot(Bot):
     cases = ['staggered', 'same_time', 'timeout_recovery']
 

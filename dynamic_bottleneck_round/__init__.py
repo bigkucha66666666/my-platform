@@ -14,6 +14,16 @@ from threading import Lock
 import time
 
 from otree.api import *
+from .accident_capacity import (
+    INFO_I0,
+    INFO_I1,
+    INFO_I2,
+    AccidentRiskConfig,
+    AccidentRiskConfigError,
+    generate_accident_sequence,
+    load_accident_sequence_bank,
+    parse_accident_risk_config,
+)
 from .agents.deepseek_agent import (
     AgentChoice,
     AgentChoiceSet,
@@ -68,6 +78,7 @@ AUTO_CHOICE_LAST_MANUAL = 'last_manual_choice'
 AUTO_CHOICE_NEUTRAL_BASELINE = 'neutral_baseline'
 
 CAPACITY_SEQUENCE_VAR = 'dynamic_bottleneck_round_capacity_sequence'
+ACCIDENT_SEQUENCE_SESSION_VAR = 'dynamic_bottleneck_round_accident_sequence_v1'
 TOTAL_PAYOFF_VAR = 'dynamic_bottleneck_round_total_payoff'
 COMPREHENSION_SEEN_VAR = 'dynamic_bottleneck_round_comprehension_seen'
 DEPARTURE_SCHEDULE_VAR = 'dynamic_bottleneck_round_departure_schedule'
@@ -644,20 +655,33 @@ class Group(BaseGroup):
     round_started = models.BooleanField(initial=False)
     decision_deadline_ts = models.FloatField(initial=0)
     results_ready = models.BooleanField(initial=False)
-    dynamic_capacity = models.IntegerField(initial=0)
+    dynamic_capacity = models.FloatField(initial=0)
     dynamic_capacity_state = models.StringField(blank=True)
     capacity_probability = models.FloatField(initial=0)
+    incident_occurred = models.BooleanField(initial=False)
+    capacity_loss_ratio = models.FloatField(initial=0)
+    remaining_capacity_ratio = models.FloatField(initial=1)
+    information_condition = models.StringField(blank=True)
+    accident_sequence_id = models.StringField(blank=True)
+    accident_sequence_seed = models.IntegerField(initial=0)
 
 
 class Player(BasePlayer):
     round_start_ready = models.BooleanField(initial=False)
-    dynamic_capacity = models.IntegerField(initial=0)
+    dynamic_capacity = models.FloatField(initial=0)
     dynamic_capacity_state = models.StringField(blank=True)
     previous_round_capacity = models.IntegerField(initial=0)
     capacity_probability = models.FloatField(initial=0)
     capacity_reveal_timing = models.StringField(blank=True)
     dynamic_capacity_seed = models.IntegerField(initial=0)
     dynamic_capacity_draw_mode = models.StringField(blank=True)
+    incident_occurred = models.BooleanField(initial=False)
+    capacity_loss_ratio = models.FloatField(initial=0)
+    remaining_capacity_ratio = models.FloatField(initial=1)
+    information_condition = models.StringField(blank=True)
+    accident_sequence_id = models.StringField(blank=True)
+    accident_sequence_seed = models.IntegerField(initial=0)
+    actor_composition = models.StringField(blank=True)
 
     departure_slot = models.IntegerField(choices=DEPARTURE_SLOT_CHOICES)
     departure_minute = models.FloatField(initial=0)
@@ -1142,6 +1166,18 @@ def static_departure_schedule():
     }
 
 
+def apply_fixed_departure_schedules(session, matrix):
+    for group_id, group_players in enumerate(matrix, start=1):
+        schedule = static_departure_schedule()
+        schedule['players_count'] = effective_group_actor_count(
+            session,
+            len(group_players),
+            group_id,
+        )
+        for player in group_players:
+            player.participant.vars[DEPARTURE_SCHEDULE_VAR] = deepcopy(schedule)
+
+
 def departure_schedule_for_player(player):
     schedule = player.participant.vars.get(DEPARTURE_SCHEDULE_VAR, {})
     if isinstance(schedule, dict) and schedule.get('enabled'):
@@ -1307,55 +1343,116 @@ def assign_group_treatment_metadata(session, matrix):
             player.participant.vars['dynamic_bottleneck_rl_agent_count'] = rl_count
 
 
-def initialize_group_capacity_sequences(subsession, config):
-    for group in subsession.get_groups():
-        records = build_capacity_round_records(
+def accident_sequence_for_session(session):
+    config = parse_accident_risk_config(session.config)
+    raw_preset = str(
+        session.config.get('dynamic_capacity_sequence_preset', 'auto') or 'auto'
+    ).strip()
+    if raw_preset.lower() == 'auto':
+        if session.config.get('name') == 'dynamic_bottleneck_round_prod':
+            raise ValueError('事故风险正式实验必须选择 S01-S05 固定事故序列。')
+        return generate_accident_sequence(
             config,
             rounds=C.FORMAL_ROUNDS,
-            group_id=group.id_in_subsession,
+            sequence_id='auto',
         )
-        for player in group.get_players():
-            player.participant.vars[CAPACITY_SEQUENCE_VAR] = records
+    sequence_id = raw_preset.upper()
+    bank = load_accident_sequence_bank()
+    if sequence_id not in bank:
+        raise ValueError(
+            f'未知事故序列 {sequence_id}；请选择 S01-S05 或 demo auto。'
+        )
+    approved = AccidentRiskConfig()
+    configured_parameters = (
+        config.normal_capacity,
+        config.incident_probability,
+        config.loss_alpha,
+        config.loss_beta,
+    )
+    approved_parameters = (
+        approved.normal_capacity,
+        approved.incident_probability,
+        approved.loss_alpha,
+        approved.loss_beta,
+    )
+    if configured_parameters != approved_parameters:
+        raise ValueError('固定事故序列只能与批准的 4.0/0.20/Beta 参数共同使用。')
+    return deepcopy(bank[sequence_id]['rounds'])
 
 
-def apply_round_capacity(group, config):
+def initialize_group_capacity_sequences(subsession, config=None):
+    records = accident_sequence_for_session(subsession.session)
+    subsession.session.vars[ACCIDENT_SEQUENCE_SESSION_VAR] = deepcopy(records)
+
+
+def _warmup_accident_record(group, config):
+    return {
+        'formal_round_number': None,
+        'incident_occurred': False,
+        'capacity_loss_ratio': 0.0,
+        'remaining_capacity_ratio': 1.0,
+        'actual_capacity': config.normal_capacity,
+        'sequence_id': 'warmup',
+        'sequence_seed': config.seed,
+    }
+
+
+def apply_round_capacity(group, config=None):
+    config = config or parse_accident_risk_config(group.session.config)
     players = group.get_players()
     if not players:
         return
     if is_warmup_round(group.round_number):
-        capacity = parse_warmup_capacity(group.session.config, config)
-        record = {
-            'capacity': capacity,
-            'state': f'warmup_capacity_{capacity}',
-            'probability': 1.0,
-            'previous_capacity': capacity if int(group.round_number) > 1 else None,
-        }
+        record = _warmup_accident_record(group, config)
+        previous_capacity = config.normal_capacity if group.round_number > 1 else 0
     else:
-        records = players[0].participant.vars.get(CAPACITY_SEQUENCE_VAR)
+        records = group.session.vars.get(ACCIDENT_SEQUENCE_SESSION_VAR)
         if not isinstance(records, list) or len(records) != C.FORMAL_ROUNDS:
-            records = build_capacity_round_records(
-                config,
-                rounds=C.FORMAL_ROUNDS,
-                group_id=group.id_in_subsession,
-            )
-            for player in players:
-                player.participant.vars[CAPACITY_SEQUENCE_VAR] = records
+            records = accident_sequence_for_session(group.session)
+            group.session.vars[ACCIDENT_SEQUENCE_SESSION_VAR] = deepcopy(records)
         record = records[formal_round_number(group.round_number) - 1]
-    group.dynamic_capacity = record['capacity']
-    group.dynamic_capacity_state = record['state']
-    group.capacity_probability = record['probability']
-    for player in players:
-        player.dynamic_capacity = record['capacity']
-        player.dynamic_capacity_state = record['state']
-        player.previous_round_capacity = record['previous_capacity'] or 0
-        player.capacity_probability = record['probability']
-        player.capacity_reveal_timing = (
-            REVEAL_BEFORE_DECISION
-            if is_warmup_round(group.round_number)
-            else config.reveal_timing
+        previous_record_index = formal_round_number(group.round_number) - 2
+        previous_capacity = (
+            records[previous_record_index]['actual_capacity']
+            if previous_record_index >= 0
+            else 0
         )
+    incident_probability = (
+        config.incident_probability
+        if record['incident_occurred']
+        else 1 - config.incident_probability
+    )
+    state = 'incident' if record['incident_occurred'] else 'normal'
+    if is_warmup_round(group.round_number):
+        state = 'warmup_normal'
+        incident_probability = 1.0
+
+    group.dynamic_capacity = record['actual_capacity']
+    group.dynamic_capacity_state = state
+    group.capacity_probability = incident_probability
+    group.incident_occurred = record['incident_occurred']
+    group.capacity_loss_ratio = record['capacity_loss_ratio']
+    group.remaining_capacity_ratio = record['remaining_capacity_ratio']
+    group.information_condition = config.information_condition
+    group.accident_sequence_id = record['sequence_id']
+    group.accident_sequence_seed = record['sequence_seed']
+    for player in players:
+        player.dynamic_capacity = record['actual_capacity']
+        player.dynamic_capacity_state = state
+        player.previous_round_capacity = previous_capacity
+        player.capacity_probability = incident_probability
+        player.capacity_reveal_timing = config.information_condition
         player.dynamic_capacity_seed = config.seed
-        player.dynamic_capacity_draw_mode = config.draw_mode
+        player.dynamic_capacity_draw_mode = 'iid_accident_beta'
+        player.incident_occurred = record['incident_occurred']
+        player.capacity_loss_ratio = record['capacity_loss_ratio']
+        player.remaining_capacity_ratio = record['remaining_capacity_ratio']
+        player.information_condition = config.information_condition
+        player.accident_sequence_id = record['sequence_id']
+        player.accident_sequence_seed = record['sequence_seed']
+        player.actor_composition = str(
+            player.participant.vars.get('dynamic_bottleneck_treatment_group', '')
+        )
 
 
 def parse_slot_spec(spec, field_name, valid_slots=None):
@@ -1863,13 +1960,10 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll)
 
 
 def creating_session(subsession):
-    config = parse_dynamic_capacity_config(subsession.session.config)
+    config = parse_accident_risk_config(subsession.session.config)
     if subsession.round_number == 1:
-        parse_warmup_capacity(subsession.session.config, config)
         validate_api_agent_count(subsession.session)
         validate_rl_agent_count(subsession.session)
-        validate_toll_reveal_compatibility(subsession.session.config)
-        validate_optional_treatments(subsession.session)
         players = subsession.get_players()
         for player in players:
             player.participant.is_dropout = False
@@ -1897,8 +1991,8 @@ def creating_session(subsession):
                 raise ValueError('cohort_size 必须是非负整数。')
             matrix = build_auto_group_matrix(players, cohort_size)
         validate_group_agent_configuration(subsession.session, matrix)
-        apply_dynamic_departure_schedules(subsession.session, matrix, config)
-        apply_dynamic_toll_calibrations(subsession.session, matrix, config)
+        validate_formal_actor_composition(subsession.session, matrix)
+        apply_fixed_departure_schedules(subsession.session, matrix)
         subsession.set_group_matrix(matrix)
         assign_group_metadata(matrix, grouping_enabled)
         assign_group_treatment_metadata(subsession.session, matrix)
@@ -1918,7 +2012,7 @@ def creating_session(subsession):
                     [group_label],
                     rl_count,
                 )
-        initialize_group_capacity_sequences(subsession, config)
+        initialize_group_capacity_sequences(subsession)
     else:
         subsession.group_like_round(1)
 

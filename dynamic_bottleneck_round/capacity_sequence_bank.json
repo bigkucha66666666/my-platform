@@ -1,0 +1,2828 @@
+{
+  "version": 2,
+  "mechanism": "iid_accident_capacity_loss_beta",
+  "formal_rounds": 60,
+  "normal_capacity": 4.0,
+  "incident_probability": 0.2,
+  "loss_distribution": {
+    "name": "beta",
+    "alpha": 6.83057,
+    "beta": 4.05907
+  },
+  "sequences": [
+    {
+      "id": "S01",
+      "generation_seed": 2026090801,
+      "incident_rounds": [
+        6,
+        10,
+        18,
+        21,
+        26,
+        31,
+        32,
+        37,
+        40,
+        45,
+        51,
+        56,
+        58,
+        60
+      ],
+      "mean_actual_capacity": 3.436571320728,
+      "rounds": [
+        {
+          "formal_round_number": 1,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 2,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 3,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 4,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 5,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 6,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.388299264172,
+          "remaining_capacity_ratio": 0.611700735828,
+          "actual_capacity": 2.446802943312,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 7,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 8,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 9,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 10,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.478434143177,
+          "remaining_capacity_ratio": 0.521565856823,
+          "actual_capacity": 2.086263427292,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 11,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 12,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 13,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 14,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 15,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 16,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 17,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 18,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.697921589644,
+          "remaining_capacity_ratio": 0.302078410356,
+          "actual_capacity": 1.208313641424,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 19,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 20,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 21,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.650962813087,
+          "remaining_capacity_ratio": 0.349037186913,
+          "actual_capacity": 1.396148747652,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 22,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 23,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 24,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 25,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 26,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.417227481487,
+          "remaining_capacity_ratio": 0.582772518513,
+          "actual_capacity": 2.331090074052,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 27,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 28,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 29,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 30,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 31,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.782399764901,
+          "remaining_capacity_ratio": 0.217600235099,
+          "actual_capacity": 0.870400940396,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 32,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.70252545634,
+          "remaining_capacity_ratio": 0.29747454366,
+          "actual_capacity": 1.18989817464,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 33,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 34,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 35,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 36,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 37,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.568993398352,
+          "remaining_capacity_ratio": 0.431006601648,
+          "actual_capacity": 1.724026406592,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 38,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 39,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 40,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.465436594651,
+          "remaining_capacity_ratio": 0.534563405349,
+          "actual_capacity": 2.138253621396,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 41,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 42,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 43,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 44,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 45,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.750855370345,
+          "remaining_capacity_ratio": 0.249144629655,
+          "actual_capacity": 0.99657851862,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 46,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 47,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 48,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 49,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 50,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 51,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.580380754181,
+          "remaining_capacity_ratio": 0.419619245819,
+          "actual_capacity": 1.678476983276,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 52,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 53,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 54,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 55,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 56,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.678794233346,
+          "remaining_capacity_ratio": 0.321205766654,
+          "actual_capacity": 1.284823066616,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 57,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 58,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.559955192633,
+          "remaining_capacity_ratio": 0.440044807367,
+          "actual_capacity": 1.760179229468,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 59,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        },
+        {
+          "formal_round_number": 60,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.729244132767,
+          "remaining_capacity_ratio": 0.270755867233,
+          "actual_capacity": 1.083023468932,
+          "sequence_id": "S01",
+          "sequence_seed": 2026090801
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "generation_seed": 2026090802,
+      "incident_rounds": [
+        3,
+        5,
+        7,
+        9,
+        10,
+        17,
+        24,
+        27,
+        30,
+        34,
+        56,
+        59
+      ],
+      "mean_actual_capacity": 3.527199859443,
+      "rounds": [
+        {
+          "formal_round_number": 1,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 2,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 3,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.659861330222,
+          "remaining_capacity_ratio": 0.340138669778,
+          "actual_capacity": 1.360554679112,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 4,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 5,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.685190408957,
+          "remaining_capacity_ratio": 0.314809591043,
+          "actual_capacity": 1.259238364172,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 6,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 7,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.369984438035,
+          "remaining_capacity_ratio": 0.630015561965,
+          "actual_capacity": 2.52006224786,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 8,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 9,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.494232350489,
+          "remaining_capacity_ratio": 0.505767649511,
+          "actual_capacity": 2.023070598044,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 10,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.55292041191,
+          "remaining_capacity_ratio": 0.44707958809,
+          "actual_capacity": 1.78831835236,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 11,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 12,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 13,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 14,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 15,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 16,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 17,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.640479519079,
+          "remaining_capacity_ratio": 0.359520480921,
+          "actual_capacity": 1.438081923684,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 18,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 19,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 20,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 21,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 22,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 23,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 24,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.620967221916,
+          "remaining_capacity_ratio": 0.379032778084,
+          "actual_capacity": 1.516131112336,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 25,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 26,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 27,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.70400295102,
+          "remaining_capacity_ratio": 0.29599704898,
+          "actual_capacity": 1.18398819592,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 28,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 29,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 30,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.479734605486,
+          "remaining_capacity_ratio": 0.520265394514,
+          "actual_capacity": 2.081061578056,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 31,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 32,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 33,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 34,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.547105954018,
+          "remaining_capacity_ratio": 0.452894045982,
+          "actual_capacity": 1.811576183928,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 35,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 36,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 37,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 38,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 39,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 40,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 41,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 42,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 43,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 44,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 45,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 46,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 47,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 48,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 49,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 50,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 51,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 52,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 53,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 54,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 55,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 56,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.790261035093,
+          "remaining_capacity_ratio": 0.209738964907,
+          "actual_capacity": 0.838955859628,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 57,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 58,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 59,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.547261882128,
+          "remaining_capacity_ratio": 0.452738117872,
+          "actual_capacity": 1.810952471488,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        },
+        {
+          "formal_round_number": 60,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S02",
+          "sequence_seed": 2026090802
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "generation_seed": 2026090803,
+      "incident_rounds": [
+        19,
+        21,
+        23,
+        28,
+        29,
+        33,
+        35,
+        37,
+        45,
+        47,
+        54,
+        56,
+        57,
+        59
+      ],
+      "mean_actual_capacity": 3.389572639788,
+      "rounds": [
+        {
+          "formal_round_number": 1,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 2,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 3,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 4,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 5,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 6,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 7,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 8,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 9,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 10,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 11,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 12,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 13,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 14,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 15,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 16,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 17,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 18,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 19,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.569762498884,
+          "remaining_capacity_ratio": 0.430237501116,
+          "actual_capacity": 1.720950004464,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 20,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 21,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.694967533221,
+          "remaining_capacity_ratio": 0.305032466779,
+          "actual_capacity": 1.220129867116,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 22,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 23,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.561193352773,
+          "remaining_capacity_ratio": 0.438806647227,
+          "actual_capacity": 1.755226588908,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 24,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 25,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 26,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 27,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 28,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.5503412451,
+          "remaining_capacity_ratio": 0.4496587549,
+          "actual_capacity": 1.7986350196,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 29,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.39438412442,
+          "remaining_capacity_ratio": 0.60561587558,
+          "actual_capacity": 2.42246350232,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 30,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 31,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 32,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 33,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.688860082565,
+          "remaining_capacity_ratio": 0.311139917435,
+          "actual_capacity": 1.24455966974,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 34,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 35,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.74866320274,
+          "remaining_capacity_ratio": 0.25133679726,
+          "actual_capacity": 1.00534718904,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 36,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 37,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.861960282956,
+          "remaining_capacity_ratio": 0.138039717044,
+          "actual_capacity": 0.552158868176,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 38,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 39,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 40,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 41,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 42,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 43,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 44,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 45,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.611739454854,
+          "remaining_capacity_ratio": 0.388260545146,
+          "actual_capacity": 1.553042180584,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 46,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 47,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.8720496057,
+          "remaining_capacity_ratio": 0.1279503943,
+          "actual_capacity": 0.5118015772,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 48,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 49,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 50,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 51,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 52,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 53,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 54,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.564472994281,
+          "remaining_capacity_ratio": 0.435527005719,
+          "actual_capacity": 1.742108022876,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 55,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 56,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.748224742292,
+          "remaining_capacity_ratio": 0.251775257708,
+          "actual_capacity": 1.007101030832,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 57,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.806302601901,
+          "remaining_capacity_ratio": 0.193697398099,
+          "actual_capacity": 0.774789592396,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 58,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 59,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.483488681493,
+          "remaining_capacity_ratio": 0.516511318507,
+          "actual_capacity": 2.066045274028,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        },
+        {
+          "formal_round_number": 60,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S03",
+          "sequence_seed": 2026090803
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "generation_seed": 2026090804,
+      "incident_rounds": [
+        2,
+        3,
+        4,
+        7,
+        26,
+        30,
+        32,
+        38,
+        40,
+        41,
+        43,
+        48,
+        51,
+        59
+      ],
+      "mean_actual_capacity": 3.412785630934,
+      "rounds": [
+        {
+          "formal_round_number": 1,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 2,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.825229897356,
+          "remaining_capacity_ratio": 0.174770102644,
+          "actual_capacity": 0.699080410576,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 3,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.707531900383,
+          "remaining_capacity_ratio": 0.292468099617,
+          "actual_capacity": 1.169872398468,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 4,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.332757161752,
+          "remaining_capacity_ratio": 0.667242838248,
+          "actual_capacity": 2.668971352992,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 5,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 6,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 7,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.399056826076,
+          "remaining_capacity_ratio": 0.600943173924,
+          "actual_capacity": 2.403772695696,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 8,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 9,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 10,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 11,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 12,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 13,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 14,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 15,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 16,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 17,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 18,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 19,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 20,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 21,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 22,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 23,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 24,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 25,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 26,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.546503087785,
+          "remaining_capacity_ratio": 0.453496912215,
+          "actual_capacity": 1.81398764886,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 27,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 28,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 29,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 30,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.783596477202,
+          "remaining_capacity_ratio": 0.216403522798,
+          "actual_capacity": 0.865614091192,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 31,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 32,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.27952597545,
+          "remaining_capacity_ratio": 0.72047402455,
+          "actual_capacity": 2.8818960982,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 33,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 34,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 35,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 36,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 37,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 38,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.633177027589,
+          "remaining_capacity_ratio": 0.366822972411,
+          "actual_capacity": 1.467291889644,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 39,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 40,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.606980525907,
+          "remaining_capacity_ratio": 0.393019474093,
+          "actual_capacity": 1.572077896372,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 41,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.854952728378,
+          "remaining_capacity_ratio": 0.145047271622,
+          "actual_capacity": 0.580189086488,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 42,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 43,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.612625710946,
+          "remaining_capacity_ratio": 0.387374289054,
+          "actual_capacity": 1.549497156216,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 44,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 45,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 46,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 47,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 48,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.564843819007,
+          "remaining_capacity_ratio": 0.435156180993,
+          "actual_capacity": 1.740624723972,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 49,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 50,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 51,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.823225717841,
+          "remaining_capacity_ratio": 0.176774282159,
+          "actual_capacity": 0.707097128636,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 52,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 53,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 54,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 55,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 56,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 57,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 58,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 59,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.838208680311,
+          "remaining_capacity_ratio": 0.161791319689,
+          "actual_capacity": 0.647165278756,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        },
+        {
+          "formal_round_number": 60,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S04",
+          "sequence_seed": 2026090804
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "generation_seed": 2026090805,
+      "incident_rounds": [
+        7,
+        8,
+        9,
+        11,
+        18,
+        22,
+        28,
+        31,
+        33,
+        37,
+        42,
+        44,
+        47,
+        52,
+        55
+      ],
+      "mean_actual_capacity": 3.415454328891,
+      "rounds": [
+        {
+          "formal_round_number": 1,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 2,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 3,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 4,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 5,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 6,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 7,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.583042911476,
+          "remaining_capacity_ratio": 0.416957088524,
+          "actual_capacity": 1.667828354096,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 8,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.560190836685,
+          "remaining_capacity_ratio": 0.439809163315,
+          "actual_capacity": 1.75923665326,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 9,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.595874114428,
+          "remaining_capacity_ratio": 0.404125885572,
+          "actual_capacity": 1.616503542288,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 10,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 11,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.667380046038,
+          "remaining_capacity_ratio": 0.332619953962,
+          "actual_capacity": 1.330479815848,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 12,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 13,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 14,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 15,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 16,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 17,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 18,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.570732658625,
+          "remaining_capacity_ratio": 0.429267341375,
+          "actual_capacity": 1.7170693655,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 19,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 20,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 21,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 22,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.604592520194,
+          "remaining_capacity_ratio": 0.395407479806,
+          "actual_capacity": 1.581629919224,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 23,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 24,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 25,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 26,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 27,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 28,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.687659922796,
+          "remaining_capacity_ratio": 0.312340077204,
+          "actual_capacity": 1.249360308816,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 29,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 30,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 31,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.611150146471,
+          "remaining_capacity_ratio": 0.388849853529,
+          "actual_capacity": 1.555399414116,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 32,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 33,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.293628146932,
+          "remaining_capacity_ratio": 0.706371853068,
+          "actual_capacity": 2.825487412272,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 34,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 35,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 36,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 37,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.589957960956,
+          "remaining_capacity_ratio": 0.410042039044,
+          "actual_capacity": 1.640168156176,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 38,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 39,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 40,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 41,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 42,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.572843108734,
+          "remaining_capacity_ratio": 0.427156891266,
+          "actual_capacity": 1.708627565064,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 43,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 44,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.459424236001,
+          "remaining_capacity_ratio": 0.540575763999,
+          "actual_capacity": 2.162303055996,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 45,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 46,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 47,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.6589690135,
+          "remaining_capacity_ratio": 0.3410309865,
+          "actual_capacity": 1.364123946,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 48,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 49,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 50,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 51,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 52,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.638521994547,
+          "remaining_capacity_ratio": 0.361478005453,
+          "actual_capacity": 1.445912021812,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 53,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 54,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 55,
+          "incident_occurred": true,
+          "capacity_loss_ratio": 0.67421744925,
+          "remaining_capacity_ratio": 0.32578255075,
+          "actual_capacity": 1.303130203,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 56,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 57,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 58,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 59,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        },
+        {
+          "formal_round_number": 60,
+          "incident_occurred": false,
+          "capacity_loss_ratio": 0.0,
+          "remaining_capacity_ratio": 1.0,
+          "actual_capacity": 4.0,
+          "sequence_id": "S05",
+          "sequence_seed": 2026090805
+        }
+      ]
+    }
+  ]
+}

@@ -488,12 +488,21 @@ def service_batch_wait_minutes(
     departure_minute: float,
     first_service_start_minute: float,
     load: int,
-    capacity: int,
+    capacity: float,
     capacity_window_minutes: float = 1,
 ) -> float:
-    batches = max(1, (int(load) + int(capacity) - 1) // int(capacity))
+    numeric_capacity = float(capacity)
+    if not isfinite(numeric_capacity) or numeric_capacity <= 0:
+        raise ValueError('capacity 必须是有限正数。')
+    numeric_load = int(load)
+    if isinstance(load, bool) or numeric_load < 0 or float(load) != numeric_load:
+        raise ValueError('load 必须是非负整数。')
+    if numeric_load == 0:
+        return 0.0
     inherited_wait = max(0, float(first_service_start_minute) - float(departure_minute))
-    return round(inherited_wait + (batches - 1) * float(capacity_window_minutes), 2)
+    service_window = float(capacity_window_minutes)
+    batch_service_duration = numeric_load / numeric_capacity * service_window
+    return inherited_wait + max(0, batch_service_duration - service_window)
 
 
 def decision_capacity_context(
@@ -1556,6 +1565,10 @@ def reward_bonus_for_slot(session, slot):
     return float(session.config.get('reward_bonus_points', 0)) if slot in slots else 0
 
 
+def accident_incentives_for_slot(session, slot):
+    return {'reward_bonus': 0.0, 'coarse_toll_charge': 0.0}
+
+
 def coarse_toll_for_slot(session, slot):
     if not config_flag(session.config.get('coarse_toll_enabled', 0)):
         return 0
@@ -1981,18 +1994,19 @@ def coarse_toll_description_for_player(player):
     return f'选择 {time_window} 出发时，需支付 {number_display(player.coarse_toll_points)} 成本。'
 
 
-def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll):
+def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=0):
     fixed_cost = float(C.FIXED_TRAVEL_TIME_COST)
     queue_cost = float(C.QUEUE_COST_PER_MINUTE) * float(queue_delay)
     early_cost = float(C.EARLY_COST_PER_MINUTE) * float(early_minutes)
     late_cost = float(C.LATE_COST_PER_MINUTE) * float(late_minutes)
-    total_cost = fixed_cost + queue_cost + early_cost + late_cost + float(toll)
+    toll_cost = 0.0
+    total_cost = fixed_cost + queue_cost + early_cost + late_cost
     return {
         'fixed_cost': round(fixed_cost, 2),
         'queue_cost': round(queue_cost, 2),
         'early_cost': round(early_cost, 2),
         'late_cost': round(late_cost, 2),
-        'toll_cost': round(float(toll), 2),
+        'toll_cost': toll_cost,
         'total_cost': round(total_cost, 2),
     }
 
@@ -2308,8 +2322,15 @@ def fill_missing_choices(group):
 
 
 def service_batch_clear_minute(first_service_start_minute, load, capacity):
-    batches = max(1, ceil(int(load) / int(capacity)))
-    return round(first_service_start_minute + batches * C.CAPACITY_WINDOW_MINUTES, 2)
+    numeric_capacity = float(capacity)
+    if not isfinite(numeric_capacity) or numeric_capacity <= 0:
+        raise ValueError('capacity 必须是有限正数。')
+    numeric_load = int(load)
+    if isinstance(load, bool) or numeric_load < 0 or float(load) != numeric_load:
+        raise ValueError('load 必须是非负整数。')
+    return float(first_service_start_minute) + (
+        numeric_load / numeric_capacity * C.CAPACITY_WINDOW_MINUTES
+    )
 
 
 def group_results_lock_path(group):
@@ -2418,8 +2439,9 @@ def _set_results_locked(group):
             source = actor['source']
             reference_player = actor['reference_player']
             slot = actor['departure_slot']
-            reward_bonus = reward_bonus_for_slot(group.session, slot)
-            toll = coarse_toll_for_player_slot(reference_player, slot)
+            incentives = accident_incentives_for_slot(group.session, slot)
+            reward_bonus = incentives['reward_bonus']
+            toll = incentives['coarse_toll_charge']
             cost_components = calculate_cost_components(
                 queue_delay=queue_delay,
                 early_minutes=early_minutes,
@@ -2430,7 +2452,7 @@ def _set_results_locked(group):
             payoff = (
                 0
                 if is_warmup_round(group.round_number)
-                else max(0, round(C.BASE_POINTS - total_cost + reward_bonus, 2))
+                else max(0, round(C.BASE_POINTS - total_cost, 2))
             )
             result_values = {
                 'slot_load': load,
@@ -2512,25 +2534,19 @@ def capacity_state_rows(config):
 def choice_preview(player):
     session = player.session
     schedule = departure_schedule_for_player(player)
-    tolled_slots = coarse_toll_slots_for_player(player)
-    rewarded_slots = parse_slot_spec(
-        session.config.get('rewarded_slot_spec', ''),
-        'rewarded_slot_spec',
-    ) if config_flag(session.config.get('reward_treatment_enabled', 0)) else set()
-    toll = float(player.coarse_toll_points)
-    reward = float(session.config.get('reward_bonus_points', 0))
-    return [
-        {
+    preview = []
+    for slot in departure_slots(schedule):
+        incentives = accident_incentives_for_slot(session, slot)
+        preview.append({
             'slot': slot,
             'minute': departure_minute_for_slot(slot, schedule),
             'time': minute_to_clock(departure_minute_for_slot(slot, schedule)),
-            'toll': toll if slot in tolled_slots else 0,
-            'toll_active': slot in tolled_slots,
-            'toll_charge_label': number_display(toll) if slot in tolled_slots else '0',
-            'reward': reward if slot in rewarded_slots else 0,
-        }
-        for slot in departure_slots(schedule)
-    ]
+            'toll': incentives['coarse_toll_charge'],
+            'toll_active': False,
+            'toll_charge_label': '0',
+            'reward': incentives['reward_bonus'],
+        })
+    return preview
 
 
 def virtual_decision_identity(record):

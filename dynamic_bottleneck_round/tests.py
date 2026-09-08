@@ -2142,6 +2142,107 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
             self.assertEqual(str(column.type), 'FLOAT')
 
 
+class DynamicContinuousQueueTests(unittest.TestCase):
+    def test_float_capacity_uses_continuous_batch_duration(self):
+        wait = dynamic_app.service_batch_wait_minutes(
+            departure_minute=474,
+            first_service_start_minute=474,
+            load=5,
+            capacity=1.5,
+        )
+
+        self.assertAlmostEqual(wait, 5 / 1.5 - 1, places=10)
+
+    def test_clear_time_preserves_unrounded_fraction_for_next_batch(self):
+        first_clear = dynamic_app.service_batch_clear_minute(474, 5, 1.5)
+        second_wait = dynamic_app.service_batch_wait_minutes(
+            departure_minute=476,
+            first_service_start_minute=max(476, first_clear),
+            load=2,
+            capacity=1.5,
+        )
+
+        self.assertAlmostEqual(first_clear, 474 + 5 / 1.5, places=10)
+        self.assertAlmostEqual(
+            second_wait,
+            (first_clear - 476) + (2 / 1.5 - 1),
+            places=10,
+        )
+
+    def test_queue_helpers_reject_non_positive_capacity(self):
+        for function, args in (
+            (
+                dynamic_app.service_batch_wait_minutes,
+                dict(
+                    departure_minute=474,
+                    first_service_start_minute=474,
+                    load=1,
+                    capacity=0,
+                ),
+            ),
+            (
+                dynamic_app.service_batch_clear_minute,
+                dict(first_service_start_minute=474, load=1, capacity=0),
+            ),
+        ):
+            with self.subTest(function=function.__name__):
+                with self.assertRaisesRegex(ValueError, 'capacity'):
+                    function(**args)
+
+
+class DynamicAccidentCostTests(unittest.TestCase):
+    def test_cost_uses_only_queue_early_and_late_components(self):
+        components = dynamic_app.calculate_cost_components(
+            queue_delay=2,
+            early_minutes=3,
+            late_minutes=4,
+        )
+
+        self.assertEqual(
+            components,
+            {
+                'fixed_cost': 0.0,
+                'queue_cost': 4.0,
+                'early_cost': 3.0,
+                'late_cost': 20.0,
+                'toll_cost': 0.0,
+                'total_cost': 27.0,
+            },
+        )
+
+    def test_legacy_toll_argument_cannot_change_accident_cost(self):
+        without_toll = dynamic_app.calculate_cost_components(
+            queue_delay=1,
+            early_minutes=0,
+            late_minutes=0,
+        )
+        with_toll = dynamic_app.calculate_cost_components(
+            queue_delay=1,
+            early_minutes=0,
+            late_minutes=0,
+            toll=99,
+        )
+
+        self.assertEqual(with_toll, without_toll)
+
+    def test_legacy_reward_and_toll_settings_are_ignored(self):
+        session = SimpleNamespace(
+            config={
+                'reward_treatment_enabled': 1,
+                'rewarded_slot_spec': '1-16',
+                'reward_bonus_points': 50,
+                'coarse_toll_enabled': 1,
+                'coarse_toll_slot_spec': '1-16',
+                'coarse_toll_points': 50,
+            }
+        )
+
+        self.assertEqual(
+            dynamic_app.accident_incentives_for_slot(session, 8),
+            {'reward_bonus': 0.0, 'coarse_toll_charge': 0.0},
+        )
+
+
 class PlayerBot(Bot):
     cases = ['staggered', 'same_time', 'timeout_recovery']
 

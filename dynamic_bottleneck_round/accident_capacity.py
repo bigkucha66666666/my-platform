@@ -28,6 +28,21 @@ class AccidentRiskConfig:
     seed: int = 2026090801
     information_condition: str = INFO_I0
 
+    @property
+    def expected_loss_ratio(self):
+        return self.loss_alpha / (self.loss_alpha + self.loss_beta)
+
+    @property
+    def expected_incident_capacity(self):
+        return self.normal_capacity * (1 - self.expected_loss_ratio)
+
+    @property
+    def expected_unconditional_capacity(self):
+        return (
+            (1 - self.incident_probability) * self.normal_capacity
+            + self.incident_probability * self.expected_incident_capacity
+        )
+
 
 def _finite_float(value, field_name):
     if isinstance(value, bool):

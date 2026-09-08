@@ -51,7 +51,7 @@ class DynamicRLFallbackPolicyTests(unittest.TestCase):
         self.assertEqual(state['observed_capacities'], [])
         self.assertEqual(state['q_values'], {})
 
-    def test_observations_learn_only_completed_capacity_transitions(self):
+    def test_observations_keep_iid_capacity_prior_and_learn_costs(self):
         state = initial_rl_state(self.capacity_states)
         state = observe_rl_outcome(
             state,
@@ -71,7 +71,8 @@ class DynamicRLFallbackPolicyTests(unittest.TestCase):
         )
 
         self.assertEqual(state['observed_capacities'], [3, 3])
-        self.assertEqual(state['transition_counts']['3']['3'], 1)
+        self.assertNotIn('transition_counts', state)
+        self.assertEqual(state['capacity_prior'], [1 / 3, 1 / 3, 1 / 3])
         learned_values = [
             actions.get('3')
             for actions in state['q_values'].values()
@@ -132,7 +133,7 @@ class DynamicRLFallbackPolicyTests(unittest.TestCase):
             known_current_capacity=3,
         )
 
-        self.assertEqual(choice['belief'], {'1': 0.0, '2': 0.0, '3': 1.0})
+        self.assertEqual(choice['belief'], {'3': 1.0})
         self.assertEqual(choice['rounds_observed'], 3)
 
     def test_public_feedback_observation_uses_only_public_fields(self):

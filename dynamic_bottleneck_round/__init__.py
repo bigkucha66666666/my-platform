@@ -1,14 +1,12 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from functools import lru_cache
 import fcntl
-from math import ceil, floor, isfinite
+from math import ceil, isfinite
 import json
 import os
 from pathlib import Path
-import random
 import tempfile
 from threading import Lock
 import time
@@ -59,17 +57,6 @@ doc = """
 """
 
 
-DRAW_MODE_BALANCED = 'balanced_shuffle'
-DRAW_MODE_IID = 'iid'
-DRAW_MODE_PHASED_MARKOV = 'phased_markov'
-DRAW_MODE_MANUAL_SEQUENCE = 'manual_sequence'
-CAPACITY_SEQUENCE_PRESET_AUTO = 'auto'
-CAPACITY_SEQUENCE_BANK_FILE = 'capacity_sequence_bank.json'
-CAPACITY_SEQUENCE_SCOPE_GROUP = 'group'
-CAPACITY_SEQUENCE_SCOPE_SESSION = 'session'
-REVEAL_BEFORE_DECISION = 'before_decision'
-REVEAL_AFTER_DECISION = 'after_decision'
-
 DECISION_SOURCE_MANUAL = 'manual'
 DECISION_SOURCE_TIMEOUT_AUTO = 'timeout_auto'
 DECISION_SOURCE_DISCONNECT_AUTO = 'disconnect_auto'
@@ -78,17 +65,10 @@ DECISION_SOURCE_SUSPENDED_AUTO = 'suspended_auto'
 AUTO_CHOICE_LAST_MANUAL = 'last_manual_choice'
 AUTO_CHOICE_NEUTRAL_BASELINE = 'neutral_baseline'
 
-CAPACITY_SEQUENCE_VAR = 'dynamic_bottleneck_round_capacity_sequence'
 ACCIDENT_SEQUENCE_SESSION_VAR = 'dynamic_bottleneck_round_accident_sequence_v1'
 TOTAL_PAYOFF_VAR = 'dynamic_bottleneck_round_total_payoff'
 COMPREHENSION_SEEN_VAR = 'dynamic_bottleneck_round_comprehension_seen'
 DEPARTURE_SCHEDULE_VAR = 'dynamic_bottleneck_round_departure_schedule'
-TOLL_BY_CAPACITY_VAR = 'dynamic_bottleneck_round_toll_by_capacity'
-TOLL_CALIBRATION_CACHE_FILE = 'toll_calibration_cache.json'
-TOLL_SOURCE_AUTO = 'auto'
-TOLL_SOURCE_MANUAL = 'manual'
-SAME_TIME_QUEUE_RULE = 'batch_max_wait'
-TOLL_WINDOW_RULE = 'symmetric_continuous'
 API_AGENT_MODE_OFF = 'off'
 API_AGENT_MODE_ACTIVE = 'active'
 API_AGENT_TYPE_DEEPSEEK = 'deepseek_api_agent'
@@ -121,368 +101,6 @@ _API_AGENT_PREFETCH_TASKS = {}
 _API_AGENT_PREFETCH_LOCK = Lock()
 
 
-class DynamicCapacityConfigError(ValueError):
-    pass
-
-
-@dataclass(frozen=True)
-class DynamicCapacityConfig:
-    values: tuple[int, ...]
-    probabilities: tuple[float, ...]
-    seed: int
-    draw_mode: str
-    sequence_scope: str
-    reveal_timing: str
-    random_rounds: int
-    transition_matrix: tuple[tuple[float, ...], ...]
-    manual_sequence: tuple[int, ...]
-
-
-def _csv_items(value, field_name):
-    items = [item.strip() for item in str(value or '').split(',') if item.strip()]
-    if not items:
-        raise DynamicCapacityConfigError(f'{field_name} 不能为空。')
-    return items
-
-
-@lru_cache(maxsize=1)
-def load_capacity_sequence_bank():
-    path = Path(__file__).with_name(CAPACITY_SEQUENCE_BANK_FILE)
-    try:
-        payload = json.loads(path.read_text(encoding='utf-8'))
-    except FileNotFoundError as exc:
-        raise DynamicCapacityConfigError(
-            f'服务率序列库不存在：{path.name}。'
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise DynamicCapacityConfigError(
-            f'服务率序列库 {path.name} 不是有效 JSON。'
-        ) from exc
-
-    raw_records = payload.get('sequences') if isinstance(payload, dict) else None
-    if not isinstance(raw_records, list) or not raw_records:
-        raise DynamicCapacityConfigError('服务率序列库中没有可用序列。')
-
-    records = {}
-    for raw_record in raw_records:
-        if not isinstance(raw_record, dict):
-            raise DynamicCapacityConfigError('服务率序列库记录格式错误。')
-        sequence_id = str(raw_record.get('id', '') or '').strip().upper()
-        sequence_spec = str(
-            raw_record.get('manual_sequence_spec', '') or ''
-        ).strip()
-        if not sequence_id or not sequence_spec:
-            raise DynamicCapacityConfigError(
-                '服务率序列库记录必须包含 id 和 manual_sequence_spec。'
-            )
-        if sequence_id in records:
-            raise DynamicCapacityConfigError(
-                f'服务率序列库中存在重复编号 {sequence_id}。'
-            )
-        records[sequence_id] = sequence_spec
-    return records
-
-
-def manual_sequence_spec_for_preset(session_config):
-    raw_preset = str(
-        session_config.get(
-            'dynamic_capacity_sequence_preset',
-            CAPACITY_SEQUENCE_PRESET_AUTO,
-        )
-        or CAPACITY_SEQUENCE_PRESET_AUTO
-    ).strip()
-    if not raw_preset or raw_preset.lower() == CAPACITY_SEQUENCE_PRESET_AUTO:
-        return None
-
-    preset = raw_preset.upper()
-    bank = load_capacity_sequence_bank()
-    if preset not in bank:
-        available = ', '.join(sorted(bank))
-        raise DynamicCapacityConfigError(
-            f'dynamic_capacity_sequence_preset={preset} 不存在；'
-            f'可选值为 auto, {available}。'
-        )
-    return bank[preset]
-
-
-def parse_dynamic_capacity_config(session_config) -> DynamicCapacityConfig:
-    preset_manual_sequence = manual_sequence_spec_for_preset(session_config)
-    raw_values = _csv_items(
-        session_config.get('dynamic_capacity_values', '1,2,3'),
-        'dynamic_capacity_values',
-    )
-    try:
-        values = tuple(int(item) for item in raw_values)
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_values 中的服务率必须为正整数。'
-        ) from exc
-    if any(value <= 0 for value in values):
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_values 中的服务率必须为正整数。'
-        )
-    if len(set(values)) != len(values):
-        raise DynamicCapacityConfigError('dynamic_capacity_values 不能包含重复服务率。')
-
-    raw_probabilities = _csv_items(
-        session_config.get('dynamic_capacity_probabilities', '0.3,0.5,0.2'),
-        'dynamic_capacity_probabilities',
-    )
-    try:
-        probabilities = tuple(float(item) for item in raw_probabilities)
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_probabilities 必须是逗号分隔的数字。'
-        ) from exc
-    if any(not isfinite(probability) for probability in probabilities):
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_probabilities 中每个概率必须是有限数。'
-        )
-    if len(values) != len(probabilities):
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_values 与 dynamic_capacity_probabilities 的状态数量必须一致。'
-        )
-    if any(probability < 0 or probability > 1 for probability in probabilities):
-        raise DynamicCapacityConfigError('dynamic_capacity_probabilities 中每个概率必须在 0 到 1 之间。')
-    if abs(sum(probabilities) - 1.0) > 1e-9:
-        raise DynamicCapacityConfigError('dynamic_capacity_probabilities 的概率之和必须为 1。')
-
-    try:
-        seed = int(session_config.get('dynamic_capacity_seed', 20260718))
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError('dynamic_capacity_seed 必须是整数。') from exc
-
-    draw_mode = (
-        DRAW_MODE_MANUAL_SEQUENCE
-        if preset_manual_sequence is not None
-        else str(
-            session_config.get('dynamic_capacity_draw_mode', DRAW_MODE_BALANCED)
-        ).strip().lower()
-    )
-    if draw_mode not in {
-        DRAW_MODE_BALANCED,
-        DRAW_MODE_IID,
-        DRAW_MODE_PHASED_MARKOV,
-        DRAW_MODE_MANUAL_SEQUENCE,
-    }:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_draw_mode 必须是 balanced_shuffle、iid、'
-            'phased_markov 或 manual_sequence。'
-        )
-
-    try:
-        random_rounds = int(session_config.get('dynamic_capacity_random_rounds', 20))
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_random_rounds 必须是非负整数。'
-        ) from exc
-    if random_rounds < 0:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_random_rounds 必须是非负整数。'
-        )
-
-    raw_matrix = str(
-        session_config.get(
-            'dynamic_capacity_transition_matrix',
-            '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
-        )
-        or ''
-    ).strip()
-    try:
-        transition_matrix = tuple(
-            tuple(float(item.strip()) for item in row.split(','))
-            for row in raw_matrix.split(';')
-            if row.strip()
-        )
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_transition_matrix 必须是分号分行、逗号分列的概率矩阵。'
-        ) from exc
-    matrix_size_valid = (
-        len(transition_matrix) == len(values)
-        and all(len(row) == len(values) for row in transition_matrix)
-    )
-    matrix_probabilities_valid = all(
-        isfinite(probability) and 0 <= probability <= 1
-        for row in transition_matrix
-        for probability in row
-    )
-    matrix_rows_sum_to_one = all(
-        abs(sum(row) - 1.0) <= 1e-9
-        for row in transition_matrix
-    )
-    if not (
-        matrix_size_valid
-        and matrix_probabilities_valid
-        and matrix_rows_sum_to_one
-    ):
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_transition_matrix 必须与服务率状态数量一致，'
-            '且每行均由 0 到 1 的有限概率组成并且概率之和为 1。'
-        )
-
-    raw_manual_sequence = (
-        preset_manual_sequence
-        if preset_manual_sequence is not None
-        else str(
-            session_config.get('dynamic_capacity_manual_sequence', '') or ''
-        ).strip()
-    )
-    try:
-        manual_sequence = tuple(
-            int(item.strip())
-            for item in raw_manual_sequence.split(',')
-            if item.strip()
-        )
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_manual_sequence 必须是逗号分隔的整数。'
-        ) from exc
-
-    sequence_scope = str(
-        session_config.get(
-            'dynamic_capacity_sequence_scope',
-            CAPACITY_SEQUENCE_SCOPE_GROUP,
-        )
-    ).strip().lower()
-    if sequence_scope not in {
-        CAPACITY_SEQUENCE_SCOPE_GROUP,
-        CAPACITY_SEQUENCE_SCOPE_SESSION,
-    }:
-        raise DynamicCapacityConfigError(
-            'dynamic_capacity_sequence_scope 必须是 group 或 session。'
-        )
-
-    reveal_timing = str(
-        session_config.get('capacity_reveal_timing', REVEAL_BEFORE_DECISION)
-    ).strip().lower()
-    if reveal_timing not in {REVEAL_BEFORE_DECISION, REVEAL_AFTER_DECISION}:
-        raise DynamicCapacityConfigError(
-            'capacity_reveal_timing 必须是 before_decision 或 after_decision。'
-        )
-
-    return DynamicCapacityConfig(
-        values=values,
-        probabilities=probabilities,
-        seed=seed,
-        draw_mode=draw_mode,
-        sequence_scope=sequence_scope,
-        reveal_timing=reveal_timing,
-        random_rounds=random_rounds,
-        transition_matrix=transition_matrix,
-        manual_sequence=manual_sequence,
-    )
-
-
-def _balanced_counts(probabilities, rounds):
-    exact_counts = [probability * rounds for probability in probabilities]
-    counts = [floor(value) for value in exact_counts]
-    remaining = rounds - sum(counts)
-    remainder_order = sorted(
-        range(len(probabilities)),
-        key=lambda index: (-(exact_counts[index] - counts[index]), index),
-    )
-    for index in remainder_order[:remaining]:
-        counts[index] += 1
-    return counts
-
-
-def generate_capacity_sequence(
-    config: DynamicCapacityConfig,
-    *,
-    rounds: int,
-    group_id: int,
-) -> list[int]:
-    if rounds <= 0:
-        return []
-    if config.draw_mode == DRAW_MODE_MANUAL_SEQUENCE:
-        if len(config.manual_sequence) != rounds:
-            raise DynamicCapacityConfigError(
-                f'dynamic_capacity_manual_sequence 必须恰好包含 {rounds} 个服务率。'
-            )
-        unknown_values = sorted(set(config.manual_sequence) - set(config.values))
-        if unknown_values:
-            raise DynamicCapacityConfigError(
-                'dynamic_capacity_manual_sequence 中的服务率必须属于 '
-                f'dynamic_capacity_values 候选集合；非法值={unknown_values}。'
-            )
-        return list(config.manual_sequence)
-    sequence_id = (
-        0
-        if config.sequence_scope == CAPACITY_SEQUENCE_SCOPE_SESSION
-        else int(group_id)
-    )
-    rng = random.Random(config.seed + sequence_id * 1009)
-    if config.draw_mode == DRAW_MODE_IID:
-        return rng.choices(config.values, weights=config.probabilities, k=rounds)
-    if config.draw_mode == DRAW_MODE_PHASED_MARKOV:
-        if config.random_rounds < 1 or config.random_rounds > rounds:
-            raise DynamicCapacityConfigError(
-                'phased_markov 模式下 dynamic_capacity_random_rounds '
-                f'必须在 1 到总轮数 {rounds} 之间。'
-            )
-        sequence = rng.choices(
-            config.values,
-            weights=config.probabilities,
-            k=config.random_rounds,
-        )
-        value_index = {value: index for index, value in enumerate(config.values)}
-        while len(sequence) < rounds:
-            previous_index = value_index[sequence[-1]]
-            sequence.append(
-                rng.choices(
-                    config.values,
-                    weights=config.transition_matrix[previous_index],
-                    k=1,
-                )[0]
-            )
-        return sequence
-
-    counts = _balanced_counts(config.probabilities, rounds)
-    sequence = [
-        capacity
-        for capacity, count in zip(config.values, counts)
-        for _ in range(count)
-    ]
-    rng.shuffle(sequence)
-    return sequence
-
-
-def build_capacity_round_records(
-    config: DynamicCapacityConfig,
-    *,
-    rounds: int,
-    group_id: int,
-):
-    sequence = generate_capacity_sequence(config, rounds=rounds, group_id=group_id)
-    probability_by_capacity = dict(zip(config.values, config.probabilities))
-    value_index = {value: index for index, value in enumerate(config.values)}
-    records = []
-    for index, capacity in enumerate(sequence):
-        previous_capacity = sequence[index - 1] if index else None
-        if config.draw_mode == DRAW_MODE_MANUAL_SEQUENCE:
-            probability = 0.0
-        elif (
-            config.draw_mode == DRAW_MODE_PHASED_MARKOV
-            and index >= config.random_rounds
-        ):
-            previous_index = value_index[previous_capacity]
-            capacity_index = value_index[capacity]
-            probability = config.transition_matrix[previous_index][capacity_index]
-        else:
-            probability = probability_by_capacity[capacity]
-        records.append(
-            {
-                'round_number': index + 1,
-                'capacity': capacity,
-                'state': f'capacity_{capacity}',
-                'probability': probability,
-                'previous_capacity': previous_capacity,
-            }
-        )
-    return records
-
-
 def service_batch_wait_minutes(
     *,
     departure_minute: float,
@@ -505,30 +123,17 @@ def service_batch_wait_minutes(
     return inherited_wait + max(0, batch_service_duration - service_window)
 
 
-def decision_capacity_context(
-    config: DynamicCapacityConfig,
-    *,
-    actual_capacity: int,
-):
-    context = {
-        'capacity_revealed': config.reveal_timing == REVEAL_BEFORE_DECISION,
-        'capacity_reveal_timing': config.reveal_timing,
-        'capacity_states': [{'capacity': capacity} for capacity in config.values],
-    }
-    if context['capacity_revealed']:
-        context['actual_capacity'] = int(actual_capacity)
-    return context
+def capacity_reveal_description(config: AccidentRiskConfig) -> str:
+    if config.information_condition == INFO_I2:
+        return '选择前公布本轮事故是否发生及实际服务率。'
+    if config.information_condition == INFO_I1:
+        return '选择前公布本轮事故是否发生，实际服务率在选择后公布。'
+    return '选择前仅提供事故风险的长期分布，本轮结果在选择后公布。'
 
 
-def capacity_reveal_description(config: DynamicCapacityConfig) -> str:
-    if config.reveal_timing == REVEAL_BEFORE_DECISION:
-        return '每轮真实服务率会在选择出发时间前公布。'
-    return '每轮真实服务率会在提交出发时间后公布。'
-
-
-def comprehension_queue_example(config: DynamicCapacityConfig):
-    capacity = min(config.values)
-    people = max(5, 2 * capacity + 1)
+def comprehension_queue_example(config: AccidentRiskConfig):
+    capacity = config.expected_incident_capacity
+    people = max(5, ceil(2 * capacity + 1))
     departure_minute = 474
     wait_minutes = service_batch_wait_minutes(
         departure_minute=departure_minute,
@@ -625,28 +230,8 @@ def formal_payoff_total(player):
     )
 
 
-def parse_warmup_capacity(session_config, dynamic_config):
-    raw_capacity = session_config.get('dynamic_warmup_capacity', 2)
-    if isinstance(raw_capacity, bool):
-        raise DynamicCapacityConfigError(
-            'dynamic_warmup_capacity 必须是正整数。'
-        )
-    try:
-        capacity = int(str(raw_capacity).strip())
-    except (TypeError, ValueError) as exc:
-        raise DynamicCapacityConfigError(
-            'dynamic_warmup_capacity 必须是正整数。'
-        ) from exc
-    if capacity <= 0:
-        raise DynamicCapacityConfigError(
-            'dynamic_warmup_capacity 必须是正整数。'
-        )
-    if capacity not in dynamic_config.values:
-        raise DynamicCapacityConfigError(
-            'dynamic_warmup_capacity 必须属于 '
-            'dynamic_capacity_values 候选集合。'
-        )
-    return capacity
+def parse_warmup_capacity(session_config, accident_config):
+    return float(accident_config.normal_capacity)
 
 
 DEPARTURE_SLOT_CHOICES = [
@@ -680,7 +265,7 @@ class Player(BasePlayer):
     round_start_ready = models.BooleanField(initial=False)
     dynamic_capacity = models.FloatField(initial=0)
     dynamic_capacity_state = models.StringField(blank=True)
-    previous_round_capacity = models.IntegerField(initial=0)
+    previous_round_capacity = models.FloatField(initial=0)
     capacity_probability = models.FloatField(initial=0)
     capacity_reveal_timing = models.StringField(blank=True)
     dynamic_capacity_seed = models.IntegerField(initial=0)
@@ -1048,29 +633,33 @@ def validate_formal_actor_composition(session, matrix):
     )
 
 
-def agent_capacity_context(
-    config: DynamicCapacityConfig,
-    *,
-    actual_capacity,
-    previous_capacity,
-):
-    context = decision_capacity_context(
-        config,
-        actual_capacity=actual_capacity,
-    )
-    context['previous_capacity'] = previous_capacity
-    return context
-
-
 def accident_record_for_group(group):
+    config = (
+        parse_accident_risk_config(group.session.config)
+        if hasattr(group, 'session')
+        else AccidentRiskConfig()
+    )
+    incident_occurred = bool(getattr(group, 'incident_occurred', False))
+    capacity = float(getattr(group, 'dynamic_capacity', config.normal_capacity))
+    loss_ratio = float(
+        getattr(
+            group,
+            'capacity_loss_ratio',
+            0 if not incident_occurred else max(0, 1 - capacity / config.normal_capacity),
+        )
+    )
     return {
         'formal_round_number': formal_round_number(group.round_number),
-        'incident_occurred': bool(group.incident_occurred),
-        'capacity_loss_ratio': float(group.capacity_loss_ratio),
-        'remaining_capacity_ratio': float(group.remaining_capacity_ratio),
-        'actual_capacity': float(group.dynamic_capacity),
-        'sequence_id': str(group.accident_sequence_id),
-        'sequence_seed': int(group.accident_sequence_seed),
+        'incident_occurred': incident_occurred,
+        'capacity_loss_ratio': loss_ratio,
+        'remaining_capacity_ratio': float(
+            getattr(group, 'remaining_capacity_ratio', 1 - loss_ratio)
+        ),
+        'actual_capacity': capacity,
+        'sequence_id': str(getattr(group, 'accident_sequence_id', '')),
+        'sequence_seed': int(
+            getattr(group, 'accident_sequence_seed', config.seed) or config.seed
+        ),
     }
 
 
@@ -1148,37 +737,6 @@ def config_float(value, default):
         return default
 
 
-def build_dynamic_departure_schedule(
-    *,
-    players_count,
-    capacity_values,
-    min_slots_each_side=10,
-):
-    values = tuple(int(value) for value in capacity_values)
-    if not values or min(values) <= 0:
-        raise ValueError('动态出发时间范围需要至少一个正服务率。')
-    capacity_basis = min(values)
-    required_occupied_slots = ceil(max(0, int(players_count)) / capacity_basis)
-    slots_each_side = max(max(0, int(min_slots_each_side)), ceil(required_occupied_slots / 2))
-    center_minute = C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES
-    first_minute = center_minute - slots_each_side * C.DEPARTURE_CHOICE_STEP_MINUTES
-    last_minute = center_minute + slots_each_side * C.DEPARTURE_CHOICE_STEP_MINUTES
-    return {
-        'enabled': True,
-        'source': 'auto',
-        'players_count': int(players_count),
-        'capacity_basis': capacity_basis,
-        'required_occupied_slots': required_occupied_slots,
-        'slots_each_side': slots_each_side,
-        'num_slots': slots_each_side * 2 + 1,
-        'slot_size_minutes': C.DEPARTURE_CHOICE_STEP_MINUTES,
-        'first_departure_minute': first_minute,
-        'last_departure_minute': last_minute,
-        'first_departure_time': minute_to_clock(first_minute),
-        'last_departure_time': minute_to_clock(last_minute),
-    }
-
-
 def static_departure_schedule():
     first_minute = C.FIRST_DEPARTURE_MINUTE
     last_minute = first_minute + (
@@ -1217,47 +775,6 @@ def departure_schedule_for_player(player):
     if isinstance(schedule, dict) and schedule.get('enabled'):
         return schedule
     return static_departure_schedule()
-
-
-def apply_dynamic_departure_schedules(session, matrix, config):
-    auto_enabled = config_flag(session.config.get('departure_schedule_auto_enabled', 1))
-    min_slots_each_side = max(
-        0,
-        config_int(session.config.get('departure_schedule_min_slots_each_side', 10), 10),
-    )
-    for group_id, group_players in enumerate(matrix, start=1):
-        actor_count = effective_group_actor_count(
-            session,
-            len(group_players),
-            group_id,
-        )
-        if auto_enabled:
-            schedule = build_dynamic_departure_schedule(
-                players_count=actor_count,
-                capacity_values=config.values,
-                min_slots_each_side=min_slots_each_side,
-            )
-        else:
-            schedule = static_departure_schedule()
-            schedule['source'] = 'static'
-        if schedule['num_slots'] > C.MAX_DEPARTURE_SLOT_CHOICES:
-            raise ValueError(
-                f"动态出发时点数量 {schedule['num_slots']} 超过上限 "
-                f'{C.MAX_DEPARTURE_SLOT_CHOICES}。'
-            )
-        for player in group_players:
-            player.participant.vars[DEPARTURE_SCHEDULE_VAR] = schedule
-
-
-def validate_toll_reveal_compatibility(session_config):
-    reveal_timing = str(
-        session_config.get('capacity_reveal_timing', REVEAL_BEFORE_DECISION)
-    ).strip().lower()
-    if config_flag(session_config.get('coarse_toll_auto_enabled', 0)) and reveal_timing == REVEAL_AFTER_DECISION:
-        raise ValueError(
-            'capacity_reveal_timing=after_decision 时不能启用自动粗收费；'
-            '请改为 before_decision，或关闭自动粗收费并使用统一手动收费。'
-        )
 
 
 def departure_slots(schedule=None):
@@ -1489,496 +1006,31 @@ def apply_round_capacity(group, config=None):
         )
 
 
-def parse_slot_spec(spec, field_name, valid_slots=None):
-    valid_slots = set(valid_slots or departure_slots())
-    slots = set()
-    for part in str(spec or '').split(','):
-        part = part.strip()
-        if not part:
-            continue
-        if '-' in part:
-            start_raw, end_raw = part.split('-', 1)
-            try:
-                start, end = int(start_raw), int(end_raw)
-            except ValueError as exc:
-                raise ValueError(f'{field_name} 必须使用如 8-10,12 的时点格式。') from exc
-            if start > end:
-                raise ValueError(f'{field_name} 的起始时点不能大于结束时点。')
-            slots.update(range(start, end + 1))
-        else:
-            try:
-                slots.add(int(part))
-            except ValueError as exc:
-                raise ValueError(f'{field_name} 必须使用如 8-10,12 的时点格式。') from exc
-    invalid = slots - valid_slots
-    if invalid:
-        raise ValueError(f'{field_name} 包含不可选时点：{sorted(invalid)}。')
-    return slots
-
-
-def parse_time_window_spec(spec, field_name, schedule):
-    text = str(spec or '').strip()
-    if not text:
-        return set()
-    parts = [part.strip() for part in text.split('-')]
-    if len(parts) == 1:
-        start_minute = end_minute = clock_to_minute(parts[0], field_name)
-    elif len(parts) == 2:
-        start_minute = clock_to_minute(parts[0], field_name)
-        end_minute = clock_to_minute(parts[1], field_name)
-    else:
-        raise ValueError(f'{field_name} 必须使用如 07:52-07:56 的时间范围。')
-    if start_minute > end_minute:
-        raise ValueError(f'{field_name} 的起始时间不能晚于结束时间。')
-
-    first_minute = float(schedule['first_departure_minute'])
-    last_minute = float(schedule['last_departure_minute'])
-    if start_minute < first_minute or end_minute > last_minute:
-        raise ValueError(
-            f'{field_name} 必须位于可选出发时间范围 '
-            f"{schedule['first_departure_time']}-{schedule['last_departure_time']} 内。"
-        )
-    start_slot = departure_slot_for_minute(start_minute, schedule)
-    end_slot = departure_slot_for_minute(end_minute, schedule)
-    if start_slot is None or end_slot is None:
-        raise ValueError(f'{field_name} 的端点必须落在可选出发时间网格上。')
-    return set(range(start_slot, end_slot + 1))
-
-
-def reward_bonus_for_slot(session, slot):
-    if not config_flag(session.config.get('reward_treatment_enabled', 0)):
-        return 0
-    slots = parse_slot_spec(session.config.get('rewarded_slot_spec', ''), 'rewarded_slot_spec')
-    return float(session.config.get('reward_bonus_points', 0)) if slot in slots else 0
-
-
 def accident_incentives_for_slot(session, slot):
     return {'reward_bonus': 0.0, 'coarse_toll_charge': 0.0}
 
 
-def coarse_toll_for_slot(session, slot):
-    if not config_flag(session.config.get('coarse_toll_enabled', 0)):
-        return 0
-    slots = parse_slot_spec(session.config.get('coarse_toll_slot_spec', ''), 'coarse_toll_slot_spec')
-    return float(session.config.get('coarse_toll_points', 0)) if slot in slots else 0
-
-
-def validate_optional_treatments(session):
-    if config_flag(session.config.get('reward_treatment_enabled', 0)):
-        if not parse_slot_spec(session.config.get('rewarded_slot_spec', ''), 'rewarded_slot_spec'):
-            raise ValueError('reward_treatment_enabled=1 时 rewarded_slot_spec 不能为空。')
-    if (
-        config_flag(session.config.get('coarse_toll_enabled', 0))
-        and not config_flag(session.config.get('coarse_toll_auto_enabled', 0))
-    ):
-        time_window_spec = str(
-            session.config.get('coarse_toll_time_window_spec', '') or ''
-        ).strip()
-        slot_spec = str(session.config.get('coarse_toll_slot_spec', '') or '').strip()
-        if time_window_spec:
-            parts = [part.strip() for part in time_window_spec.split('-')]
-            if len(parts) not in {1, 2}:
-                raise ValueError(
-                    'coarse_toll_time_window_spec 必须使用如 07:52-07:56 的时间范围。'
-                )
-            for part in parts:
-                clock_to_minute(part, 'coarse_toll_time_window_spec')
-        elif slot_spec:
-            parse_slot_spec(slot_spec, 'coarse_toll_slot_spec')
-        else:
-            raise ValueError(
-                'coarse_toll_enabled=1 时 coarse_toll_time_window_spec '
-                '或 coarse_toll_slot_spec 不能为空。'
-            )
-
-
-def toll_calibration_settings(settings):
-    mode = str(settings.get('coarse_toll_auto_mode', 'auto')).strip().lower().replace('_', '-')
-    return {
-        'min_toll': max(0, config_float(settings.get('coarse_toll_auto_min_toll', 0), 0)),
-        'max_toll': max(0, config_float(settings.get('coarse_toll_auto_max_toll', 40), 40)),
-        'toll_step': max(0, config_float(settings.get('coarse_toll_auto_toll_step', 1), 1)),
-        'calibration_mode': mode,
-        'approx_refine_pool_size': max(
-            1,
-            config_int(settings.get('coarse_toll_auto_approx_refine_pool_size', 8), 8),
-        ),
-        'approx_refine_iterations': max(
-            1,
-            config_int(settings.get('coarse_toll_auto_approx_refine_iterations', 160), 160),
-        ),
-    }
-
-
-def load_toll_calibration_cache(cache_path=None):
-    path = Path(cache_path) if cache_path else Path(__file__).with_name(
-        TOLL_CALIBRATION_CACHE_FILE
-    )
-    if not path.exists():
-        return {
-            'version': 1,
-            'same_time_queue_rule': SAME_TIME_QUEUE_RULE,
-            'toll_window_rule': TOLL_WINDOW_RULE,
-            'records': [],
-        }
-    try:
-        cache_data = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f'粗收费缓存文件不是有效 JSON：{path}') from exc
-    if not isinstance(cache_data, dict) or not isinstance(cache_data.get('records'), list):
-        raise ValueError(f'粗收费缓存文件结构无效：{path}')
-    return cache_data
-
-
-def _same_number(left, right):
-    try:
-        return abs(float(left) - float(right)) <= 1e-9
-    except (TypeError, ValueError):
-        return False
-
-
-def cached_toll_candidate(
-    *,
-    players_count,
-    capacity,
-    schedule,
-    settings,
-    cache_data=None,
-):
-    from .toll_calibration import EquilibriumCandidate
-
-    cache_data = cache_data if cache_data is not None else load_toll_calibration_cache()
-    if cache_data.get('version') != 1:
-        return None
-    if cache_data.get('same_time_queue_rule') != SAME_TIME_QUEUE_RULE:
-        return None
-    if cache_data.get('toll_window_rule') != TOLL_WINDOW_RULE:
-        return None
-
-    calibration = toll_calibration_settings(settings)
-    expected = {
-        'players': int(players_count),
-        'capacity': int(capacity),
-        'num_slots': int(schedule['num_slots']),
-        'first_departure_minute': float(schedule['first_departure_minute']),
-        'last_departure_minute': float(schedule['last_departure_minute']),
-        'slot_size_minutes': float(schedule['slot_size_minutes']),
-        'min_toll': calibration['min_toll'],
-        'max_toll': calibration['max_toll'],
-        'toll_step': calibration['toll_step'],
-        'requested_calibration_mode': calibration['calibration_mode'],
-        'approx_refine_pool_size': calibration['approx_refine_pool_size'],
-        'approx_refine_iterations': calibration['approx_refine_iterations'],
-    }
-    numeric_keys = {
-        'players',
-        'capacity',
-        'num_slots',
-        'first_departure_minute',
-        'last_departure_minute',
-        'slot_size_minutes',
-        'min_toll',
-        'max_toll',
-        'toll_step',
-        'approx_refine_pool_size',
-        'approx_refine_iterations',
-    }
-    valid_slots = set(departure_slots(schedule))
-    center_slot = min(
-        valid_slots,
-        key=lambda slot: abs(
-            departure_minute_for_slot(slot, schedule)
-            - (C.PREFERRED_ARRIVAL_MINUTE - C.FREE_FLOW_TRAVEL_MINUTES)
-        ),
-    )
-    for record in cache_data.get('records', []):
-        if not isinstance(record, dict):
-            continue
-        matches = all(
-            _same_number(record.get(key), value)
-            if key in numeric_keys
-            else record.get(key) == value
-            for key, value in expected.items()
-        )
-        if not matches:
-            continue
-        try:
-            window_start = int(record['window_start'])
-            window_end = int(record['window_end'])
-            toll = float(record['toll'])
-            distribution = tuple(int(value) for value in record['distribution'])
-            selected_costs = tuple(
-                (int(slot), float(cost)) for slot, cost in record['selected_costs']
-            )
-            toll_step_offset = (
-                (toll - calibration['min_toll']) / calibration['toll_step']
-                if calibration['toll_step'] else float('inf')
-            )
-            if (
-                window_start not in valid_slots
-                or window_end not in valid_slots
-                or window_start > window_end
-                or window_start + window_end != center_slot * 2
-                or not isfinite(toll)
-                or toll < calibration['min_toll'] - 1e-9
-                or toll > calibration['max_toll'] + 1e-9
-                or abs(toll_step_offset - round(toll_step_offset)) > 1e-9
-                or len(distribution) != len(valid_slots)
-                or any(count < 0 for count in distribution)
-                or sum(distribution) != int(players_count)
-                or any(
-                    slot not in valid_slots or not isfinite(cost)
-                    for slot, cost in selected_costs
-                )
-            ):
-                continue
-            return EquilibriumCandidate(
-                window_start=window_start,
-                window_end=window_end,
-                toll=toll,
-                cost_gap=float(record.get('cost_gap', 0)),
-                nash_count=int(record.get('nash_count', 0)),
-                distribution=distribution,
-                selected_costs=selected_costs,
-                calibration_mode=str(record.get('calibration_mode', 'large-group')),
-                deviation_gap=float(record.get('deviation_gap', 0)),
-                calibration_source='cache',
-            )
-        except (KeyError, TypeError, ValueError):
-            continue
-    return None
-
-
-def _equilibrium_distribution_summary(candidate, schedule):
-    return ', '.join(
-        f'{minute_to_clock(departure_minute_for_slot(slot, schedule))}: {count}人'
-        for slot, count in zip(departure_slots(schedule), candidate.distribution)
-        if count > 0
-    )
-
-
-def _equilibrium_cost_summary(candidate, schedule):
-    return ', '.join(
-        f'{minute_to_clock(departure_minute_for_slot(slot, schedule))}: {number_display(cost)}'
-        for slot, cost in candidate.selected_costs
-    )
-
-
-def _toll_result_from_candidate(candidate, players_count, capacity, schedule):
-    start_time = minute_to_clock(departure_minute_for_slot(candidate.window_start, schedule))
-    end_time = minute_to_clock(departure_minute_for_slot(candidate.window_end, schedule))
-    return {
-        'enabled': True,
-        'source': TOLL_SOURCE_AUTO,
-        'capacity': int(capacity),
-        'calibration_players': int(players_count),
-        'calibration_mode': candidate.calibration_mode,
-        'calibration_source': candidate.calibration_source,
-        'slot_spec': candidate.window_spec,
-        'time_window_spec': start_time if start_time == end_time else f'{start_time}-{end_time}',
-        'points': round(float(candidate.toll), 2),
-        'cost_gap': round(float(candidate.cost_gap), 6),
-        'deviation_gap': round(float(candidate.deviation_gap), 6),
-        'nash_count': int(candidate.nash_count),
-        'equilibrium_distribution': _equilibrium_distribution_summary(candidate, schedule),
-        'equilibrium_costs': _equilibrium_cost_summary(candidate, schedule),
-    }
-
-
-def calibrate_tolls_for_group(
-    *, players_count, capacities, schedule, settings, cache_data=None
-):
-    calibration = toll_calibration_settings(settings)
-    if calibration['toll_step'] <= 0:
-        raise ValueError('coarse_toll_auto_toll_step 必须大于 0。')
-    if calibration['min_toll'] > calibration['max_toll']:
-        raise ValueError('coarse_toll_auto_min_toll 不能大于 coarse_toll_auto_max_toll。')
-
-    from .toll_calibration import CalibrationError, calibrate_best_candidate
-
-    results = {}
-    valid_slots = tuple(departure_slots(schedule))
-    for capacity in sorted(set(int(value) for value in capacities)):
-        candidate = cached_toll_candidate(
-            players_count=players_count,
-            capacity=capacity,
-            schedule=schedule,
-            settings=settings,
-            cache_data=cache_data,
-        )
-        if candidate is not None:
-            results[str(capacity)] = _toll_result_from_candidate(
-                candidate,
-                players_count,
-                capacity,
-                schedule,
-            )
-            continue
-        try:
-            candidate = calibrate_best_candidate(
-                players=int(players_count),
-                capacity=capacity,
-                valid_slots=valid_slots,
-                first_departure_minute=schedule['first_departure_minute'],
-                slot_size_minutes=schedule['slot_size_minutes'],
-                **calibration,
-            )
-        except CalibrationError as exc:
-            raise ValueError(
-                f'动态粗收费自动校准失败：人数={players_count}, 服务率={capacity}, '
-                f"时点数={len(valid_slots)}, 模式={calibration['calibration_mode']}。{exc}"
-            ) from exc
-        results[str(capacity)] = _toll_result_from_candidate(
-            candidate,
-            players_count,
-            capacity,
-            schedule,
-        )
-    return results
-
-
-def apply_dynamic_toll_calibrations(session, matrix, config):
-    auto_enabled = config_flag(session.config.get('coarse_toll_auto_enabled', 0))
-    for group_players in matrix:
-        for player in group_players:
-            player.participant.vars.pop(TOLL_BY_CAPACITY_VAR, None)
-    if not auto_enabled:
-        return
-
-    result_cache = {}
-    file_cache = load_toll_calibration_cache()
-    settings_signature = tuple(sorted(toll_calibration_settings(session.config).items()))
-    for group_id, group_players in enumerate(matrix, start=1):
-        if not group_players:
-            continue
-        actor_count = effective_group_actor_count(
-            session,
-            len(group_players),
-            group_id,
-        )
-        schedule = departure_schedule_for_player(group_players[0])
-        cache_key = (
-            actor_count,
-            tuple(config.values),
-            schedule['num_slots'],
-            schedule['first_departure_minute'],
-            schedule['slot_size_minutes'],
-            settings_signature,
-        )
-        if cache_key not in result_cache:
-            result_cache[cache_key] = calibrate_tolls_for_group(
-                players_count=actor_count,
-                capacities=config.values,
-                schedule=schedule,
-                settings=session.config,
-                cache_data=file_cache,
-            )
-        for player in group_players:
-            player.participant.vars[TOLL_BY_CAPACITY_VAR] = result_cache[cache_key]
-
-
-def _manual_round_toll(player):
-    session = player.session
-    schedule = departure_schedule_for_player(player)
-    enabled = config_flag(session.config.get('coarse_toll_enabled', 0))
-    slot_spec = str(session.config.get('coarse_toll_slot_spec', '') or '').strip()
-    time_window_spec = str(
-        session.config.get('coarse_toll_time_window_spec', '') or ''
-    ).strip()
-    if enabled:
-        if time_window_spec:
-            slots = parse_time_window_spec(
-                time_window_spec,
-                'coarse_toll_time_window_spec',
-                schedule,
-            )
-            slot_spec = (
-                str(min(slots))
-                if min(slots) == max(slots)
-                else f'{min(slots)}-{max(slots)}'
-            )
-        else:
-            parse_slot_spec(slot_spec, 'coarse_toll_slot_spec', departure_slots(schedule))
-            slots = sorted(parse_slot_spec(
-                slot_spec,
-                'coarse_toll_slot_spec',
-                departure_slots(schedule),
-            ))
-            if slots:
-                start = minute_to_clock(departure_minute_for_slot(slots[0], schedule))
-                end = minute_to_clock(departure_minute_for_slot(slots[-1], schedule))
-                time_window_spec = start if start == end else f'{start}-{end}'
-    return {
-        'enabled': enabled,
-        'source': TOLL_SOURCE_MANUAL,
-        'capacity': int(player.dynamic_capacity),
-        'calibration_players': effective_group_actor_count(
-            session,
-            len(player.group.get_players()),
-            player.group.id_in_subsession,
-        ),
-        'calibration_mode': '',
-        'calibration_source': '',
-        'slot_spec': slot_spec,
-        'time_window_spec': time_window_spec,
-        'points': max(0, config_float(session.config.get('coarse_toll_points', 0), 0)),
-        'cost_gap': 0,
-        'deviation_gap': 0,
-        'nash_count': 0,
-        'equilibrium_distribution': '',
-        'equilibrium_costs': '',
-    }
-
-
 def apply_round_toll(group):
     for player in group.get_players():
-        results = player.participant.vars.get(TOLL_BY_CAPACITY_VAR, {})
-        result = results.get(str(group.dynamic_capacity)) if isinstance(results, dict) else None
-        if not isinstance(result, dict):
-            result = _manual_round_toll(player)
-        player.coarse_toll_source = result.get('source', TOLL_SOURCE_MANUAL)
-        player.coarse_toll_auto_enabled = player.coarse_toll_source == TOLL_SOURCE_AUTO
-        player.coarse_toll_calibration_source = result.get('calibration_source', '')
-        player.coarse_toll_calibration_mode = result.get('calibration_mode', '')
-        player.coarse_toll_calibration_players = int(result.get('calibration_players', 0))
-        player.coarse_toll_calibration_capacity = int(result.get('capacity', group.dynamic_capacity))
-        player.coarse_toll_calibration_cost_gap = float(result.get('cost_gap', 0))
-        player.coarse_toll_calibration_deviation_gap = float(result.get('deviation_gap', 0))
-        player.coarse_toll_calibration_nash_count = int(result.get('nash_count', 0))
-        player.coarse_toll_equilibrium_distribution = result.get('equilibrium_distribution', '')
-        player.coarse_toll_equilibrium_costs = result.get('equilibrium_costs', '')
-        player.coarse_toll_enabled = bool(result.get('enabled'))
-        player.coarse_toll_slot_spec = result.get('slot_spec', '')
-        player.coarse_toll_time_window_spec = result.get('time_window_spec', '')
-        player.coarse_toll_points = cu(max(0, float(result.get('points', 0))))
-
-
-def coarse_toll_slots_for_player(player):
-    if not bool(player.coarse_toll_enabled):
-        return set()
-    schedule = departure_schedule_for_player(player)
-    return parse_slot_spec(
-        player.coarse_toll_slot_spec,
-        'coarse_toll_slot_spec',
-        departure_slots(schedule),
-    )
-
-
-def coarse_toll_for_player_slot(player, slot):
-    if slot not in coarse_toll_slots_for_player(player):
-        return 0
-    return float(player.coarse_toll_points)
+        player.coarse_toll_source = ''
+        player.coarse_toll_auto_enabled = False
+        player.coarse_toll_calibration_source = ''
+        player.coarse_toll_calibration_mode = ''
+        player.coarse_toll_calibration_players = 0
+        player.coarse_toll_calibration_capacity = 0
+        player.coarse_toll_calibration_cost_gap = 0
+        player.coarse_toll_calibration_deviation_gap = 0
+        player.coarse_toll_calibration_nash_count = 0
+        player.coarse_toll_equilibrium_distribution = ''
+        player.coarse_toll_equilibrium_costs = ''
+        player.coarse_toll_enabled = False
+        player.coarse_toll_slot_spec = ''
+        player.coarse_toll_time_window_spec = ''
+        player.coarse_toll_points = cu(0)
 
 
 def coarse_toll_description_for_player(player):
-    slots = sorted(coarse_toll_slots_for_player(player))
-    if not slots:
-        return '当前未开启粗收费。'
-    schedule = departure_schedule_for_player(player)
-    start = minute_to_clock(departure_minute_for_slot(slots[0], schedule))
-    end = minute_to_clock(departure_minute_for_slot(slots[-1], schedule))
-    time_window = start if start == end else f'{start}-{end}'
-    return f'选择 {time_window} 出发时，需支付 {number_display(player.coarse_toll_points)} 成本。'
+    return '当前未开启粗收费。'
 
 
 def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=0):
@@ -2509,12 +1561,17 @@ def access_allowed(player):
 def capacity_state_rows(config):
     return [
         {
-            'capacity': capacity,
-            'probability': probability,
-            'probability_label': probability_display(probability),
-            'state': f'capacity_{capacity}',
-        }
-        for capacity, probability in zip(config.values, config.probabilities)
+            'capacity': config.normal_capacity,
+            'probability': 1 - config.incident_probability,
+            'probability_label': probability_display(1 - config.incident_probability),
+            'state': 'normal',
+        },
+        {
+            'capacity': config.expected_incident_capacity,
+            'probability': config.incident_probability,
+            'probability_label': probability_display(config.incident_probability),
+            'state': 'incident',
+        },
     ]
 
 
@@ -2874,6 +1931,10 @@ def prepare_independent_rl_decisions_for_group(group):
                 'belief': {},
             }
         departure_minute = departure_minute_for_slot(slot, schedule)
+        accident = accident_record_for_group(group)
+        information_condition = parse_accident_risk_config(
+            group.session.config
+        ).information_condition
         records.append(
             {
                 'actor_type': RL_AGENT_TYPE,
@@ -2885,17 +1946,16 @@ def prepare_independent_rl_decisions_for_group(group):
                 'persona_label': str(persona['label']),
                 'group_id': int(group.id_in_subsession),
                 'round_number': phase['display_round_number'],
-                'dynamic_capacity': int(group.dynamic_capacity),
+                'dynamic_capacity': float(group.dynamic_capacity),
                 'dynamic_capacity_state': str(group.dynamic_capacity_state),
                 'capacity_probability': float(group.capacity_probability),
-                'capacity_reveal_timing': (
-                    REVEAL_BEFORE_DECISION
-                    if phase['is_warmup']
-                    else str(group.session.config.get(
-                        'capacity_reveal_timing',
-                        REVEAL_BEFORE_DECISION,
-                    ))
-                ),
+                'capacity_reveal_timing': information_condition,
+                'incident_occurred': accident['incident_occurred'],
+                'capacity_loss_ratio': accident['capacity_loss_ratio'],
+                'remaining_capacity_ratio': accident['remaining_capacity_ratio'],
+                'information_condition': information_condition,
+                'accident_sequence_id': accident['sequence_id'],
+                'accident_sequence_seed': accident['sequence_seed'],
                 'departure_slot': slot,
                 'departure_minute': round(departure_minute, 2),
                 'departure_time_label': minute_to_clock(departure_minute),
@@ -2947,7 +2007,7 @@ def update_independent_rl_states(group, records):
     if feedback is None:
         return
     observation = public_feedback_observation(feedback)
-    config = parse_dynamic_capacity_config(group.session.config)
+    config = parse_accident_risk_config(group.session.config)
     capacity_states = capacity_state_rows(config)
     states, reference_player = independent_rl_state_store_for_group(group)
     if reference_player is None:
@@ -3072,7 +2132,7 @@ def update_rl_shadow_states(group, agent_records):
     if feedback is None:
         return
     observation = public_feedback_observation(feedback)
-    config = parse_dynamic_capacity_config(group.session.config)
+    config = parse_accident_risk_config(group.session.config)
     capacity_states = capacity_state_rows(config)
     store, reference_player = rl_state_store_for_group(group)
     if reference_player is None:
@@ -3169,6 +2229,10 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
     schedule = departure_schedule_for_player(players[0])
     records = []
     phase = round_phase_context(group.round_number)
+    accident = accident_record_for_group(group)
+    information_condition = parse_accident_risk_config(
+        group.session.config
+    ).information_condition
     for (agent_id, choice_set), choice in zip(prepared_agents, choices):
         slot = int(choice.departure_slot)
         departure_minute = departure_minute_for_slot(slot, schedule)
@@ -3189,17 +2253,16 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
                 'persona_label': str(persona.get('label', '')),
                 'group_id': int(group.id_in_subsession),
                 'round_number': phase['display_round_number'],
-                'dynamic_capacity': int(group.dynamic_capacity),
+                'dynamic_capacity': float(group.dynamic_capacity),
                 'dynamic_capacity_state': str(group.dynamic_capacity_state),
                 'capacity_probability': float(group.capacity_probability),
-                'capacity_reveal_timing': (
-                    REVEAL_BEFORE_DECISION
-                    if phase['is_warmup']
-                    else str(group.session.config.get(
-                        'capacity_reveal_timing',
-                        REVEAL_BEFORE_DECISION,
-                    ))
-                ),
+                'capacity_reveal_timing': information_condition,
+                'incident_occurred': accident['incident_occurred'],
+                'capacity_loss_ratio': accident['capacity_loss_ratio'],
+                'remaining_capacity_ratio': accident['remaining_capacity_ratio'],
+                'information_condition': information_condition,
+                'accident_sequence_id': accident['sequence_id'],
+                'accident_sequence_seed': accident['sequence_seed'],
                 'departure_slot': slot,
                 'departure_minute': round(departure_minute, 2),
                 'departure_time_label': minute_to_clock(departure_minute),
@@ -3399,15 +2462,25 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
             costs_by_slot[slot].append(float(record.get('total_cost', 0)))
 
     all_costs = [cost for values in costs_by_slot.values() for cost in values]
+    accident = accident_record_for_group(group)
+    information_condition = str(
+        getattr(
+            group,
+            'information_condition',
+            parse_accident_risk_config(group.session.config).information_condition
+            if hasattr(group, 'session')
+            else INFO_I0,
+        )
+    )
     return {
         'round_number': round_phase_context(group.round_number)['display_round_number'],
-        'incident_occurred': bool(group.incident_occurred),
-        'capacity_loss_ratio': float(group.capacity_loss_ratio),
-        'remaining_capacity_ratio': float(group.remaining_capacity_ratio),
-        'actual_capacity': float(group.dynamic_capacity),
-        'dynamic_capacity': float(group.dynamic_capacity),
-        'information_condition': str(group.information_condition),
-        'accident_sequence_id': str(group.accident_sequence_id),
+        'incident_occurred': accident['incident_occurred'],
+        'capacity_loss_ratio': accident['capacity_loss_ratio'],
+        'remaining_capacity_ratio': accident['remaining_capacity_ratio'],
+        'actual_capacity': accident['actual_capacity'],
+        'dynamic_capacity': accident['actual_capacity'],
+        'information_condition': information_condition,
+        'accident_sequence_id': accident['sequence_id'],
         'departure_outcomes': [
             {
                 'slot': slot,
@@ -3814,7 +2887,7 @@ class Introduction(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_dynamic_capacity_config(player.session.config)
+        config = parse_accident_risk_config(player.session.config)
         schedule = departure_schedule_for_player(player)
         return {
             'capacity_states': capacity_state_rows(config),
@@ -3841,7 +2914,7 @@ class ComprehensionCheck(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_dynamic_capacity_config(player.session.config)
+        config = parse_accident_risk_config(player.session.config)
         queue_example = comprehension_queue_example(config)
         example_people = queue_example['people']
         example_capacity = queue_example['capacity']
@@ -3900,7 +2973,7 @@ class WarmupStart(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_dynamic_capacity_config(player.session.config)
+        config = parse_accident_risk_config(player.session.config)
         return {
             'warmup_rounds': C.WARMUP_ROUNDS,
             'warmup_capacity': parse_warmup_capacity(player.session.config, config),

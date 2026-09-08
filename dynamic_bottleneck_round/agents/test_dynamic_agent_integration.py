@@ -133,46 +133,6 @@ class DynamicAgentConfigTests(unittest.TestCase):
 
 
 class DynamicAgentRevealTests(unittest.TestCase):
-    def test_after_decision_context_does_not_expose_actual_capacity(self):
-        config = app.parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
-
-        context = app.agent_capacity_context(
-            config,
-            actual_capacity=2,
-            previous_capacity=1,
-        )
-
-        self.assertNotIn('actual_capacity', context)
-        self.assertEqual(context['previous_capacity'], 1)
-        self.assertEqual(
-            [state['capacity'] for state in context['capacity_states']],
-            [1, 2, 3],
-        )
-
-    def test_before_decision_context_exposes_actual_capacity(self):
-        config = app.parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'before_decision',
-            }
-        )
-
-        context = app.agent_capacity_context(
-            config,
-            actual_capacity=3,
-            previous_capacity=None,
-        )
-
-        self.assertEqual(context['actual_capacity'], 3)
-        self.assertIsNone(context['previous_capacity'])
-
     def test_serialized_after_decision_prompt_does_not_leak_capacity(self):
         choice_set = AgentChoiceSet(
             round_number=1,
@@ -569,15 +529,15 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_agent_history_exposes_only_previous_public_feedback(self):
         group, participant = self.make_record_group()
-        group.round_number = 4
+        group.round_number = 7
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '2': {
-                'round_number': 2,
+            '5': {
+                'round_number': 5,
                 'dynamic_capacity': 1,
                 'departure_outcomes': [],
                 'group_average_cost': 18,
             },
-            '3': {
+            '6': {
                 'round_number': 1,
                 'dynamic_capacity': 3,
                 'departure_outcomes': [
@@ -587,8 +547,8 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             },
         }
         participant.vars[app.AGENT_DECISIONS_PARTICIPANT_VAR] = {
-            '2': [{'agent_id': 'G01_API_01', 'round_number': 2, 'total_cost': 18}],
-            '3': [
+            '5': [{'agent_id': 'G01_API_01', 'round_number': 5, 'total_cost': 18}],
+            '6': [
                 {
                     'agent_id': 'G01_API_01',
                     'round_number': 1,
@@ -621,9 +581,9 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_missing_public_snapshot_does_not_expose_private_personal_record(self):
         group, participant = self.make_record_group()
-        group.round_number = 3
+        group.round_number = 7
         participant.vars[app.AGENT_DECISIONS_PARTICIPANT_VAR] = {
-            '2': [
+            '6': [
                 {
                     'agent_id': 'G01_API_01',
                     'round_number': 2,
@@ -653,12 +613,12 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_first_formal_round_does_not_receive_warmup_history(self):
         group, participant = self.make_record_group()
-        group.round_number = 3
+        group.round_number = 6
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '2': {'round_number': 2, 'dynamic_capacity': 2},
+            '5': {'round_number': 5, 'dynamic_capacity': 2},
         }
         participant.vars[app.AGENT_DECISIONS_PARTICIPANT_VAR] = {
-            '2': [{'agent_id': 'G01_API_01', 'round_number': 2}],
+            '5': [{'agent_id': 'G01_API_01', 'round_number': 5}],
         }
 
         self.assertEqual(
@@ -714,7 +674,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_valid_memory_update_replaces_only_its_agent_memory(self):
         group, participant = self.make_record_group()
-        group.round_number = 3
+        group.round_number = 6
         group.session.config.update({
             'api_agent_limited_memory_enabled': 1,
             'api_agent_limited_memory_max_chars': 400,
@@ -916,7 +876,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         group = SimpleNamespace(
             results_ready=False,
             dynamic_capacity=2,
-            round_number=3,
+            round_number=6,
             session=SimpleNamespace(config={'reward_treatment_enabled': 0}),
             get_players=lambda: [player],
         )
@@ -940,8 +900,6 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             patch.object(app, 'player_departure_slot', return_value=2),
             patch.object(app, 'set_player_departure_choice'),
             patch.object(app, 'departure_minute_for_slot', return_value=474),
-            patch.object(app, 'reward_bonus_for_slot', return_value=0),
-            patch.object(app, 'coarse_toll_for_player_slot', return_value=0),
             patch.object(app, 'update_rl_shadow_states') as update_shadow,
             patch.object(app, 'update_independent_rl_states') as update_independent,
             patch.object(app, 'save_virtual_decisions_for_group') as save_virtual,
@@ -1108,7 +1066,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         group = SimpleNamespace(
             session=session,
-            round_number=3,
+            round_number=6,
             id_in_subsession=1,
             dynamic_capacity=3,
             get_players=lambda: [player],
@@ -1120,7 +1078,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'decision_source': 'deepseek_api',
         }
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '3': {
+            '6': {
                 'round_number': 1,
                 'dynamic_capacity': 3,
                 'departure_outcomes': [
@@ -1163,7 +1121,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'rl_fallback_enabled': 1,
         })
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '3': {
+            '6': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1204,7 +1162,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'departure_slot': 2,
         }
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '3': {
+            '6': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1239,9 +1197,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                 'api_agent_mode': 'off',
                 'rl_agent_enabled': '1',
                 'rl_agent_count_per_group': 2,
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'after_decision',
+                'accident_information_condition': 'I0',
                 'reward_treatment_enabled': 0,
             },
         )
@@ -1270,11 +1226,17 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         player.field_maybe_none = lambda field_name: getattr(player, field_name, None)
         group = SimpleNamespace(
             session=session,
-            round_number=3,
+            round_number=6,
             id_in_subsession=1,
             dynamic_capacity=2,
-            dynamic_capacity_state='capacity_2',
-            capacity_probability=0.5,
+            dynamic_capacity_state='incident',
+            capacity_probability=0.2,
+            incident_occurred=True,
+            capacity_loss_ratio=0.5,
+            remaining_capacity_ratio=0.5,
+            information_condition='I0',
+            accident_sequence_id='S01',
+            accident_sequence_seed=2026090801,
             get_players=lambda: [player],
         )
         return group, participant
@@ -1333,7 +1295,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         records[0]['total_cost'] = 5
         records[1]['total_cost'] = 17
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '3': {
+            '6': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1362,7 +1324,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         records[0]['total_cost'] = 5
         records[1]['total_cost'] = 17
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '3': {
+            '6': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [

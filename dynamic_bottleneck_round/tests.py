@@ -1,19 +1,14 @@
-from collections import Counter
-import importlib.util
 import json
 from pathlib import Path
-import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from math import ceil
 from otree.api import Bot, Submission, expect
 
 import dynamic_bottleneck_round as dynamic_app
 
 from . import (
-    DynamicCapacityConfigError,
     C,
     COMPREHENSION_SEEN_VAR,
     DEPARTURE_SCHEDULE_VAR,
@@ -27,15 +22,11 @@ from . import (
     ResultsSync,
     RoundStartSync,
     WarmupStart,
-    build_capacity_round_records,
     capacity_reveal_description,
     comprehension_queue_example,
-    decision_capacity_context,
     decision_submission_closed,
-    generate_capacity_sequence,
     mark_round_ready,
     maybe_start_round,
-    parse_dynamic_capacity_config,
     remaining_decision_seconds,
     round_start_wait_seconds,
     service_batch_wait_minutes,
@@ -43,345 +34,11 @@ from . import (
 )
 
 
-class DynamicCapacityConfigTests(unittest.TestCase):
-    def test_valid_config_is_parsed_with_matching_probabilities(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'dynamic_capacity_seed': 20260718,
-                'dynamic_capacity_draw_mode': 'balanced_shuffle',
-                'capacity_reveal_timing': 'before_decision',
-            }
-        )
-
-        self.assertEqual(config.values, (1, 2, 3))
-        self.assertEqual(config.probabilities, (0.3, 0.5, 0.2))
-        self.assertEqual(config.seed, 20260718)
-        self.assertEqual(config.draw_mode, 'balanced_shuffle')
-        self.assertEqual(config.reveal_timing, 'before_decision')
-
-    def test_probability_count_must_match_capacity_count(self):
-        with self.assertRaisesRegex(
-            DynamicCapacityConfigError,
-            'dynamic_capacity_values.*dynamic_capacity_probabilities',
-        ):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,2,3',
-                    'dynamic_capacity_probabilities': '0.5,0.5',
-                }
-            )
-
-    def test_probabilities_must_sum_to_one(self):
-        with self.assertRaisesRegex(DynamicCapacityConfigError, '概率之和必须为 1'):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,2,3',
-                    'dynamic_capacity_probabilities': '0.3,0.3,0.3',
-                }
-            )
-
-    def test_probabilities_must_be_finite(self):
-        with self.assertRaisesRegex(DynamicCapacityConfigError, '有限数'):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,2,3',
-                    'dynamic_capacity_probabilities': 'NaN,0.5,0.5',
-                }
-            )
-
-    def test_capacity_values_must_be_positive_integers(self):
-        with self.assertRaisesRegex(DynamicCapacityConfigError, '服务率必须为正整数'):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,0,3',
-                    'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                }
-            )
-
-    def test_phased_markov_config_parses_phase_and_transition_settings(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
-                'dynamic_capacity_draw_mode': 'phased_markov',
-                'dynamic_capacity_random_rounds': 20,
-                'dynamic_capacity_transition_matrix': (
-                    '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8'
-                ),
-            }
-        )
-
-        self.assertEqual(config.random_rounds, 20)
-        self.assertEqual(
-            config.transition_matrix,
-            (
-                (0.8, 0.1, 0.1),
-                (0.1, 0.8, 0.1),
-                (0.1, 0.1, 0.8),
-            ),
-        )
-
-    def test_transition_matrix_rows_must_match_states_and_sum_to_one(self):
-        with self.assertRaisesRegex(
-            DynamicCapacityConfigError,
-            'dynamic_capacity_transition_matrix',
-        ):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,2,3',
-                    'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                    'dynamic_capacity_draw_mode': 'phased_markov',
-                    'dynamic_capacity_transition_matrix': (
-                        '0.8,0.2;0.1,0.8,0.1;0.1,0.1,0.8'
-                    ),
-                }
-            )
-
-    def test_named_sequence_preset_resolves_to_bank_manual_sequence(self):
-        bank = json.loads(
-            Path('dynamic_bottleneck_round/capacity_sequence_bank.json').read_text(
-                encoding='utf-8'
-            )
-        )
-        expected = next(
-            record['manual_sequence_spec']
-            for record in bank['sequences']
-            if record['id'] == 'S01'
-        )
-
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': (
-                    '0.3333333333333333,0.3333333333333333,0.3333333333333334'
-                ),
-                'dynamic_capacity_draw_mode': 'phased_markov',
-                'dynamic_capacity_sequence_preset': 'S01',
-            }
-        )
-
-        self.assertEqual(config.draw_mode, 'manual_sequence')
-        self.assertEqual(config.manual_sequence, tuple(map(int, expected.split(','))))
-
-    def test_unknown_sequence_preset_is_rejected(self):
-        with self.assertRaisesRegex(
-            DynamicCapacityConfigError,
-            'dynamic_capacity_sequence_preset.*S99',
-        ):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,2,3',
-                    'dynamic_capacity_probabilities': (
-                        '0.3333333333333333,0.3333333333333333,0.3333333333333334'
-                    ),
-                    'dynamic_capacity_sequence_preset': 'S99',
-                }
-            )
-
-
-class DynamicCapacitySequenceTests(unittest.TestCase):
-    def setUp(self):
-        self.config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'dynamic_capacity_seed': 20260718,
-                'dynamic_capacity_draw_mode': 'balanced_shuffle',
-                'capacity_reveal_timing': 'before_decision',
-            }
-        )
-
-    def test_balanced_shuffle_matches_target_counts_for_ten_rounds(self):
-        sequence = generate_capacity_sequence(self.config, rounds=10, group_id=1)
-
-        self.assertEqual(Counter(sequence), Counter({1: 3, 2: 5, 3: 2}))
-
-    def test_same_seed_and_group_generate_same_sequence(self):
-        first = generate_capacity_sequence(self.config, rounds=10, group_id=2)
-        second = generate_capacity_sequence(self.config, rounds=10, group_id=2)
-
-        self.assertEqual(first, second)
-
-    def test_sequence_only_contains_configured_capacities(self):
-        sequence = generate_capacity_sequence(self.config, rounds=100, group_id=3)
-
-        self.assertTrue(set(sequence).issubset(set(self.config.values)))
-
-    def test_iid_mode_is_reproducible(self):
-        iid_config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'dynamic_capacity_seed': 20260718,
-                'dynamic_capacity_draw_mode': 'iid',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
-
-        first = generate_capacity_sequence(iid_config, rounds=40, group_id=4)
-        second = generate_capacity_sequence(iid_config, rounds=40, group_id=4)
-
-        self.assertEqual(first, second)
-        self.assertTrue(set(first).issubset(set(iid_config.values)))
-
-    def test_round_records_include_previous_capacity_and_probability(self):
-        records = build_capacity_round_records(self.config, rounds=10, group_id=1)
-
-        self.assertEqual(len(records), 10)
-        self.assertIsNone(records[0]['previous_capacity'])
-        for index, record in enumerate(records):
-            self.assertIn(record['capacity'], self.config.values)
-            self.assertEqual(record['state'], f"capacity_{record['capacity']}")
-            probability_index = self.config.values.index(record['capacity'])
-            self.assertEqual(
-                record['probability'],
-                self.config.probabilities[probability_index],
-            )
-            if index:
-                self.assertEqual(record['previous_capacity'], records[index - 1]['capacity'])
-
-    def test_session_scope_uses_the_same_sequence_for_every_group(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'dynamic_capacity_seed': 20260718,
-                'dynamic_capacity_draw_mode': 'balanced_shuffle',
-                'dynamic_capacity_sequence_scope': 'session',
-                'capacity_reveal_timing': 'before_decision',
-            }
-        )
-
-        group_one = generate_capacity_sequence(config, rounds=10, group_id=1)
-        group_two = generate_capacity_sequence(config, rounds=10, group_id=2)
-
-        self.assertEqual(group_one, group_two)
-
-    def test_invalid_capacity_sequence_scope_is_rejected(self):
-        with self.assertRaisesRegex(
-            DynamicCapacityConfigError,
-            'dynamic_capacity_sequence_scope',
-        ):
-            parse_dynamic_capacity_config(
-                {
-                    'dynamic_capacity_values': '1,2,3',
-                    'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                    'dynamic_capacity_sequence_scope': 'participant',
-                }
-            )
-    def test_group_scope_keeps_independent_group_sequences(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'dynamic_capacity_seed': 20260718,
-                'dynamic_capacity_draw_mode': 'balanced_shuffle',
-                'dynamic_capacity_sequence_scope': 'group',
-                'capacity_reveal_timing': 'before_decision',
-            }
-        )
-
-        group_one = generate_capacity_sequence(config, rounds=10, group_id=1)
-        group_two = generate_capacity_sequence(config, rounds=10, group_id=2)
-
-        self.assertNotEqual(group_one, group_two)
-
-    def test_phased_markov_switches_from_random_to_transition_rule_at_round_21(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '1,0,0',
-                'dynamic_capacity_seed': 12,
-                'dynamic_capacity_draw_mode': 'phased_markov',
-                'dynamic_capacity_random_rounds': 20,
-                'dynamic_capacity_transition_matrix': (
-                    '0,1,0;0,0,1;0,0,1'
-                ),
-                'dynamic_capacity_sequence_scope': 'session',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
-
-        sequence = generate_capacity_sequence(config, rounds=60, group_id=1)
-
-        self.assertEqual(sequence[:20], [1] * 20)
-        self.assertEqual(sequence[20], 2)
-        self.assertEqual(sequence[21:], [3] * 39)
-
-    def test_phased_markov_is_reproducible_and_shared_across_groups(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
-                'dynamic_capacity_seed': 20260718,
-                'dynamic_capacity_draw_mode': 'phased_markov',
-                'dynamic_capacity_random_rounds': 20,
-                'dynamic_capacity_transition_matrix': (
-                    '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8'
-                ),
-                'dynamic_capacity_sequence_scope': 'session',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
-
-        first = generate_capacity_sequence(config, rounds=60, group_id=1)
-        repeated = generate_capacity_sequence(config, rounds=60, group_id=1)
-        other_group = generate_capacity_sequence(config, rounds=60, group_id=2)
-
-        self.assertEqual(len(first), 60)
-        self.assertEqual(first, repeated)
-        self.assertEqual(first, other_group)
-        self.assertTrue(set(first).issubset({1, 2, 3}))
-
-    def test_manual_sequence_mode_uses_exact_60_round_sequence(self):
-        sequence = ([1, 2, 3] * 20)
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
-                'dynamic_capacity_draw_mode': 'manual_sequence',
-                'dynamic_capacity_manual_sequence': ','.join(map(str, sequence)),
-                'dynamic_capacity_sequence_scope': 'session',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
-
-        self.assertEqual(
-            generate_capacity_sequence(config, rounds=60, group_id=99),
-            sequence,
-        )
-
-    def test_manual_sequence_rejects_wrong_length_and_unknown_capacity(self):
-        wrong_length = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
-                'dynamic_capacity_draw_mode': 'manual_sequence',
-                'dynamic_capacity_manual_sequence': '1,2,3',
-            }
-        )
-        with self.assertRaisesRegex(DynamicCapacityConfigError, '恰好包含 60 个'):
-            generate_capacity_sequence(wrong_length, rounds=60, group_id=1)
-
-        unknown_capacity = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3333333333333333,0.3333333333333333,0.3333333333333334',
-                'dynamic_capacity_draw_mode': 'manual_sequence',
-                'dynamic_capacity_manual_sequence': ','.join(['4'] * 60),
-            }
-        )
-        with self.assertRaisesRegex(DynamicCapacityConfigError, '候选集合'):
-            generate_capacity_sequence(unknown_capacity, rounds=60, group_id=1)
-
-
 class WarmupRoundPhaseTests(unittest.TestCase):
-    def test_two_warmup_rounds_precede_sixty_formal_rounds(self):
-        self.assertEqual(getattr(C, 'WARMUP_ROUNDS', None), 2)
+    def test_five_warmup_rounds_precede_sixty_formal_rounds(self):
+        self.assertEqual(getattr(C, 'WARMUP_ROUNDS', None), 5)
         self.assertEqual(getattr(C, 'FORMAL_ROUNDS', None), 60)
-        self.assertEqual(C.NUM_ROUNDS, 62)
+        self.assertEqual(C.NUM_ROUNDS, 65)
 
     def test_raw_rounds_map_to_warmup_and_formal_round_numbers(self):
         is_warmup_round = getattr(dynamic_app, 'is_warmup_round', None)
@@ -391,30 +48,24 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         self.assertIsNotNone(formal_round_number)
         self.assertTrue(is_warmup_round(1))
         self.assertTrue(is_warmup_round(2))
-        self.assertFalse(is_warmup_round(3))
+        self.assertTrue(is_warmup_round(5))
+        self.assertFalse(is_warmup_round(6))
         self.assertIsNone(formal_round_number(1))
-        self.assertIsNone(formal_round_number(2))
-        self.assertEqual(formal_round_number(3), 1)
-        self.assertEqual(formal_round_number(62), 60)
+        self.assertIsNone(formal_round_number(5))
+        self.assertEqual(formal_round_number(6), 1)
+        self.assertEqual(formal_round_number(65), 60)
 
-    def test_warmup_capacity_must_be_a_configured_positive_state(self):
+    def test_warmup_capacity_is_the_normal_accident_capacity(self):
         parse_warmup_capacity = getattr(dynamic_app, 'parse_warmup_capacity', None)
         self.assertIsNotNone(parse_warmup_capacity)
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-            }
+        config = dynamic_app.parse_accident_risk_config(
+            {'accident_normal_capacity': 4}
         )
 
         self.assertEqual(
-            parse_warmup_capacity({'dynamic_warmup_capacity': 2}, config),
-            2,
+            parse_warmup_capacity({}, config),
+            4,
         )
-        with self.assertRaisesRegex(DynamicCapacityConfigError, 'dynamic_warmup_capacity'):
-            parse_warmup_capacity({'dynamic_warmup_capacity': 0}, config)
-        with self.assertRaisesRegex(DynamicCapacityConfigError, '候选'):
-            parse_warmup_capacity({'dynamic_warmup_capacity': 4}, config)
 
     def test_phase_context_uses_participant_facing_round_numbers(self):
         round_phase_context = getattr(dynamic_app, 'round_phase_context', None)
@@ -426,12 +77,12 @@ class WarmupRoundPhaseTests(unittest.TestCase):
                 'is_warmup': True,
                 'phase_name': 'warmup',
                 'display_round_number': 2,
-                'display_total_rounds': 2,
+                'display_total_rounds': 5,
                 'round_label': '热身第 2 轮',
             },
         )
         self.assertEqual(
-            round_phase_context(3),
+            round_phase_context(6),
             {
                 'is_warmup': False,
                 'phase_name': 'formal',
@@ -450,24 +101,24 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         with patch.object(dynamic_app, 'access_allowed', return_value=True):
             self.assertTrue(warmup_start.is_displayed(SimpleNamespace(round_number=1)))
             self.assertFalse(warmup_start.is_displayed(SimpleNamespace(round_number=2)))
-            self.assertTrue(formal_start.is_displayed(SimpleNamespace(round_number=3)))
-            self.assertFalse(formal_start.is_displayed(SimpleNamespace(round_number=4)))
+            self.assertTrue(formal_start.is_displayed(SimpleNamespace(round_number=6)))
+            self.assertFalse(formal_start.is_displayed(SimpleNamespace(round_number=7)))
 
     def test_formal_payoff_total_excludes_warmup_rounds(self):
         formal_payoff_total = getattr(dynamic_app, 'formal_payoff_total', None)
         self.assertIsNotNone(formal_payoff_total)
         rounds = [
             SimpleNamespace(round_number=1, payoff=99),
-            SimpleNamespace(round_number=2, payoff=98),
-            SimpleNamespace(round_number=3, payoff=10),
-            SimpleNamespace(round_number=4, payoff=20),
+            SimpleNamespace(round_number=5, payoff=98),
+            SimpleNamespace(round_number=6, payoff=10),
+            SimpleNamespace(round_number=7, payoff=20),
         ]
         player = SimpleNamespace(in_all_rounds=lambda: rounds)
 
         self.assertEqual(float(formal_payoff_total(player)), 30)
 
     def test_custom_export_omits_warmup_and_renumbers_formal_rounds(self):
-        players = [SimpleNamespace(round_number=value) for value in (1, 2, 3, 4)]
+        players = [SimpleNamespace(round_number=value) for value in (1, 5, 6, 7)]
 
         with (
             patch.object(
@@ -488,7 +139,7 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         group = SimpleNamespace(id_in_subsession=1, session=session)
         players = [
             SimpleNamespace(round_number=round_number, group=group)
-            for round_number in (1, 2)
+            for round_number in (1, 5)
         ]
 
         rows, states, _summary = dynamic_app.build_admin_report_rows(players)
@@ -674,7 +325,7 @@ class DynamicCapacityQueueTests(unittest.TestCase):
         )
 
         self.assertEqual(slow_wait, 4)
-        self.assertEqual(fast_wait, 1)
+        self.assertAlmostEqual(fast_wait, 2 / 3)
 
     def test_queue_left_by_earlier_departures_is_included(self):
         wait = service_batch_wait_minutes(
@@ -684,411 +335,11 @@ class DynamicCapacityQueueTests(unittest.TestCase):
             capacity=2,
         )
 
-        self.assertEqual(wait, 4)
-
-
-class DynamicScheduleTests(unittest.TestCase):
-    def test_schedule_uses_lowest_capacity_and_group_size(self):
-        builder = getattr(dynamic_app, 'build_dynamic_departure_schedule', None)
-        self.assertIsNotNone(builder)
-
-        schedule = builder(
-            players_count=60,
-            capacity_values=(1, 2, 3),
-            min_slots_each_side=10,
-        )
-
-        self.assertEqual(schedule['capacity_basis'], 1)
-        self.assertEqual(schedule['slots_each_side'], 30)
-        self.assertEqual(schedule['num_slots'], 61)
-
-    def test_auto_toll_rejects_after_decision(self):
-        validator = getattr(dynamic_app, 'validate_toll_reveal_compatibility', None)
-        self.assertIsNotNone(validator)
-
-        with self.assertRaisesRegex(ValueError, 'after_decision.*自动粗收费'):
-            validator(
-                {
-                    'capacity_reveal_timing': 'after_decision',
-                    'coarse_toll_auto_enabled': 1,
-                }
-            )
-
-
-class DynamicTollCalibrationTests(unittest.TestCase):
-    def calibration_module(self):
-        spec = importlib.util.find_spec('dynamic_bottleneck_round.toll_calibration')
-        self.assertIsNotNone(spec)
-        from . import toll_calibration
-
-        return toll_calibration
-
-    def test_small_group_returns_symmetric_candidate(self):
-        calibration = self.calibration_module()
-        candidate = calibration.calibrate_best_candidate(
-            players=5,
-            capacity=2,
-            valid_slots=tuple(range(1, 22)),
-            first_departure_minute=464,
-            slot_size_minutes=1,
-            min_toll=0,
-            max_toll=10,
-            toll_step=1,
-            calibration_mode='auto',
-        )
-
-        self.assertGreaterEqual(candidate.window_start, 1)
-        self.assertLessEqual(candidate.window_end, 21)
-        self.assertEqual(candidate.window_start + candidate.window_end, 22)
-        self.assertGreaterEqual(candidate.toll, 0)
-        self.assertEqual(sum(candidate.distribution), 5)
-
-    def test_large_group_mode_returns_candidate(self):
-        calibration = self.calibration_module()
-        candidate = calibration.calibrate_best_candidate(
-            players=60,
-            capacity=1,
-            valid_slots=tuple(range(1, 62)),
-            first_departure_minute=444,
-            slot_size_minutes=1,
-            min_toll=0,
-            max_toll=10,
-            toll_step=1,
-            calibration_mode='large-group',
-            approx_refine_pool_size=4,
-            approx_refine_iterations=80,
-        )
-
-        self.assertEqual(candidate.calibration_mode, 'large-group')
-        self.assertEqual(sum(candidate.distribution), 60)
-
-    def test_matching_cache_record_is_used_before_computation(self):
-        schedule = {
-            'num_slots': 21,
-            'slot_size_minutes': 1,
-            'first_departure_minute': 464,
-            'last_departure_minute': 484,
-        }
-        settings = {
-            'coarse_toll_auto_min_toll': 0,
-            'coarse_toll_auto_max_toll': 10,
-            'coarse_toll_auto_toll_step': 1,
-            'coarse_toll_auto_mode': 'auto',
-            'coarse_toll_auto_approx_refine_pool_size': 8,
-            'coarse_toll_auto_approx_refine_iterations': 160,
-        }
-        distribution = [0] * 21
-        distribution[8] = 2
-        distribution[12] = 3
-        cache_data = {
-            'version': 1,
-            'same_time_queue_rule': 'batch_max_wait',
-            'toll_window_rule': 'symmetric_continuous',
-            'records': [
-                {
-                    'players': 5,
-                    'capacity': 2,
-                    'num_slots': 21,
-                    'first_departure_minute': 464,
-                    'last_departure_minute': 484,
-                    'slot_size_minutes': 1,
-                    'min_toll': 0,
-                    'max_toll': 10,
-                    'toll_step': 1,
-                    'requested_calibration_mode': 'auto',
-                    'approx_refine_pool_size': 8,
-                    'approx_refine_iterations': 160,
-                    'window_start': 9,
-                    'window_end': 13,
-                    'toll': 3,
-                    'cost_gap': 0,
-                    'deviation_gap': 0,
-                    'nash_count': 1,
-                    'distribution': distribution,
-                    'selected_costs': [[9, 8], [13, 8]],
-                    'calibration_mode': 'large-group',
-                }
-            ],
-        }
-
-        candidate = dynamic_app.cached_toll_candidate(
-            players_count=5,
-            capacity=2,
-            schedule=schedule,
-            settings=settings,
-            cache_data=cache_data,
-        )
-
-        self.assertIsNotNone(candidate)
-        self.assertEqual(candidate.calibration_source, 'cache')
-        self.assertEqual(candidate.window_spec, '9-13')
-
-    def test_cache_record_with_different_schedule_is_ignored(self):
-        schedule = {
-            'num_slots': 21,
-            'slot_size_minutes': 1,
-            'first_departure_minute': 464,
-            'last_departure_minute': 484,
-        }
-        settings = {
-            'coarse_toll_auto_min_toll': 0,
-            'coarse_toll_auto_max_toll': 10,
-            'coarse_toll_auto_toll_step': 1,
-            'coarse_toll_auto_mode': 'auto',
-            'coarse_toll_auto_approx_refine_pool_size': 8,
-            'coarse_toll_auto_approx_refine_iterations': 160,
-        }
-        cache_data = {
-            'version': 1,
-            'same_time_queue_rule': 'batch_max_wait',
-            'toll_window_rule': 'symmetric_continuous',
-            'records': [
-                {
-                    'players': 5,
-                    'capacity': 2,
-                    'num_slots': 21,
-                    'first_departure_minute': 463,
-                    'last_departure_minute': 483,
-                    'slot_size_minutes': 1,
-                    'min_toll': 0,
-                    'max_toll': 10,
-                    'toll_step': 1,
-                    'requested_calibration_mode': 'auto',
-                    'approx_refine_pool_size': 8,
-                    'approx_refine_iterations': 160,
-                    'window_start': 9,
-                    'window_end': 13,
-                    'toll': 3,
-                    'distribution': [0] * 21,
-                    'selected_costs': [],
-                    'calibration_mode': 'large-group',
-                }
-            ],
-        }
-
-        candidate = dynamic_app.cached_toll_candidate(
-            players_count=5,
-            capacity=2,
-            schedule=schedule,
-            settings=settings,
-            cache_data=cache_data,
-        )
-
-        self.assertIsNone(candidate)
-
-    def test_group_calibration_returns_cached_source(self):
-        schedule = {
-            'num_slots': 3,
-            'slot_size_minutes': 1,
-            'first_departure_minute': 473,
-            'last_departure_minute': 475,
-        }
-        settings = {
-            'coarse_toll_auto_min_toll': 0,
-            'coarse_toll_auto_max_toll': 10,
-            'coarse_toll_auto_toll_step': 1,
-            'coarse_toll_auto_mode': 'auto',
-            'coarse_toll_auto_approx_refine_pool_size': 8,
-            'coarse_toll_auto_approx_refine_iterations': 160,
-        }
-        cache_data = {
-            'version': 1,
-            'same_time_queue_rule': 'batch_max_wait',
-            'toll_window_rule': 'symmetric_continuous',
-            'records': [
-                {
-                    'players': 2,
-                    'capacity': 1,
-                    'num_slots': 3,
-                    'first_departure_minute': 473,
-                    'last_departure_minute': 475,
-                    'slot_size_minutes': 1,
-                    'min_toll': 0,
-                    'max_toll': 10,
-                    'toll_step': 1,
-                    'requested_calibration_mode': 'auto',
-                    'approx_refine_pool_size': 8,
-                    'approx_refine_iterations': 160,
-                    'window_start': 2,
-                    'window_end': 2,
-                    'toll': 2,
-                    'cost_gap': 0,
-                    'deviation_gap': 0,
-                    'nash_count': 1,
-                    'distribution': [1, 0, 1],
-                    'selected_costs': [[1, 2], [3, 2]],
-                    'calibration_mode': 'exact',
-                }
-            ],
-        }
-
-        results = dynamic_app.calibrate_tolls_for_group(
-            players_count=2,
-            capacities=(1,),
-            schedule=schedule,
-            settings=settings,
-            cache_data=cache_data,
-        )
-
-        self.assertEqual(results['1']['calibration_source'], 'cache')
-        self.assertEqual(results['1']['slot_spec'], '2')
-
-    def test_cache_candidate_outside_toll_range_is_ignored(self):
-        schedule = {
-            'num_slots': 3,
-            'slot_size_minutes': 1,
-            'first_departure_minute': 473,
-            'last_departure_minute': 475,
-        }
-        settings = {
-            'coarse_toll_auto_min_toll': 0,
-            'coarse_toll_auto_max_toll': 10,
-            'coarse_toll_auto_toll_step': 1,
-            'coarse_toll_auto_mode': 'auto',
-            'coarse_toll_auto_approx_refine_pool_size': 8,
-            'coarse_toll_auto_approx_refine_iterations': 160,
-        }
-        record = {
-            'players': 2,
-            'capacity': 1,
-            'num_slots': 3,
-            'first_departure_minute': 473,
-            'last_departure_minute': 475,
-            'slot_size_minutes': 1,
-            'min_toll': 0,
-            'max_toll': 10,
-            'toll_step': 1,
-            'requested_calibration_mode': 'auto',
-            'approx_refine_pool_size': 8,
-            'approx_refine_iterations': 160,
-            'window_start': 2,
-            'window_end': 2,
-            'toll': 99,
-            'distribution': [1, 0, 1],
-            'selected_costs': [[1, 2], [3, 2]],
-            'calibration_mode': 'exact',
-        }
-        cache_data = {
-            'version': 1,
-            'same_time_queue_rule': 'batch_max_wait',
-            'toll_window_rule': 'symmetric_continuous',
-            'records': [record],
-        }
-
-        candidate = dynamic_app.cached_toll_candidate(
-            players_count=2,
-            capacity=1,
-            schedule=schedule,
-            settings=settings,
-            cache_data=cache_data,
-        )
-
-        self.assertIsNone(candidate)
-
-    def test_cache_loader_rejects_invalid_json_with_clear_message(self):
-        with tempfile.TemporaryDirectory() as directory:
-            cache_path = Path(directory) / 'cache.json'
-            cache_path.write_text('{invalid', encoding='utf-8')
-
-            with self.assertRaisesRegex(ValueError, '粗收费缓存文件不是有效 JSON'):
-                dynamic_app.load_toll_calibration_cache(cache_path)
-
-
-class DynamicTollApplicationTests(unittest.TestCase):
-    def setUp(self):
-        self.schedule = {
-            'enabled': True,
-            'source': 'auto',
-            'players_count': 5,
-            'capacity_basis': 1,
-            'slots_each_side': 10,
-            'num_slots': 21,
-            'slot_size_minutes': 1,
-            'first_departure_minute': 464,
-            'last_departure_minute': 484,
-            'first_departure_time': '07:44',
-            'last_departure_time': '08:04',
-        }
-        self.settings = {
-            'coarse_toll_auto_min_toll': 0,
-            'coarse_toll_auto_max_toll': 2,
-            'coarse_toll_auto_toll_step': 1,
-            'coarse_toll_auto_mode': 'large-group',
-            'coarse_toll_auto_approx_refine_pool_size': 2,
-            'coarse_toll_auto_approx_refine_iterations': 20,
-        }
-
-    def test_builds_one_result_per_capacity(self):
-        calibrator = getattr(dynamic_app, 'calibrate_tolls_for_group', None)
-        self.assertIsNotNone(calibrator)
-
-        results = calibrator(
-            players_count=5,
-            capacities=(1, 2, 3),
-            schedule=self.schedule,
-            settings=self.settings,
-        )
-
-        self.assertEqual(set(results), {'1', '2', '3'})
-        self.assertEqual(results['2']['capacity'], 2)
-        self.assertEqual(results['2']['calibration_players'], 5)
-
-    def test_round_selects_toll_matching_actual_capacity(self):
-        apply_round_toll = getattr(dynamic_app, 'apply_round_toll', None)
-        toll_var = getattr(dynamic_app, 'TOLL_BY_CAPACITY_VAR', None)
-        self.assertIsNotNone(apply_round_toll)
-        self.assertIsNotNone(toll_var)
-
-        result = {
-            'enabled': True,
-            'source': 'auto',
-            'capacity': 2,
-            'calibration_players': 5,
-            'calibration_mode': 'large-group',
-            'calibration_source': 'computed',
-            'slot_spec': '9-13',
-            'time_window_spec': '07:52-07:56',
-            'points': 3,
-            'cost_gap': 0,
-            'deviation_gap': 0,
-            'nash_count': 1,
-            'equilibrium_distribution': '07:50: 2人, 07:58: 3人',
-            'equilibrium_costs': '07:50: 8, 07:58: 8',
-        }
-        participant_vars = {toll_var: {'2': result}}
-        players = [
-            SimpleNamespace(participant=SimpleNamespace(vars=participant_vars.copy()))
-            for _ in range(3)
-        ]
-        group = SimpleNamespace(dynamic_capacity=2, get_players=lambda: players)
-
-        apply_round_toll(group)
-
-        for player in players:
-            self.assertEqual(player.coarse_toll_calibration_capacity, 2)
-            self.assertEqual(player.coarse_toll_time_window_spec, '07:52-07:56')
-            self.assertEqual(float(player.coarse_toll_points), 3)
-
-    def test_manual_time_window_is_converted_to_schedule_slots(self):
-        slots = dynamic_app.parse_time_window_spec(
-            '07:52-07:56',
-            'coarse_toll_time_window_spec',
-            self.schedule,
-        )
-
-        self.assertEqual(slots, {9, 10, 11, 12, 13})
-
-    def test_manual_time_window_outside_schedule_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, '可选出发时间范围'):
-            dynamic_app.parse_time_window_spec(
-                '07:30-07:40',
-                'coarse_toll_time_window_spec',
-                self.schedule,
-            )
+        self.assertEqual(wait, 3.5)
 
 
 class DynamicCostExportTests(unittest.TestCase):
-    def test_effective_toll_is_added_to_total_cost(self):
+    def test_accident_cost_uses_only_queue_early_and_late_components(self):
         calculator = getattr(dynamic_app, 'calculate_cost_components', None)
         self.assertIsNotNone(calculator)
 
@@ -1099,24 +350,22 @@ class DynamicCostExportTests(unittest.TestCase):
             toll=3,
         )
 
-        self.assertEqual(components['fixed_cost'], 12)
+        self.assertEqual(components['fixed_cost'], 0)
         self.assertEqual(components['queue_cost'], 4)
-        self.assertEqual(components['late_cost'], 3)
-        self.assertEqual(components['total_cost'], 22)
+        self.assertEqual(components['late_cost'], 5)
+        self.assertEqual(components['toll_cost'], 0)
+        self.assertEqual(components['total_cost'], 9)
 
-    def test_export_contains_effective_toll_and_schedule_metadata(self):
+    def test_export_contains_fixed_schedule_but_no_toll_metadata(self):
         required = {
-            'coarse_toll_source',
-            'coarse_toll_calibration_capacity',
-            'coarse_toll_time_window_spec',
-            'coarse_toll_points',
-            'coarse_toll_charge',
             'departure_schedule_first_time',
             'departure_schedule_last_time',
             'departure_schedule_num_slots',
         }
+        removed = {'coarse_toll_source', 'coarse_toll_points', 'coarse_toll_charge'}
 
         self.assertTrue(required.issubset(set(EXPORT_HEADERS)))
+        self.assertTrue(removed.isdisjoint(EXPORT_HEADERS))
 
 
 class PublicFeedbackSnapshotTests(unittest.TestCase):
@@ -1152,6 +401,11 @@ class PublicFeedbackSnapshotTests(unittest.TestCase):
         self.group = SimpleNamespace(
             round_number=2,
             dynamic_capacity=3,
+            incident_occurred=False,
+            capacity_loss_ratio=0,
+            remaining_capacity_ratio=1,
+            information_condition='I0',
+            accident_sequence_id='warmup',
             get_players=lambda: self.players,
         )
         self.virtual_records = [
@@ -1608,77 +862,28 @@ class PersistentDropoutSuspensionTests(unittest.TestCase):
         self.assertEqual(audit['automatic_choice_strategy'], 'last_manual_choice')
 
 
-class CapacityRevealTests(unittest.TestCase):
-    def test_after_decision_context_does_not_include_actual_capacity(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
-
-        context = decision_capacity_context(config, actual_capacity=3)
-
-        self.assertFalse(context['capacity_revealed'])
-        self.assertNotIn('actual_capacity', context)
-        self.assertNotIn('3 人 / 1 分钟', str(context))
-
-    def test_before_decision_context_includes_actual_capacity(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'before_decision',
-            }
-        )
-
-        context = decision_capacity_context(config, actual_capacity=2)
-
-        self.assertTrue(context['capacity_revealed'])
-        self.assertEqual(context['actual_capacity'], 2)
-
-
 class DynamicPresentationContextTests(unittest.TestCase):
-    def test_reveal_description_matches_before_decision_mode(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'before_decision',
-            }
+    def test_reveal_description_matches_i2(self):
+        config = dynamic_app.parse_accident_risk_config(
+            {'accident_information_condition': 'I2'}
         )
 
-        self.assertEqual(
-            capacity_reveal_description(config),
-            '每轮真实服务率会在选择出发时间前公布。',
+        self.assertIn('实际服务率', capacity_reveal_description(config))
+
+    def test_reveal_description_matches_i0(self):
+        config = dynamic_app.parse_accident_risk_config(
+            {'accident_information_condition': 'I0'}
         )
 
-    def test_reveal_description_matches_after_decision_mode(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '1,2,3',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-                'capacity_reveal_timing': 'after_decision',
-            }
-        )
+        self.assertIn('长期分布', capacity_reveal_description(config))
 
-        self.assertEqual(
-            capacity_reveal_description(config),
-            '每轮真实服务率会在提交出发时间后公布。',
-        )
-
-    def test_queue_example_keeps_all_arrival_choices_distinct_at_high_capacities(self):
-        config = parse_dynamic_capacity_config(
-            {
-                'dynamic_capacity_values': '3,4,5',
-                'dynamic_capacity_probabilities': '0.3,0.5,0.2',
-            }
-        )
+    def test_queue_example_uses_expected_incident_capacity(self):
+        config = dynamic_app.parse_accident_risk_config({})
 
         example = comprehension_queue_example(config)
 
-        self.assertGreaterEqual(example['wait_minutes'], 2)
+        self.assertEqual(example['capacity'], config.expected_incident_capacity)
+        self.assertGreater(example['wait_minutes'], 0)
         self.assertEqual(
             len(
                 {
@@ -1837,49 +1042,21 @@ class TemplateContractTests(unittest.TestCase):
 
 
 class SettingsContractTests(unittest.TestCase):
-    def test_demo_and_prod_configs_use_20_plus_40_after_decision_design(self):
+    def test_dynamic_configs_no_longer_expose_rejected_markov_or_toll_rules(self):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         for name in ('dynamic_bottleneck_round_demo', 'dynamic_bottleneck_round_prod'):
             self.assertIn(name, configs)
             config = configs[name]
-            self.assertEqual(config['dynamic_capacity_values'], '1,2,3')
-            self.assertEqual(config['dynamic_warmup_capacity'], 2)
-            probabilities = [
-                float(item)
-                for item in config['dynamic_capacity_probabilities'].split(',')
-            ]
-            self.assertAlmostEqual(probabilities[0], 1 / 3)
-            self.assertAlmostEqual(probabilities[1], 1 / 3)
-            self.assertAlmostEqual(probabilities[2], 1 / 3)
-            self.assertEqual(config['dynamic_capacity_seed'], 20260718)
-            self.assertEqual(config['dynamic_capacity_draw_mode'], 'phased_markov')
-            self.assertEqual(config['dynamic_capacity_random_rounds'], 20)
-            self.assertEqual(
-                config['dynamic_capacity_transition_matrix'],
-                '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
-            )
-            self.assertEqual(config['dynamic_capacity_manual_sequence'], '')
-            self.assertEqual(config['dynamic_capacity_sequence_preset'], 'auto')
-            self.assertEqual(config['dynamic_capacity_sequence_scope'], 'session')
-            self.assertEqual(config['capacity_reveal_timing'], 'after_decision')
-            self.assertEqual(config['group_agent_spec'], '')
-            self.assertEqual(config['api_agent_timeout_seconds'], 12)
-            self.assertIn(
-                str(config['api_agent_thinking_enabled']).lower(),
-                {'0', 'false', 'off'},
-            )
-            self.assertEqual(config['api_agent_max_tokens'], 512)
-            self.assertEqual(config['reward_treatment_enabled'], 0)
-            self.assertEqual(config['departure_schedule_auto_enabled'], 1)
-            self.assertEqual(config['departure_schedule_min_slots_each_side'], 10)
-            self.assertEqual(config['coarse_toll_auto_enabled'], 0)
-            self.assertEqual(config['coarse_toll_enabled'], 1)
+            self.assertNotIn('dynamic_capacity_draw_mode', config)
+            self.assertNotIn('dynamic_capacity_transition_matrix', config)
+            self.assertNotIn('coarse_toll_enabled', config)
+            self.assertNotIn('reward_treatment_enabled', config)
             self.assertEqual(config['payoff_rounds'], 60)
-        self.assertEqual(C.WARMUP_ROUNDS, 2)
+        self.assertEqual(C.WARMUP_ROUNDS, 5)
         self.assertEqual(C.FORMAL_ROUNDS, 60)
-        self.assertEqual(C.NUM_ROUNDS, 62)
+        self.assertEqual(C.NUM_ROUNDS, 65)
         self.assertEqual(C.SYNC_POLL_INTERVAL_SECONDS, 1.5)
 
         for name in ('single_bottleneck_demo', 'single_bottleneck_prod'):
@@ -1888,13 +1065,12 @@ class SettingsContractTests(unittest.TestCase):
     def test_export_headers_match_required_round_level_schema(self):
         required = {
             'session_code', 'participant_code', 'group_id', 'round_number',
-            'dynamic_capacity', 'dynamic_capacity_state', 'previous_round_capacity',
-            'capacity_probability', 'capacity_reveal_timing', 'dynamic_capacity_seed',
-            'dynamic_capacity_draw_mode', 'departure_slot', 'departure_minute',
+            'treatment_condition', 'actor_composition', 'information_condition',
+            'incident_occurred', 'capacity_loss_ratio', 'remaining_capacity_ratio',
+            'dynamic_capacity', 'dynamic_capacity_state', 'accident_sequence_id',
+            'accident_sequence_seed', 'departure_slot', 'departure_minute',
             'queue_delay_minutes', 'arrival_minute', 'early_minutes', 'late_minutes',
             'total_cost', 'payoff', 'decision_source', 'timeout_happened',
-            'coarse_toll_source', 'coarse_toll_calibration_capacity',
-            'coarse_toll_time_window_spec', 'coarse_toll_points', 'coarse_toll_charge',
             'departure_schedule_num_slots', 'departure_schedule_first_time',
             'departure_schedule_last_time',
         }
@@ -2080,11 +1256,11 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         stored = session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR]
         self.assertEqual(len(stored), 60)
         self.assertNotIn(
-            dynamic_app.CAPACITY_SEQUENCE_VAR,
+            'dynamic_bottleneck_round_capacity_sequence',
             group_one.get_players()[0].participant.vars,
         )
         self.assertNotIn(
-            dynamic_app.CAPACITY_SEQUENCE_VAR,
+            'dynamic_bottleneck_round_capacity_sequence',
             group_two.get_players()[0].participant.vars,
         )
 
@@ -2345,6 +1521,74 @@ class DynamicAccidentExportTests(unittest.TestCase):
         self.assertEqual(player.dynamic_capacity, 1.50123456789)
 
 
+class DynamicAccidentPresentationBackendTests(unittest.TestCase):
+    def test_capacity_rows_describe_iid_normal_and_incident_distribution(self):
+        config = dynamic_app.parse_accident_risk_config(
+            {
+                'normal_capacity': 4,
+                'incident_probability': 0.2,
+                'capacity_loss_alpha': 6.83057,
+                'capacity_loss_beta': 4.05907,
+                'information_condition': 'I1',
+            }
+        )
+
+        rows = dynamic_app.capacity_state_rows(config)
+
+        self.assertEqual([row['state'] for row in rows], ['normal', 'incident'])
+        self.assertEqual([row['probability'] for row in rows], [0.8, 0.2])
+        self.assertEqual(rows[0]['capacity'], 4.0)
+        self.assertAlmostEqual(
+            rows[1]['capacity'],
+            config.expected_incident_capacity,
+        )
+
+    def test_information_descriptions_match_i0_i1_i2(self):
+        descriptions = {
+            condition: dynamic_app.capacity_reveal_description(
+                dynamic_app.parse_accident_risk_config(
+                    {'accident_information_condition': condition}
+                )
+            )
+            for condition in ('I0', 'I1', 'I2')
+        }
+
+        self.assertIn('长期分布', descriptions['I0'])
+        self.assertIn('事故是否发生', descriptions['I1'])
+        self.assertIn('实际服务率', descriptions['I2'])
+
+    def test_warmup_capacity_is_normal_capacity(self):
+        config = dynamic_app.parse_accident_risk_config({'normal_capacity': 4.0})
+
+        self.assertEqual(dynamic_app.parse_warmup_capacity({}, config), 4.0)
+
+
+class DynamicLegacyBackendRemovalTests(unittest.TestCase):
+    def test_rejected_capacity_engine_is_absent_from_active_backend(self):
+        source = Path(dynamic_app.__file__).read_text(encoding='utf-8')
+        rejected = {
+            'phased_markov',
+            'balanced_shuffle',
+            'dynamic_capacity_transition_matrix',
+            'dynamic_capacity_random_rounds',
+            'manual_sequence_spec',
+            'build_dynamic_departure_schedule',
+            'DynamicCapacityConfig',
+        }
+
+        for token in rejected:
+            with self.subTest(token=token):
+                self.assertNotIn(token, source)
+
+    def test_accident_bank_contains_no_legacy_sequence_schema(self):
+        bank_text = Path(
+            dynamic_app.__file__
+        ).with_name('capacity_sequence_bank.json').read_text(encoding='utf-8')
+
+        self.assertNotIn('manual_sequence_spec', bank_text)
+        self.assertNotIn('phased_markov', bank_text)
+
+
 class PlayerBot(Bot):
     cases = ['staggered', 'same_time', 'timeout_recovery']
 
@@ -2373,23 +1617,17 @@ class PlayerBot(Bot):
         expect('data-poll="1500"', 'in', self.html)
         yield Submission(RoundStartSync, check_html=False)
 
-        configured_values = {
-            int(item)
-            for item in self.session.config['dynamic_capacity_values'].split(',')
-        }
+        accident_config = dynamic_app.parse_accident_risk_config(self.session.config)
         group_capacities = {player.dynamic_capacity for player in self.group.get_players()}
         expect(len(group_capacities), '==', 1)
-        expect(self.player.dynamic_capacity, 'in', configured_values)
+        expect(self.player.dynamic_capacity, '>', 0)
+        expect(self.player.dynamic_capacity, '<=', accident_config.normal_capacity)
         if phase['is_warmup']:
             expect('本轮真实瓶颈服务率', 'in', self.html)
-            expect(self.player.dynamic_capacity, '==', 2)
-        elif self.session.config['capacity_reveal_timing'] == 'after_decision':
-            expect('本轮服务率将在提交后公布', 'in', self.html)
-            expect('本轮真实瓶颈服务率', 'not in', self.html)
-        else:
+            expect(self.player.dynamic_capacity, '==', accident_config.normal_capacity)
+        elif accident_config.information_condition == 'I2':
             expect('本轮真实瓶颈服务率', 'in', self.html)
             expect(f'{self.player.dynamic_capacity} 人 / 1 分钟', 'in', self.html)
-        expect('收费', 'in', self.html)
 
         if self.case == 'same_time':
             chosen_minute = 474
@@ -2446,7 +1684,7 @@ class PlayerBot(Bot):
         else:
             expect(self.player.decision_source, '==', 'manual')
             expect(self.player.timeout_happened, '==', False)
-        expect(self.player.coarse_toll_calibration_capacity, '==', self.player.dynamic_capacity)
+        expect(self.player.coarse_toll_calibration_capacity, '==', 0)
         if dynamic_app.api_agent_mode(self.session) == 'active':
             agent_records = dynamic_app.active_agent_decisions_for_group(self.group)
             group_api_count = dynamic_app.api_agent_count_per_group(
@@ -2498,15 +1736,7 @@ class PlayerBot(Bot):
                     '==',
                     phase['display_round_number'],
                 )
-        expect(
-            self.player.coarse_toll_calibration_players,
-            '==',
-            dynamic_app.effective_group_actor_count(
-                self.session,
-                len(self.group.get_players()),
-                self.group.id_in_subsession,
-            ),
-        )
+        expect(self.player.coarse_toll_calibration_players, '==', 0)
 
         expected_payoff = (
             0

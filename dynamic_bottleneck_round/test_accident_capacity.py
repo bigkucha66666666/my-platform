@@ -7,6 +7,7 @@ from dynamic_bottleneck_round.accident_capacity import (
     INFO_I0,
     INFO_I2,
     AccidentRiskConfigError,
+    accident_public_context,
     generate_accident_sequence,
     load_accident_sequence_bank,
     parse_accident_risk_config,
@@ -200,6 +201,81 @@ class AccidentSequenceBankTests(unittest.TestCase):
                 encoding='utf-8',
             )
             return load_accident_sequence_bank(path)
+
+
+class AccidentInformationTests(unittest.TestCase):
+    def setUp(self):
+        self.record = {
+            'formal_round_number': 7,
+            'incident_occurred': True,
+            'capacity_loss_ratio': 0.625,
+            'remaining_capacity_ratio': 0.375,
+            'actual_capacity': 1.5,
+            'sequence_id': 'S01',
+            'sequence_seed': 2026090801,
+        }
+        self.base_fields = {
+            'information_condition',
+            'normal_capacity',
+            'incident_probability',
+            'loss_distribution',
+            'expected_incident_capacity',
+            'expected_unconditional_capacity',
+            'capacity_revealed',
+        }
+
+    def context(self, condition, **kwargs):
+        config = parse_accident_risk_config(
+            {'accident_information_condition': condition}
+        )
+        return accident_public_context(config, self.record, **kwargs)
+
+    def test_i0_only_exposes_long_run_distribution_before_decision(self):
+        context = self.context('I0')
+
+        self.assertEqual(set(context), self.base_fields)
+        self.assertFalse(context['capacity_revealed'])
+
+    def test_i1_adds_only_current_incident_status_before_decision(self):
+        context = self.context('I1')
+
+        self.assertEqual(set(context), self.base_fields | {'incident_occurred'})
+        self.assertTrue(context['incident_occurred'])
+        self.assertFalse(context['capacity_revealed'])
+
+    def test_i2_adds_status_and_actual_capacity_but_not_loss_before_decision(self):
+        context = self.context('I2')
+
+        self.assertEqual(
+            set(context),
+            self.base_fields | {'incident_occurred', 'actual_capacity'},
+        )
+        self.assertEqual(context['actual_capacity'], 1.5)
+        self.assertTrue(context['capacity_revealed'])
+        self.assertNotIn('capacity_loss_ratio', context)
+
+    def test_all_conditions_receive_complete_realized_feedback_after_decision(self):
+        realized_fields = {
+            'incident_occurred',
+            'capacity_loss_ratio',
+            'remaining_capacity_ratio',
+            'actual_capacity',
+        }
+        for condition in ('I0', 'I1', 'I2'):
+            with self.subTest(condition=condition):
+                context = self.context(condition, after_decision=True)
+                self.assertEqual(set(context), self.base_fields | realized_fields)
+                self.assertEqual(context['capacity_loss_ratio'], 0.625)
+                self.assertTrue(context['capacity_revealed'])
+
+    def test_warmup_publicly_reveals_normal_capacity(self):
+        context = self.context('I0', warmup=True)
+
+        self.assertTrue(context['is_warmup'])
+        self.assertTrue(context['capacity_revealed'])
+        self.assertEqual(context['actual_capacity'], 4.0)
+        self.assertFalse(context['incident_occurred'])
+        self.assertNotIn('capacity_loss_ratio', context)
 
 
 if __name__ == '__main__':

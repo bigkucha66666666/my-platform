@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from math import ceil
 from typing import Mapping, Sequence
 
 
@@ -33,17 +32,18 @@ def initial_rl_state(
     *,
     policy_version=RL_POLICY_VERSION,
 ) -> dict:
-    values = [int(item['capacity']) for item in capacity_states]
+    values = [float(item['capacity']) for item in capacity_states]
+    labels = [
+        str(item.get('state', _capacity_key(item['capacity'])))
+        for item in capacity_states
+    ]
     probabilities = _normalized_probabilities(capacity_states)
     return {
         'policy_version': policy_version,
         'capacity_values': values,
+        'capacity_labels': labels,
         'capacity_prior': probabilities,
         'observed_capacities': [],
-        'transition_counts': {
-            str(source): {str(target): 0 for target in values}
-            for source in values
-        },
         'q_values': {},
         'last_departure_slot': None,
         'last_total_cost': None,
@@ -61,12 +61,18 @@ def valid_or_initial_state(
     *,
     policy_version=RL_POLICY_VERSION,
 ) -> dict:
-    expected_values = [int(item['capacity']) for item in capacity_states]
+    expected_values = [float(item['capacity']) for item in capacity_states]
+    expected_labels = [
+        str(item.get('state', _capacity_key(item['capacity'])))
+        for item in capacity_states
+    ]
     if not isinstance(state, dict):
         return initial_rl_state(capacity_states, policy_version=policy_version)
     if state.get('policy_version') != policy_version:
         return initial_rl_state(capacity_states, policy_version=policy_version)
     if state.get('capacity_values') != expected_values:
+        return initial_rl_state(capacity_states, policy_version=policy_version)
+    if state.get('capacity_labels') != expected_labels:
         return initial_rl_state(capacity_states, policy_version=policy_version)
     return deepcopy(state)
 
@@ -85,21 +91,16 @@ def observe_rl_outcome(
 ) -> dict:
     updated = deepcopy(state)
     previous_state_key = rl_state_key(updated)
-    values = [int(value) for value in updated['capacity_values']]
-    capacity = int(revealed_capacity)
-    if capacity not in values:
+    try:
+        capacity = float(revealed_capacity)
+    except (TypeError, ValueError):
+        return updated
+    if capacity <= 0:
         return updated
 
-    observed = [int(value) for value in updated.get('observed_capacities', [])]
-    if observed:
-        source = str(observed[-1])
-        target = str(capacity)
-        transitions = updated.setdefault('transition_counts', {})
-        row = transitions.setdefault(
-            source,
-            {str(value): 0 for value in values},
-        )
-        row[target] = int(row.get(target, 0)) + 1
+    observed = [
+        float(value) for value in updated.get('observed_capacities', [])
+    ]
     observed.append(capacity)
     updated['observed_capacities'] = observed
 
@@ -137,27 +138,16 @@ def observe_rl_outcome(
     return updated
 
 
-def capacity_belief(state) -> dict[int, float]:
-    values = [int(value) for value in state['capacity_values']]
+def capacity_belief(state) -> dict[float, float]:
+    values = [float(value) for value in state['capacity_values']]
     prior = [float(value) for value in state['capacity_prior']]
-    observed = [int(value) for value in state.get('observed_capacities', [])]
-    if not observed:
-        return dict(zip(values, prior))
-
-    row = state.get('transition_counts', {}).get(str(observed[-1]), {})
-    # One pseudo-observation distributed according to the public prior.
-    weights = [float(row.get(str(value), 0)) + prior[index] for index, value in enumerate(values)]
-    total = sum(weights)
-    return {
-        value: weight / total
-        for value, weight in zip(values, weights)
-    }
+    return dict(zip(values, prior))
 
 
 def rl_state_key(state) -> str:
     belief = capacity_belief(state)
     belief_bin = ','.join(
-        f'{capacity}:{int(round(probability * 10))}'
+        f'{_capacity_key(capacity)}:{int(round(probability * 10))}'
         for capacity, probability in sorted(belief.items())
     )
     last_capacity = (
@@ -179,6 +169,7 @@ def choose_rl_departure(
     rewards,
     persona,
     known_current_capacity=None,
+    known_incident_status=None,
     policy_version=RL_POLICY_VERSION,
     decision_source='deepseek_fallback_rl',
 ) -> dict:
@@ -189,12 +180,21 @@ def choose_rl_departure(
     )
     belief = capacity_belief(current)
     if known_current_capacity is not None:
-        known = int(known_current_capacity)
-        if known in belief:
-            belief = {
-                capacity: 1.0 if capacity == known else 0.0
-                for capacity in belief
-            }
+        known = float(known_current_capacity)
+        if known > 0:
+            belief = {known: 1.0}
+    elif known_incident_status is not None:
+        desired_label = 'incident_expected' if known_incident_status else 'normal'
+        matching = [
+            capacity
+            for label, capacity in zip(
+                current['capacity_labels'],
+                current['capacity_values'],
+            )
+            if label == desired_label
+        ]
+        if matching:
+            belief = {float(matching[0]): 1.0}
     legal_slots = [dict(item) for item in available_slots]
     if not legal_slots:
         raise ValueError('RL fallback has no legal departure slots.')
@@ -248,7 +248,10 @@ def choose_rl_departure(
         ranked.append((score, expected_cost, slot))
 
     selected_slot = min(ranked)[2]
-    belief_json = {str(capacity): round(probability, 6) for capacity, probability in belief.items()}
+    belief_json = {
+        _capacity_key(capacity): round(probability, 6)
+        for capacity, probability in belief.items()
+    }
     return {
         'departure_slot': selected_slot,
         'decision_source': decision_source,
@@ -291,11 +294,12 @@ def _estimated_cost(
         if load <= 0:
             continue
         first_service_start = max(departure_minute, next_available)
-        batches = max(1, ceil(load / max(1, int(capacity))))
-        queue_delay = max(
-            0.0,
-            first_service_start + (batches - 1) * service_window - departure_minute,
-        )
+        numeric_capacity = float(capacity)
+        if numeric_capacity <= 0:
+            raise ValueError('RL capacity must be positive.')
+        inherited_wait = max(0.0, first_service_start - departure_minute)
+        service_duration = load / numeric_capacity * service_window
+        queue_delay = inherited_wait + max(0.0, service_duration - service_window)
         if slot == selected_slot:
             arrival = departure_minute + free_flow + queue_delay
             early = max(0.0, preferred_arrival - arrival)
@@ -308,7 +312,7 @@ def _estimated_cost(
                 + toll_by_slot.get(slot, 0)
                 - reward_by_slot.get(slot, 0)
             )
-        next_available = first_service_start + batches * service_window
+        next_available = first_service_start + service_duration
 
     return float(selected_cost if selected_cost is not None else fixed_cost)
 
@@ -319,6 +323,13 @@ def _normalized_probabilities(capacity_states):
     if total <= 0:
         return [1 / len(probabilities) for _ in probabilities]
     return [value / total for value in probabilities]
+
+
+def _capacity_key(value):
+    numeric = float(value)
+    if numeric.is_integer():
+        return str(int(numeric))
+    return str(numeric)
 
 
 def _slot_values(items, key):

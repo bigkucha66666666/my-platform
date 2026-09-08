@@ -20,6 +20,7 @@ from .accident_capacity import (
     INFO_I2,
     AccidentRiskConfig,
     AccidentRiskConfigError,
+    accident_public_context,
     generate_accident_sequence,
     load_accident_sequence_bank,
     parse_accident_risk_config,
@@ -1062,6 +1063,43 @@ def agent_capacity_context(
         actual_capacity=actual_capacity,
     )
     context['previous_capacity'] = previous_capacity
+    return context
+
+
+def accident_record_for_group(group):
+    return {
+        'formal_round_number': formal_round_number(group.round_number),
+        'incident_occurred': bool(group.incident_occurred),
+        'capacity_loss_ratio': float(group.capacity_loss_ratio),
+        'remaining_capacity_ratio': float(group.remaining_capacity_ratio),
+        'actual_capacity': float(group.dynamic_capacity),
+        'sequence_id': str(group.accident_sequence_id),
+        'sequence_seed': int(group.accident_sequence_seed),
+    }
+
+
+def public_accident_context_for_group(group, *, after_decision=False):
+    config = parse_accident_risk_config(group.session.config)
+    context = accident_public_context(
+        config,
+        accident_record_for_group(group),
+        after_decision=after_decision,
+        warmup=is_warmup_round(group.round_number),
+    )
+    expected_incident_capacity = context['expected_incident_capacity']
+    context['capacity_states'] = [
+        {
+            'state': 'normal',
+            'capacity': config.normal_capacity,
+            'probability': 1 - config.incident_probability,
+        },
+        {
+            'state': 'incident_expected',
+            'capacity': expected_incident_capacity,
+            'probability': config.incident_probability,
+        },
+    ]
+    context['capacity_reveal_timing'] = config.information_condition
     return context
 
 
@@ -2686,26 +2724,12 @@ def agent_history_for_group(group, agent_id):
 
 
 def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
-    config = parse_dynamic_capacity_config(group.session.config)
     schedule = departure_schedule_for_player(reference_player)
     preview = choice_preview(reference_player)
     phase = round_phase_context(group.round_number)
-    previous_capacity = (
-        reference_player.previous_round_capacity
-        if not phase['is_warmup'] and phase['display_round_number'] > 1
-        else None
-    )
-    capacity_context = agent_capacity_context(
-        config,
-        actual_capacity=group.dynamic_capacity,
-        previous_capacity=previous_capacity,
-    )
+    capacity_context = public_accident_context_for_group(group)
     capacity_context['experiment_phase'] = phase['phase_name']
     capacity_context['round_label'] = phase['round_label']
-    if phase['is_warmup']:
-        capacity_context['actual_capacity'] = group.dynamic_capacity
-        capacity_context['capacity_revealed'] = True
-        capacity_context['capacity_reveal_timing'] = REVEAL_BEFORE_DECISION
     return AgentChoiceSet(
         round_number=phase['display_round_number'],
         total_rounds=phase['display_total_rounds'],
@@ -2829,6 +2853,9 @@ def prepare_independent_rl_decisions_for_group(group):
                 persona=persona,
                 known_current_capacity=choice_set.capacity_context.get(
                     'actual_capacity'
+                ),
+                known_incident_status=choice_set.capacity_context.get(
+                    'incident_occurred'
                 ),
             )
             slot = int(choice['departure_slot'])
@@ -2981,6 +3008,9 @@ def rl_candidate_for_choice_set(group, choice_set):
         rewards=choice_set.rewards,
         persona=choice_set.persona,
         known_current_capacity=visible_capacity,
+        known_incident_status=choice_set.capacity_context.get(
+            'incident_occurred'
+        ),
     )
     return {
         **choice,
@@ -3950,19 +3980,7 @@ class Decision(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_dynamic_capacity_config(player.session.config)
-        if is_warmup_round(player.round_number):
-            context = {
-                'capacity_revealed': True,
-                'capacity_reveal_timing': REVEAL_BEFORE_DECISION,
-                'capacity_states': capacity_state_rows(config),
-                'actual_capacity': player.dynamic_capacity,
-            }
-        else:
-            context = decision_capacity_context(
-                config,
-                actual_capacity=player.dynamic_capacity,
-            )
+        context = public_accident_context_for_group(player.group)
         schedule = departure_schedule_for_player(player)
         preview = choice_preview(player)
         return {

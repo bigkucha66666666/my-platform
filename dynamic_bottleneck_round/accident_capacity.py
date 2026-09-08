@@ -142,6 +142,63 @@ def generate_accident_sequence(
     return records
 
 
+def accident_public_context(
+    config: AccidentRiskConfig,
+    record: Mapping[str, object],
+    *,
+    after_decision=False,
+    warmup=False,
+):
+    expected_loss = config.loss_alpha / (config.loss_alpha + config.loss_beta)
+    expected_incident_capacity = config.normal_capacity * (1 - expected_loss)
+    expected_unconditional_capacity = (
+        (1 - config.incident_probability) * config.normal_capacity
+        + config.incident_probability * expected_incident_capacity
+    )
+    context = {
+        'information_condition': config.information_condition,
+        'normal_capacity': config.normal_capacity,
+        'incident_probability': config.incident_probability,
+        'loss_distribution': {
+            'name': 'beta',
+            'alpha': config.loss_alpha,
+            'beta': config.loss_beta,
+            'expected_loss_ratio': expected_loss,
+        },
+        'expected_incident_capacity': expected_incident_capacity,
+        'expected_unconditional_capacity': expected_unconditional_capacity,
+        'capacity_revealed': bool(
+            after_decision or warmup or config.information_condition == INFO_I2
+        ),
+    }
+    if warmup:
+        context.update(
+            {
+                'is_warmup': True,
+                'incident_occurred': False,
+                'actual_capacity': config.normal_capacity,
+            }
+        )
+        return context
+    if after_decision:
+        context.update(
+            {
+                'incident_occurred': bool(record['incident_occurred']),
+                'capacity_loss_ratio': float(record['capacity_loss_ratio']),
+                'remaining_capacity_ratio': float(
+                    record['remaining_capacity_ratio']
+                ),
+                'actual_capacity': float(record['actual_capacity']),
+            }
+        )
+        return context
+    if config.information_condition in {INFO_I1, INFO_I2}:
+        context['incident_occurred'] = bool(record['incident_occurred'])
+    if config.information_condition == INFO_I2:
+        context['actual_capacity'] = float(record['actual_capacity'])
+    return context
+
+
 def load_accident_sequence_bank(path=None):
     bank_path = Path(path) if path is not None else Path(__file__).with_name(
         SEQUENCE_BANK_FILE

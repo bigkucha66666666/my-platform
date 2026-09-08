@@ -208,5 +208,89 @@ class DynamicRLFallbackPolicyTests(unittest.TestCase):
         self.assertEqual(updated['last_own_public_result'], own_result)
 
 
+class AccidentRLFallbackPolicyTests(unittest.TestCase):
+    def setUp(self):
+        self.capacity_states = (
+            {'state': 'normal', 'capacity': 4.0, 'probability': 0.8},
+            {
+                'state': 'incident_expected',
+                'capacity': 1.490853959841,
+                'probability': 0.2,
+            },
+        )
+        self.slots = (
+            {'slot': 1, 'departure_minute': 473},
+            {'slot': 2, 'departure_minute': 474},
+            {'slot': 3, 'departure_minute': 475},
+        )
+        self.costs = {
+            'fixed_travel_time_cost': 0,
+            'queue_cost_per_minute': 2,
+            'early_cost_per_minute': 1,
+            'late_cost_per_minute': 5,
+            'preferred_arrival_minute': 480,
+            'free_flow_travel_minutes': 6,
+            'capacity_window_minutes': 1,
+        }
+        self.persona = {'traits': {}}
+
+    def test_initial_state_keeps_float_iid_prior_without_transitions(self):
+        state = initial_rl_state(self.capacity_states)
+
+        self.assertEqual(
+            state['capacity_values'],
+            [4.0, 1.490853959841],
+        )
+        self.assertEqual(state['capacity_prior'], [0.8, 0.2])
+        self.assertNotIn('transition_counts', state)
+
+    def test_observation_accepts_any_realized_float_capacity(self):
+        state = initial_rl_state(self.capacity_states)
+
+        updated = observe_rl_outcome(
+            state,
+            revealed_capacity=0.8754321,
+            departure_slot=2,
+            total_cost=17,
+            anonymous_slot_counts={'2': 3},
+            persona=self.persona,
+        )
+
+        self.assertEqual(updated['observed_capacities'], [0.8754321])
+        self.assertEqual(updated['rounds_observed'], 1)
+        self.assertNotIn('transition_counts', updated)
+
+    def test_exact_i2_capacity_overrides_discrete_prior(self):
+        choice = choose_rl_departure(
+            state=initial_rl_state(self.capacity_states),
+            available_slots=self.slots,
+            cost_parameters=self.costs,
+            capacity_states=self.capacity_states,
+            tolls=(),
+            rewards=(),
+            persona=self.persona,
+            known_current_capacity=1.375,
+        )
+
+        self.assertEqual(choice['belief'], {'1.375': 1.0})
+
+    def test_i1_incident_status_collapses_to_conditional_mean_capacity(self):
+        choice = choose_rl_departure(
+            state=initial_rl_state(self.capacity_states),
+            available_slots=self.slots,
+            cost_parameters=self.costs,
+            capacity_states=self.capacity_states,
+            tolls=(),
+            rewards=(),
+            persona=self.persona,
+            known_incident_status=True,
+        )
+
+        self.assertEqual(
+            choice['belief'],
+            {'1.490853959841': 1.0},
+        )
+
+
 if __name__ == '__main__':
     unittest.main()

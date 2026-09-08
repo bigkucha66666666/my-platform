@@ -199,6 +199,7 @@ class DynamicAgentRevealTests(unittest.TestCase):
         self.assertNotIn('actual_capacity', prompt)
         self.assertNotIn('dynamic_capacity', prompt)
 
+
     def test_chat_payload_uses_fast_bounded_json_output(self):
         choice_set = AgentChoiceSet(
             round_number=1,
@@ -329,6 +330,170 @@ class DynamicAgentRevealTests(unittest.TestCase):
         )
 
         self.assertIsNone(choice.memory_summary)
+
+
+class DynamicAgentInformationParityTests(unittest.TestCase):
+    PUBLIC_FIELDS = {
+        'information_condition',
+        'normal_capacity',
+        'incident_probability',
+        'loss_distribution',
+        'expected_incident_capacity',
+        'expected_unconditional_capacity',
+        'capacity_revealed',
+        'incident_occurred',
+        'actual_capacity',
+    }
+
+    @staticmethod
+    def make_round(condition):
+        session = SimpleNamespace(
+            config={
+                'name': 'dynamic_bottleneck_round_demo',
+                'accident_normal_capacity': 4.0,
+                'accident_probability': 0.20,
+                'accident_loss_alpha': 6.83057,
+                'accident_loss_beta': 4.05907,
+                'accident_sequence_seed': 2026090801,
+                'accident_information_condition': condition,
+                'api_agent_mode': 'off',
+                'rl_agent_enabled': '0',
+                'reward_treatment_enabled': 0,
+            },
+            vars={},
+        )
+        schedule = app.static_departure_schedule()
+        participant = SimpleNamespace(
+            vars={
+                app.DEPARTURE_SCHEDULE_VAR: schedule,
+                'assigned_group_label': 'G01',
+            }
+        )
+        player = SimpleNamespace(
+            session=session,
+            participant=participant,
+            round_number=app.C.WARMUP_ROUNDS + 1,
+            dynamic_capacity=1.5,
+            incident_occurred=True,
+            capacity_loss_ratio=0.625,
+            remaining_capacity_ratio=0.375,
+            information_condition=condition,
+            accident_sequence_id='S01',
+            accident_sequence_seed=2026090801,
+            previous_round_capacity=0,
+            coarse_toll_enabled=False,
+            coarse_toll_points=0,
+        )
+        player.field_maybe_none = lambda field_name: getattr(
+            player,
+            field_name,
+            None,
+        )
+        group = SimpleNamespace(
+            session=session,
+            round_number=player.round_number,
+            id_in_subsession=1,
+            dynamic_capacity=1.5,
+            incident_occurred=True,
+            capacity_loss_ratio=0.625,
+            remaining_capacity_ratio=0.375,
+            information_condition=condition,
+            accident_sequence_id='S01',
+            accident_sequence_seed=2026090801,
+            get_players=lambda: [player],
+        )
+        player.group = group
+        return player, group
+
+    def test_human_and_agent_receive_identical_condition_limited_context(self):
+        for condition in ('I0', 'I1', 'I2'):
+            with self.subTest(condition=condition):
+                player, group = self.make_round(condition)
+                preview = [
+                    {
+                        'slot': 1,
+                        'minute': 466,
+                        'time': '07:46',
+                        'toll': 0,
+                        'toll_active': False,
+                        'reward': 0,
+                    }
+                ]
+                with (
+                    patch.object(app, 'choice_preview', return_value=preview),
+                    patch.object(app.Decision, 'get_timeout_seconds', return_value=60),
+                    patch.object(app, 'agent_history_for_group', return_value={}),
+                    patch.object(app, 'limited_memory_for_agent', return_value=''),
+                ):
+                    human_template = app.Decision.vars_for_template(player)
+                    choice_set = app.api_agent_choice_set_for_group(
+                        group,
+                        player,
+                        'G01_API_01',
+                        {},
+                    )
+
+                human_context = {
+                    key: human_template[key]
+                    for key in self.PUBLIC_FIELDS
+                    if key in human_template
+                }
+                agent_context = {
+                    key: choice_set.capacity_context[key]
+                    for key in self.PUBLIC_FIELDS
+                    if key in choice_set.capacity_context
+                }
+                self.assertEqual(human_context, agent_context)
+                self.assertNotIn('capacity_loss_ratio', choice_set.capacity_context)
+                self.assertNotIn('accident_sequence_id', choice_set.capacity_context)
+                self.assertNotIn('accident_sequence_seed', choice_set.capacity_context)
+                if condition == 'I0':
+                    self.assertNotIn('incident_occurred', agent_context)
+                    self.assertNotIn('actual_capacity', agent_context)
+                elif condition == 'I1':
+                    self.assertTrue(agent_context['incident_occurred'])
+                    self.assertNotIn('actual_capacity', agent_context)
+                else:
+                    self.assertEqual(agent_context['actual_capacity'], 1.5)
+
+    def test_rl_fallback_receives_i1_incident_signal_without_hidden_capacity(self):
+        player, group = self.make_round('I1')
+        group.session.config.update(
+            {'api_agent_mode': 'active', 'rl_fallback_enabled': '1'}
+        )
+        choice_set = AgentChoiceSet(
+            round_number=1,
+            total_rounds=60,
+            available_slots=({'slot': 1, 'departure_minute': 466},),
+            cost_parameters={},
+            capacity_context={
+                'information_condition': 'I1',
+                'incident_occurred': True,
+                'capacity_revealed': False,
+                'capacity_states': [
+                    {'state': 'normal', 'capacity': 4.0, 'probability': 0.8},
+                    {
+                        'state': 'incident_expected',
+                        'capacity': 1.490853959841,
+                        'probability': 0.2,
+                    },
+                ],
+            },
+            agent_id='G01_API_01',
+            persona={},
+        )
+        selected = {
+            'departure_slot': 1,
+            'decision_source': 'deepseek_fallback_rl',
+            'reason': '',
+            'belief': {'1.490853959841': 1.0},
+        }
+
+        with patch.object(app, 'choose_rl_departure', return_value=selected) as choose:
+            app.rl_candidate_for_choice_set(group, choice_set)
+
+        self.assertTrue(choose.call_args.kwargs['known_incident_status'])
+        self.assertIsNone(choose.call_args.kwargs['known_current_capacity'])
 
 
 class DynamicAgentDecisionTests(unittest.TestCase):
@@ -1403,6 +1568,18 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
         self.assertIn('rl_agent_enabled', html)
         self.assertIn('rl_agent_count_per_group', html)
         self.assertIn('不会增加 API 等待时间', html)
+
+    def test_create_session_page_has_capacity_sequence_selector(self):
+        html = Path(
+            '_templates/otree/includes/DynamicSessionControls.html'
+        ).read_text(encoding='utf-8')
+
+        self.assertIn('id="dynamic-capacity-sequence-preset"', html)
+        self.assertIn('dynamic_capacity_sequence_preset', html)
+        self.assertIn('value="auto"', html)
+        for sequence_id in ('S01', 'S02', 'S03', 'S04', 'S05'):
+            with self.subTest(sequence_id=sequence_id):
+                self.assertIn(f'value="{sequence_id}"', html)
 
     def test_admin_report_separates_deepseek_rl_and_fallback_metrics(self):
         html = Path('dynamic_bottleneck_round/admin_report.html').read_text(

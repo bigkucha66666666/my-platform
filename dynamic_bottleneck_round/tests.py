@@ -139,6 +139,47 @@ class DynamicCapacityConfigTests(unittest.TestCase):
                 }
             )
 
+    def test_named_sequence_preset_resolves_to_bank_manual_sequence(self):
+        bank = json.loads(
+            Path('dynamic_bottleneck_round/capacity_sequence_bank.json').read_text(
+                encoding='utf-8'
+            )
+        )
+        expected = next(
+            record['manual_sequence_spec']
+            for record in bank['sequences']
+            if record['id'] == 'S01'
+        )
+
+        config = parse_dynamic_capacity_config(
+            {
+                'dynamic_capacity_values': '1,2,3',
+                'dynamic_capacity_probabilities': (
+                    '0.3333333333333333,0.3333333333333333,0.3333333333333334'
+                ),
+                'dynamic_capacity_draw_mode': 'phased_markov',
+                'dynamic_capacity_sequence_preset': 'S01',
+            }
+        )
+
+        self.assertEqual(config.draw_mode, 'manual_sequence')
+        self.assertEqual(config.manual_sequence, tuple(map(int, expected.split(','))))
+
+    def test_unknown_sequence_preset_is_rejected(self):
+        with self.assertRaisesRegex(
+            DynamicCapacityConfigError,
+            'dynamic_capacity_sequence_preset.*S99',
+        ):
+            parse_dynamic_capacity_config(
+                {
+                    'dynamic_capacity_values': '1,2,3',
+                    'dynamic_capacity_probabilities': (
+                        '0.3333333333333333,0.3333333333333333,0.3333333333333334'
+                    ),
+                    'dynamic_capacity_sequence_preset': 'S99',
+                }
+            )
+
 
 class DynamicCapacitySequenceTests(unittest.TestCase):
     def setUp(self):
@@ -1820,6 +1861,7 @@ class SettingsContractTests(unittest.TestCase):
                 '0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
             )
             self.assertEqual(config['dynamic_capacity_manual_sequence'], '')
+            self.assertEqual(config['dynamic_capacity_sequence_preset'], 'auto')
             self.assertEqual(config['dynamic_capacity_sequence_scope'], 'session')
             self.assertEqual(config['capacity_reveal_timing'], 'after_decision')
             self.assertEqual(config['group_agent_spec'], '')
@@ -1857,6 +1899,127 @@ class SettingsContractTests(unittest.TestCase):
             'departure_schedule_last_time',
         }
         self.assertTrue(required.issubset(set(EXPORT_HEADERS)))
+
+
+class AccidentExperimentContractTests(unittest.TestCase):
+    def test_dynamic_settings_use_accident_risk_contract(self):
+        import settings
+
+        configs = {config['name']: config for config in settings.SESSION_CONFIGS}
+        prod = configs['dynamic_bottleneck_round_prod']
+        demo = configs['dynamic_bottleneck_round_demo']
+        for config in (prod, demo):
+            self.assertEqual(config['accident_normal_capacity'], 4.0)
+            self.assertEqual(config['accident_probability'], 0.20)
+            self.assertEqual(config['accident_loss_alpha'], 6.83057)
+            self.assertEqual(config['accident_loss_beta'], 4.05907)
+            self.assertEqual(config['accident_information_condition'], 'I0')
+            self.assertNotIn('dynamic_capacity_draw_mode', config)
+            self.assertNotIn('dynamic_capacity_transition_matrix', config)
+            self.assertNotIn('dynamic_capacity_values', config)
+        self.assertEqual(prod['dynamic_capacity_sequence_preset'], 'S01')
+        self.assertEqual(demo['dynamic_capacity_sequence_preset'], 'auto')
+
+    def test_rounds_costs_and_fixed_action_space_match_approved_design(self):
+        self.assertEqual(C.WARMUP_ROUNDS, 5)
+        self.assertEqual(C.FORMAL_ROUNDS, 60)
+        self.assertEqual(C.NUM_ROUNDS, 65)
+        self.assertEqual(C.NUM_DEPARTURE_SLOTS, 16)
+        self.assertEqual(C.FIXED_TRAVEL_TIME_COST, 0)
+        self.assertEqual(C.QUEUE_COST_PER_MINUTE, 2)
+        self.assertEqual(C.EARLY_COST_PER_MINUTE, 1)
+        self.assertEqual(C.LATE_COST_PER_MINUTE, 5)
+
+        schedule = dynamic_app.static_departure_schedule()
+        self.assertEqual(schedule['num_slots'], 16)
+        self.assertEqual(schedule['first_departure_time'], '07:46')
+        self.assertEqual(schedule['last_departure_time'], '08:01')
+
+    @staticmethod
+    def make_session(name, *, api_mode='off', api_count=0, rl_enabled='0', rl_count=0):
+        return SimpleNamespace(
+            config={
+                'name': name,
+                'api_agent_mode': api_mode,
+                'api_agent_count_per_group': api_count,
+                'rl_agent_enabled': rl_enabled,
+                'rl_agent_count_per_group': rl_count,
+                'group_agent_spec': '',
+            },
+            vars={},
+        )
+
+    def test_formal_human_only_composition_is_exactly_twenty_humans(self):
+        session = self.make_session('dynamic_bottleneck_round_prod')
+
+        result = dynamic_app.validate_formal_actor_composition(
+            session,
+            [[object() for _ in range(20)]],
+        )
+
+        self.assertEqual(result, 'H')
+
+    def test_formal_human_agent_composition_is_sixteen_plus_two_plus_two(self):
+        session = self.make_session(
+            'dynamic_bottleneck_round_prod',
+            api_mode='active',
+            api_count=2,
+            rl_enabled='1',
+            rl_count=2,
+        )
+
+        result = dynamic_app.validate_formal_actor_composition(
+            session,
+            [[object() for _ in range(16)]],
+        )
+
+        self.assertEqual(result, 'HA')
+
+    def test_formal_composition_rejects_any_other_actor_counts(self):
+        invalid = (
+            self.make_session('dynamic_bottleneck_round_prod'),
+            self.make_session(
+                'dynamic_bottleneck_round_prod',
+                api_mode='active',
+                api_count=2,
+                rl_enabled='1',
+                rl_count=2,
+            ),
+            self.make_session(
+                'dynamic_bottleneck_round_prod',
+                api_mode='active',
+                api_count=2,
+            ),
+        )
+        matrices = (
+            [[object() for _ in range(19)]],
+            [[object() for _ in range(20)]],
+            [[object() for _ in range(18)]],
+        )
+        for session, matrix in zip(invalid, matrices):
+            with self.subTest(config=session.config):
+                with self.assertRaisesRegex(ValueError, '20 Human|16 Human'):
+                    dynamic_app.validate_formal_actor_composition(session, matrix)
+
+    def test_formal_composition_rejects_group_specific_agent_configuration(self):
+        session = self.make_session('dynamic_bottleneck_round_prod')
+        session.config['group_agent_spec'] = 'G01:api=0,rl=0'
+
+        with self.assertRaisesRegex(ValueError, 'group_agent_spec'):
+            dynamic_app.validate_formal_actor_composition(
+                session,
+                [[object() for _ in range(20)]],
+            )
+
+    def test_demo_allows_smaller_actor_count(self):
+        session = self.make_session('dynamic_bottleneck_round_demo')
+
+        result = dynamic_app.validate_formal_actor_composition(
+            session,
+            [[object() for _ in range(5)]],
+        )
+
+        self.assertEqual(result, 'demo')
 
 
 class PlayerBot(Bot):

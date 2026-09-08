@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from functools import lru_cache
 import fcntl
 from math import ceil, floor, isfinite
 import json
@@ -51,6 +52,8 @@ DRAW_MODE_BALANCED = 'balanced_shuffle'
 DRAW_MODE_IID = 'iid'
 DRAW_MODE_PHASED_MARKOV = 'phased_markov'
 DRAW_MODE_MANUAL_SEQUENCE = 'manual_sequence'
+CAPACITY_SEQUENCE_PRESET_AUTO = 'auto'
+CAPACITY_SEQUENCE_BANK_FILE = 'capacity_sequence_bank.json'
 CAPACITY_SEQUENCE_SCOPE_GROUP = 'group'
 CAPACITY_SEQUENCE_SCOPE_SESSION = 'session'
 REVEAL_BEFORE_DECISION = 'before_decision'
@@ -130,7 +133,68 @@ def _csv_items(value, field_name):
     return items
 
 
+@lru_cache(maxsize=1)
+def load_capacity_sequence_bank():
+    path = Path(__file__).with_name(CAPACITY_SEQUENCE_BANK_FILE)
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+    except FileNotFoundError as exc:
+        raise DynamicCapacityConfigError(
+            f'服务率序列库不存在：{path.name}。'
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise DynamicCapacityConfigError(
+            f'服务率序列库 {path.name} 不是有效 JSON。'
+        ) from exc
+
+    raw_records = payload.get('sequences') if isinstance(payload, dict) else None
+    if not isinstance(raw_records, list) or not raw_records:
+        raise DynamicCapacityConfigError('服务率序列库中没有可用序列。')
+
+    records = {}
+    for raw_record in raw_records:
+        if not isinstance(raw_record, dict):
+            raise DynamicCapacityConfigError('服务率序列库记录格式错误。')
+        sequence_id = str(raw_record.get('id', '') or '').strip().upper()
+        sequence_spec = str(
+            raw_record.get('manual_sequence_spec', '') or ''
+        ).strip()
+        if not sequence_id or not sequence_spec:
+            raise DynamicCapacityConfigError(
+                '服务率序列库记录必须包含 id 和 manual_sequence_spec。'
+            )
+        if sequence_id in records:
+            raise DynamicCapacityConfigError(
+                f'服务率序列库中存在重复编号 {sequence_id}。'
+            )
+        records[sequence_id] = sequence_spec
+    return records
+
+
+def manual_sequence_spec_for_preset(session_config):
+    raw_preset = str(
+        session_config.get(
+            'dynamic_capacity_sequence_preset',
+            CAPACITY_SEQUENCE_PRESET_AUTO,
+        )
+        or CAPACITY_SEQUENCE_PRESET_AUTO
+    ).strip()
+    if not raw_preset or raw_preset.lower() == CAPACITY_SEQUENCE_PRESET_AUTO:
+        return None
+
+    preset = raw_preset.upper()
+    bank = load_capacity_sequence_bank()
+    if preset not in bank:
+        available = ', '.join(sorted(bank))
+        raise DynamicCapacityConfigError(
+            f'dynamic_capacity_sequence_preset={preset} 不存在；'
+            f'可选值为 auto, {available}。'
+        )
+    return bank[preset]
+
+
 def parse_dynamic_capacity_config(session_config) -> DynamicCapacityConfig:
+    preset_manual_sequence = manual_sequence_spec_for_preset(session_config)
     raw_values = _csv_items(
         session_config.get('dynamic_capacity_values', '1,2,3'),
         'dynamic_capacity_values',
@@ -176,9 +240,13 @@ def parse_dynamic_capacity_config(session_config) -> DynamicCapacityConfig:
     except (TypeError, ValueError) as exc:
         raise DynamicCapacityConfigError('dynamic_capacity_seed 必须是整数。') from exc
 
-    draw_mode = str(
-        session_config.get('dynamic_capacity_draw_mode', DRAW_MODE_BALANCED)
-    ).strip().lower()
+    draw_mode = (
+        DRAW_MODE_MANUAL_SEQUENCE
+        if preset_manual_sequence is not None
+        else str(
+            session_config.get('dynamic_capacity_draw_mode', DRAW_MODE_BALANCED)
+        ).strip().lower()
+    )
     if draw_mode not in {
         DRAW_MODE_BALANCED,
         DRAW_MODE_IID,
@@ -241,9 +309,13 @@ def parse_dynamic_capacity_config(session_config) -> DynamicCapacityConfig:
             '且每行均由 0 到 1 的有限概率组成并且概率之和为 1。'
         )
 
-    raw_manual_sequence = str(
-        session_config.get('dynamic_capacity_manual_sequence', '') or ''
-    ).strip()
+    raw_manual_sequence = (
+        preset_manual_sequence
+        if preset_manual_sequence is not None
+        else str(
+            session_config.get('dynamic_capacity_manual_sequence', '') or ''
+        ).strip()
+    )
     try:
         manual_sequence = tuple(
             int(item.strip())
@@ -466,7 +538,7 @@ def should_start_round(*, ready_count, group_size, now_ts, deadline_ts):
 class C(BaseConstants):
     NAME_IN_URL = 'dynamic_bottleneck_round'
     PLAYERS_PER_GROUP = None
-    WARMUP_ROUNDS = 2
+    WARMUP_ROUNDS = 5
     FORMAL_ROUNDS = 60
     NUM_ROUNDS = WARMUP_ROUNDS + FORMAL_ROUNDS
 
@@ -481,15 +553,15 @@ class C(BaseConstants):
     FREE_FLOW_TRAVEL_MINUTES = 6
     CAPACITY_WINDOW_MINUTES = 1
     DEPARTURE_CHOICE_STEP_MINUTES = 1
-    NUM_DEPARTURE_SLOTS = 21
+    NUM_DEPARTURE_SLOTS = 16
     MAX_DEPARTURE_SLOT_CHOICES = 401
-    FIRST_DEPARTURE_MINUTE = PREFERRED_ARRIVAL_MINUTE - FREE_FLOW_TRAVEL_MINUTES - 10
+    FIRST_DEPARTURE_MINUTE = 7 * 60 + 46
 
     BASE_POINTS = 140
-    FIXED_TRAVEL_TIME_COST = 12
+    FIXED_TRAVEL_TIME_COST = 0
     QUEUE_COST_PER_MINUTE = 2
     EARLY_COST_PER_MINUTE = 1
-    LATE_COST_PER_MINUTE = 3
+    LATE_COST_PER_MINUTE = 5
 
 
 def is_warmup_round(round_number):
@@ -930,6 +1002,31 @@ def effective_group_actor_count(session, human_count, group_id=None) -> int:
     )
 
 
+def validate_formal_actor_composition(session, matrix):
+    if session.config.get('name') != 'dynamic_bottleneck_round_prod':
+        return 'demo'
+    if str(session.config.get('group_agent_spec', '') or '').strip():
+        raise ValueError(
+            '事故风险正式实验不允许使用 group_agent_spec 按组改变主体构成。'
+        )
+    if len(matrix) != 1:
+        raise ValueError(
+            '事故风险正式实验每个 Session 必须且只能包含一个实验组。'
+        )
+
+    human_count = len(matrix[0])
+    api_count = api_agent_count_per_group(session, 1)
+    rl_count = rl_agent_count_per_group(session, 1)
+    if (human_count, api_count, rl_count) == (20, 0, 0):
+        return 'H'
+    if (human_count, api_count, rl_count) == (16, 2, 2):
+        return 'HA'
+    raise ValueError(
+        '事故风险正式实验主体构成只能是 20 Human，'
+        '或 16 Human + 2 LLM + 2 RL。'
+    )
+
+
 def agent_capacity_context(
     config: DynamicCapacityConfig,
     *,
@@ -1025,11 +1122,24 @@ def build_dynamic_departure_schedule(
 
 
 def static_departure_schedule():
-    return build_dynamic_departure_schedule(
-        players_count=0,
-        capacity_values=(1,),
-        min_slots_each_side=(C.NUM_DEPARTURE_SLOTS - 1) // 2,
-    )
+    first_minute = C.FIRST_DEPARTURE_MINUTE
+    last_minute = first_minute + (
+        C.NUM_DEPARTURE_SLOTS - 1
+    ) * C.DEPARTURE_CHOICE_STEP_MINUTES
+    return {
+        'enabled': True,
+        'source': 'fixed_accident_design',
+        'players_count': 20,
+        'capacity_basis': 4.0,
+        'required_occupied_slots': C.NUM_DEPARTURE_SLOTS,
+        'slots_each_side': None,
+        'num_slots': C.NUM_DEPARTURE_SLOTS,
+        'slot_size_minutes': C.DEPARTURE_CHOICE_STEP_MINUTES,
+        'first_departure_minute': first_minute,
+        'last_departure_minute': last_minute,
+        'first_departure_time': minute_to_clock(first_minute),
+        'last_departure_time': minute_to_clock(last_minute),
+    }
 
 
 def departure_schedule_for_player(player):

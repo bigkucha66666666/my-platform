@@ -103,32 +103,12 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     cohort_size=0,
     grouping_enabled=0,
     manual_grouping_spec='',
-    dynamic_warmup_capacity=2,
-    dynamic_capacity_values='1,2,3',
-    dynamic_capacity_probabilities='0.3333333333333333,0.3333333333333333,0.3333333333333334',
-    dynamic_capacity_seed=20260718,
-    dynamic_capacity_draw_mode='phased_markov',
-    dynamic_capacity_random_rounds=20,
-    dynamic_capacity_transition_matrix='0.8,0.1,0.1;0.1,0.8,0.1;0.1,0.1,0.8',
-    dynamic_capacity_manual_sequence='',
-    dynamic_capacity_sequence_scope='session',
-    capacity_reveal_timing='after_decision',
-    reward_treatment_enabled=0,
-    rewarded_slot_spec='',
-    reward_bonus_points=0,
-    departure_schedule_auto_enabled=1,
-    departure_schedule_min_slots_each_side=10,
-    coarse_toll_auto_enabled=0,
-    coarse_toll_auto_min_toll=0,
-    coarse_toll_auto_max_toll=40,
-    coarse_toll_auto_toll_step=1,
-    coarse_toll_auto_mode='auto',
-    coarse_toll_auto_approx_refine_pool_size=8,
-    coarse_toll_auto_approx_refine_iterations=160,
-    coarse_toll_enabled=1,
-    coarse_toll_slot_spec='10-12',
-    coarse_toll_time_window_spec='07:53-07:55',
-    coarse_toll_points=3,
+    accident_normal_capacity=4.0,
+    accident_probability=0.20,
+    accident_loss_alpha=6.83057,
+    accident_loss_beta=4.05907,
+    accident_sequence_seed=2026090801,
+    accident_information_condition='I0',
     api_agent_mode=DYNAMIC_BOTTLENECK_API_AGENT_MODE,
     api_agent_count_per_group=DYNAMIC_BOTTLENECK_API_AGENT_COUNT,
     group_agent_spec='',
@@ -241,15 +221,14 @@ SESSION_CONFIGS = [
             'payment_info',
         ],
         doc=(
-            "用于真实被试的动态瓶颈服务率实验。\n"
-            "先完成 2 轮固定服务率热身，热身不计入正式数据与收益。\n"
-            "随后进行 60 轮正式实验：前 20 轮独立随机，后 40 轮按 Markov 规律变化。\n"
-            "默认各组共用同一条逐轮服务率序列；group_agent_spec 可按组配置 API/RL Agent。\n"
-            "本轮服务率在提交后公布；默认关闭奖励并使用统一手动粗收费。\n"
-            "创建 Session 时可选择是否加入 Agent，并设置每组 Agent 数量。"
+            "用于真实被试的事故风险动态瓶颈实验。\n"
+            "先完成 5 轮正常容量练习，随后完成 60 轮独立事故风险正式实验。\n"
+            "正式场次必须使用 S01-S05 固定事故序列，并选择 I0、I1 或 I2 信息条件。\n"
+            "主体构成必须为 20 Human，或 16 Human + 2 LLM + 2 RL。"
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
         **DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        dynamic_capacity_sequence_preset='S01',
         num_demo_participants=1,
     ),
     dict(
@@ -257,12 +236,11 @@ SESSION_CONFIGS = [
         display_name="演示测试 · 动态瓶颈服务率",
         app_sequence=['dynamic_bottleneck_round', 'dynamic_bottleneck_survey'],
         doc=(
-            "用于 2 轮热身 + 动态瓶颈服务率 20+40 轮正式实验的流程走查。\n"
-            "默认使用 1、2、3 人/分钟三种状态，各组共用同一条逐轮服务率序列；"
-            "本轮服务率在提交后公布，并使用不随服务率变化的统一手动粗收费；"
-            "创建时可选择是否加入 Agent。"
+            "用于 5 轮练习 + 60 轮事故风险动态瓶颈正式实验的流程走查。\n"
+            "默认按固定种子生成可复现事故序列；可切换 S01-S05 固定序列。"
         ),
         **DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        dynamic_capacity_sequence_preset='auto',
         num_demo_participants=5,
     ),
 ]

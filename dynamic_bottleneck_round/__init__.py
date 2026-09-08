@@ -734,31 +734,17 @@ EXPORT_HEADERS = [
     'participant_code',
     'group_id',
     'round_number',
+    'treatment_condition',
+    'actor_composition',
+    'information_condition',
+    'incident_occurred',
+    'capacity_loss_ratio',
+    'remaining_capacity_ratio',
     'dynamic_capacity',
     'dynamic_capacity_state',
-    'previous_round_capacity',
-    'capacity_probability',
-    'capacity_reveal_timing',
-    'dynamic_capacity_seed',
-    'dynamic_capacity_draw_mode',
-    'coarse_toll_source',
-    'coarse_toll_auto_enabled',
-    'coarse_toll_calibration_source',
-    'coarse_toll_calibration_mode',
-    'coarse_toll_calibration_players',
-    'coarse_toll_calibration_capacity',
-    'coarse_toll_calibration_cost_gap',
-    'coarse_toll_calibration_deviation_gap',
-    'coarse_toll_calibration_nash_count',
-    'coarse_toll_equilibrium_distribution',
-    'coarse_toll_equilibrium_costs',
-    'coarse_toll_enabled',
-    'coarse_toll_slot_spec',
-    'coarse_toll_time_window_spec',
-    'coarse_toll_points',
-    'coarse_toll_charge',
+    'accident_sequence_id',
+    'accident_sequence_seed',
     'departure_schedule_source',
-    'departure_schedule_capacity_basis',
     'departure_schedule_num_slots',
     'departure_schedule_first_time',
     'departure_schedule_last_time',
@@ -768,6 +754,7 @@ EXPORT_HEADERS = [
     'arrival_minute',
     'early_minutes',
     'late_minutes',
+    'slot_load',
     'total_cost',
     'payoff',
     'decision_source',
@@ -3414,7 +3401,13 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
     all_costs = [cost for values in costs_by_slot.values() for cost in values]
     return {
         'round_number': round_phase_context(group.round_number)['display_round_number'],
-        'dynamic_capacity': int(group.dynamic_capacity),
+        'incident_occurred': bool(group.incident_occurred),
+        'capacity_loss_ratio': float(group.capacity_loss_ratio),
+        'remaining_capacity_ratio': float(group.remaining_capacity_ratio),
+        'actual_capacity': float(group.dynamic_capacity),
+        'dynamic_capacity': float(group.dynamic_capacity),
+        'information_condition': str(group.information_condition),
+        'accident_sequence_id': str(group.accident_sequence_id),
         'departure_outcomes': [
             {
                 'slot': slot,
@@ -3513,83 +3506,81 @@ def result_current_round_cost_snapshot(player):
     }
 
 
+def accident_export_metadata(player):
+    actor_composition = str(
+        getattr(player, 'actor_composition', '')
+        or player.participant.vars.get('dynamic_bottleneck_treatment_group', '')
+        or 'H'
+    )
+    information_condition = str(
+        getattr(player, 'information_condition', '') or INFO_I0
+    )
+    return {
+        'treatment_condition': f'{actor_composition}-{information_condition}',
+        'actor_composition': actor_composition,
+        'information_condition': information_condition,
+        'incident_occurred': bool(getattr(player, 'incident_occurred', False)),
+        'capacity_loss_ratio': round(float(getattr(player, 'capacity_loss_ratio', 0)), 6),
+        'remaining_capacity_ratio': round(
+            float(getattr(player, 'remaining_capacity_ratio', 1)),
+            6,
+        ),
+        'dynamic_capacity': round(float(getattr(player, 'dynamic_capacity', 0)), 6),
+        'dynamic_capacity_state': str(getattr(player, 'dynamic_capacity_state', '')),
+        'accident_sequence_id': str(getattr(player, 'accident_sequence_id', '')),
+        'accident_sequence_seed': int(
+            getattr(player, 'accident_sequence_seed', 0) or 0
+        ),
+    }
+
+
 def export_row_for_player(player):
     schedule = departure_schedule_for_player(player)
-    exported_round_number = formal_round_number(player.round_number)
     dropout_audit = dropout_audit_for_player_round(player)
-    return [
-        player.session.code,
-        player.participant.code,
-        player.group.id_in_subsession,
-        exported_round_number,
-        player.dynamic_capacity,
-        player.dynamic_capacity_state,
-        (
-            player.previous_round_capacity
-            if exported_round_number is not None and exported_round_number > 1
-            else ''
+    values = {
+        **accident_export_metadata(player),
+        'session_code': player.session.code,
+        'participant_code': getattr(player.participant, 'code', ''),
+        'group_id': player.group.id_in_subsession,
+        'round_number': formal_round_number(player.round_number),
+        'departure_schedule_source': schedule.get('source', ''),
+        'departure_schedule_num_slots': schedule.get('num_slots', ''),
+        'departure_schedule_first_time': schedule.get('first_departure_time', ''),
+        'departure_schedule_last_time': schedule.get('last_departure_time', ''),
+        'departure_slot': player.field_maybe_none('departure_slot') or '',
+        'departure_minute': player.field_maybe_none('departure_minute') or '',
+        'queue_delay_minutes': getattr(player, 'queue_delay_minutes', 0),
+        'arrival_minute': getattr(player, 'arrival_minute', 0),
+        'early_minutes': getattr(player, 'early_minutes', 0),
+        'late_minutes': getattr(player, 'late_minutes', 0),
+        'slot_load': getattr(player, 'slot_load', 0),
+        'total_cost': getattr(player, 'total_cost', 0),
+        'payoff': getattr(player, 'payoff', 0),
+        'decision_source': getattr(player, 'decision_source', ''),
+        'timeout_happened': bool(getattr(player, 'timeout_happened', False)),
+        'dropout_event': getattr(player, 'dropout_event', ''),
+        'recovered_this_round': bool(getattr(player, 'recovered_this_round', False)),
+        'recovery_reason': getattr(player, 'recovery_reason', ''),
+        'historical_dropout': bool(participant_var(player, 'is_dropout', False)),
+        'dropout_active_at_export': participant_dropout_active(player),
+        'dropout_reason_at_export': participant_dropout_reason(player),
+        'has_recovered_after_disconnect': bool(
+            participant_var(player, 'has_recovered_after_disconnect', False)
         ),
-        player.capacity_probability,
-        player.capacity_reveal_timing,
-        player.dynamic_capacity_seed,
-        player.dynamic_capacity_draw_mode,
-        player.coarse_toll_source,
-        player.coarse_toll_auto_enabled,
-        player.coarse_toll_calibration_source,
-        player.coarse_toll_calibration_mode,
-        player.coarse_toll_calibration_players,
-        player.coarse_toll_calibration_capacity,
-        player.coarse_toll_calibration_cost_gap,
-        player.coarse_toll_calibration_deviation_gap,
-        player.coarse_toll_calibration_nash_count,
-        player.coarse_toll_equilibrium_distribution,
-        player.coarse_toll_equilibrium_costs,
-        player.coarse_toll_enabled,
-        player.coarse_toll_slot_spec,
-        player.coarse_toll_time_window_spec,
-        player.coarse_toll_points,
-        player.coarse_toll_charge,
-        schedule.get('source', ''),
-        schedule.get('capacity_basis', ''),
-        schedule.get('num_slots', ''),
-        schedule.get('first_departure_time', ''),
-        schedule.get('last_departure_time', ''),
-        player.field_maybe_none('departure_slot') or '',
-        player.field_maybe_none('departure_minute') or '',
-        player.queue_delay_minutes,
-        player.arrival_minute,
-        player.early_minutes,
-        player.late_minutes,
-        player.total_cost,
-        player.payoff,
-        player.decision_source,
-        player.timeout_happened,
-        player.dropout_event,
-        player.recovered_this_round,
-        player.recovery_reason,
-        bool(participant_var(player, 'is_dropout', False)),
-        participant_dropout_active(player),
-        participant_dropout_reason(player),
-        bool(participant_var(player, 'has_recovered_after_disconnect', False)),
-        bool(participant_var(player, 'has_recovered_after_timeout', False)),
-        int(dropout_audit.get('consecutive_missed_decisions', 0) or 0),
-        bool(dropout_audit.get('dropout_suspended', False)),
-        dropout_audit.get('automatic_choice_strategy', ''),
-        'human',
-        '',
-        '',
-        api_agent_mode(player.session),
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-    ]
+        'has_recovered_after_timeout': bool(
+            participant_var(player, 'has_recovered_after_timeout', False)
+        ),
+        'consecutive_missed_decisions': int(
+            dropout_audit.get('consecutive_missed_decisions', 0) or 0
+        ),
+        'dropout_suspended': bool(dropout_audit.get('dropout_suspended', False)),
+        'automatic_choice_strategy': dropout_audit.get(
+            'automatic_choice_strategy', ''
+        ),
+        'actor_type': 'human',
+        'api_agent_mode': api_agent_mode(player.session),
+    }
+    return [values.get(header, '') for header in EXPORT_HEADERS]
 
 
 def agent_decisions_for_players(players):
@@ -3646,7 +3637,6 @@ def export_row_for_agent_record(record, reference_player):
         'consecutive_missed_decisions': 0,
         'dropout_suspended': False,
         'automatic_choice_strategy': '',
-        'coarse_toll_charge': record.get('coarse_toll_charge', 0),
         'actor_type': record.get('actor_type', API_AGENT_TYPE_DEEPSEEK),
         'agent_id': record.get('agent_id', ''),
         'agent_type': record.get('agent_type', ''),
@@ -3663,7 +3653,8 @@ def export_row_for_agent_record(record, reference_player):
         'rl_rounds_observed': record.get('rounds_observed', ''),
     }
     for field_name, value in values.items():
-        row[EXPORT_HEADERS.index(field_name)] = value
+        if field_name in EXPORT_HEADERS:
+            row[EXPORT_HEADERS.index(field_name)] = value
     return row
 
 

@@ -2243,6 +2243,108 @@ class DynamicAccidentCostTests(unittest.TestCase):
         )
 
 
+class DynamicAccidentExportTests(unittest.TestCase):
+    @staticmethod
+    def make_player_and_group():
+        session = SimpleNamespace(code='SESSION01', config={}, vars={})
+        participant = SimpleNamespace(vars={})
+        player = SimpleNamespace(
+            session=session,
+            participant=participant,
+            round_number=C.WARMUP_ROUNDS + 1,
+            dynamic_capacity=1.50123456789,
+            incident_occurred=True,
+            capacity_loss_ratio=0.6246913580275,
+            remaining_capacity_ratio=0.3753086419725,
+            information_condition='I1',
+            accident_sequence_id='S01',
+            accident_sequence_seed=2026090801,
+            actor_composition='H',
+            departure_slot=1,
+            departure_minute=466,
+            total_cost=12,
+        )
+        player.field_maybe_none = lambda field_name: getattr(
+            player,
+            field_name,
+            None,
+        )
+        group = SimpleNamespace(
+            session=session,
+            round_number=player.round_number,
+            id_in_subsession=1,
+            dynamic_capacity=player.dynamic_capacity,
+            incident_occurred=True,
+            capacity_loss_ratio=player.capacity_loss_ratio,
+            remaining_capacity_ratio=player.remaining_capacity_ratio,
+            information_condition='I1',
+            accident_sequence_id='S01',
+            accident_sequence_seed=2026090801,
+            get_players=lambda: [player],
+        )
+        player.group = group
+        return player, group
+
+    def test_public_snapshot_contains_realized_accident_without_identity(self):
+        player, group = self.make_player_and_group()
+
+        snapshot = dynamic_app.public_feedback_snapshot_for_group(
+            group,
+            virtual_records=[],
+        )
+
+        self.assertTrue(snapshot['incident_occurred'])
+        self.assertEqual(snapshot['capacity_loss_ratio'], player.capacity_loss_ratio)
+        self.assertEqual(
+            snapshot['remaining_capacity_ratio'],
+            player.remaining_capacity_ratio,
+        )
+        self.assertEqual(snapshot['actual_capacity'], player.dynamic_capacity)
+        self.assertEqual(snapshot['information_condition'], 'I1')
+        self.assertEqual(snapshot['accident_sequence_id'], 'S01')
+        serialized = json.dumps(snapshot, ensure_ascii=False)
+        self.assertNotIn('participant_code', serialized)
+        self.assertNotIn('actor_type', serialized)
+        self.assertNotIn('agent_id', serialized)
+
+    def test_export_schema_uses_accident_treatment_fields_not_markov_fields(self):
+        required = {
+            'treatment_condition',
+            'actor_composition',
+            'information_condition',
+            'incident_occurred',
+            'capacity_loss_ratio',
+            'remaining_capacity_ratio',
+            'dynamic_capacity',
+            'accident_sequence_id',
+            'accident_sequence_seed',
+        }
+        removed = {
+            'previous_round_capacity',
+            'capacity_probability',
+            'capacity_reveal_timing',
+            'dynamic_capacity_seed',
+            'dynamic_capacity_draw_mode',
+            'coarse_toll_calibration_capacity',
+            'coarse_toll_points',
+            'coarse_toll_charge',
+        }
+
+        self.assertTrue(required.issubset(EXPORT_HEADERS))
+        self.assertTrue(removed.isdisjoint(EXPORT_HEADERS))
+
+    def test_export_metadata_rounds_only_serialized_accident_values(self):
+        player, _group = self.make_player_and_group()
+
+        metadata = dynamic_app.accident_export_metadata(player)
+
+        self.assertEqual(metadata['treatment_condition'], 'H-I1')
+        self.assertEqual(metadata['capacity_loss_ratio'], 0.624691)
+        self.assertEqual(metadata['remaining_capacity_ratio'], 0.375309)
+        self.assertEqual(metadata['dynamic_capacity'], 1.501235)
+        self.assertEqual(player.dynamic_capacity, 1.50123456789)
+
+
 class PlayerBot(Bot):
     cases = ['staggered', 'same_time', 'timeout_recovery']
 

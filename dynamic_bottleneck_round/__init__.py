@@ -224,7 +224,13 @@ def round_phase_context(round_number):
 
 def formal_payoff_total(player):
     return sum(
-        round_player.payoff
+        float(
+            getattr(
+                round_player,
+                'payoff_unrounded',
+                round_player.payoff,
+            )
+        )
         for round_player in player.in_all_rounds()
         if not is_warmup_round(round_player.round_number)
     )
@@ -289,7 +295,8 @@ class Player(BasePlayer):
     late_minutes = models.FloatField(initial=0)
     slot_load = models.IntegerField(initial=0)
 
-    total_cost = models.CurrencyField(initial=0)
+    total_cost = models.FloatField(initial=0)
+    payoff_unrounded = models.FloatField(initial=0)
     reward_bonus = models.CurrencyField(initial=0)
     coarse_toll_charge = models.CurrencyField(initial=0)
     coarse_toll_source = models.StringField(blank=True)
@@ -1041,12 +1048,12 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=
     toll_cost = 0.0
     total_cost = fixed_cost + queue_cost + early_cost + late_cost
     return {
-        'fixed_cost': round(fixed_cost, 2),
-        'queue_cost': round(queue_cost, 2),
-        'early_cost': round(early_cost, 2),
-        'late_cost': round(late_cost, 2),
+        'fixed_cost': fixed_cost,
+        'queue_cost': queue_cost,
+        'early_cost': early_cost,
+        'late_cost': late_cost,
         'toll_cost': toll_cost,
-        'total_cost': round(total_cost, 2),
+        'total_cost': total_cost,
     }
 
 
@@ -1489,25 +1496,23 @@ def _set_results_locked(group):
             )
             total_cost = cost_components['total_cost']
             payoff = (
-                0
+                0.0
                 if is_warmup_round(group.round_number)
-                else max(0, round(C.BASE_POINTS - total_cost, 2))
+                else max(0.0, float(C.BASE_POINTS) - total_cost)
             )
             result_values = {
                 'slot_load': load,
-                'arrival_minute': round(arrival_minute, 2),
+                'arrival_minute': arrival_minute,
                 'arrival_time_label': minute_to_clock(arrival_minute),
                 'queue_delay_minutes': queue_delay,
-                'travel_time_minutes': round(
-                    C.FREE_FLOW_TRAVEL_MINUTES + queue_delay,
-                    2,
-                ),
-                'early_minutes': round(early_minutes, 2),
-                'late_minutes': round(late_minutes, 2),
-                'reward_bonus': round(float(reward_bonus), 2),
-                'coarse_toll_charge': round(float(toll), 2),
-                'total_cost': round(float(total_cost), 2),
-                'payoff': round(float(payoff), 2),
+                'travel_time_minutes': C.FREE_FLOW_TRAVEL_MINUTES + queue_delay,
+                'early_minutes': early_minutes,
+                'late_minutes': late_minutes,
+                'reward_bonus': float(reward_bonus),
+                'coarse_toll_charge': float(toll),
+                'total_cost': float(total_cost),
+                'payoff_unrounded': float(payoff),
+                'payoff': float(payoff),
             }
             if actor['actor_type'] != 'human':
                 source.update(result_values)
@@ -1517,7 +1522,6 @@ def _set_results_locked(group):
                     if field_name in {
                         'reward_bonus',
                         'coarse_toll_charge',
-                        'total_cost',
                         'payoff',
                     }:
                         value = cu(value)
@@ -2607,6 +2611,10 @@ def accident_export_metadata(player):
     }
 
 
+def export_float(value):
+    return round(float(value or 0), 6)
+
+
 def export_row_for_player(player):
     schedule = departure_schedule_for_player(player)
     dropout_audit = dropout_audit_for_player_round(player)
@@ -2622,13 +2630,17 @@ def export_row_for_player(player):
         'departure_schedule_last_time': schedule.get('last_departure_time', ''),
         'departure_slot': player.field_maybe_none('departure_slot') or '',
         'departure_minute': player.field_maybe_none('departure_minute') or '',
-        'queue_delay_minutes': getattr(player, 'queue_delay_minutes', 0),
-        'arrival_minute': getattr(player, 'arrival_minute', 0),
-        'early_minutes': getattr(player, 'early_minutes', 0),
-        'late_minutes': getattr(player, 'late_minutes', 0),
+        'queue_delay_minutes': export_float(
+            getattr(player, 'queue_delay_minutes', 0)
+        ),
+        'arrival_minute': export_float(getattr(player, 'arrival_minute', 0)),
+        'early_minutes': export_float(getattr(player, 'early_minutes', 0)),
+        'late_minutes': export_float(getattr(player, 'late_minutes', 0)),
         'slot_load': getattr(player, 'slot_load', 0),
-        'total_cost': getattr(player, 'total_cost', 0),
-        'payoff': getattr(player, 'payoff', 0),
+        'total_cost': export_float(getattr(player, 'total_cost', 0)),
+        'payoff': export_float(
+            getattr(player, 'payoff_unrounded', getattr(player, 'payoff', 0))
+        ),
         'decision_source': getattr(player, 'decision_source', ''),
         'timeout_happened': bool(getattr(player, 'timeout_happened', False)),
         'dropout_event': getattr(player, 'dropout_event', ''),
@@ -2684,19 +2696,24 @@ def export_row_for_agent_record(record, reference_player):
         'participant_code': '',
         'group_id': record.get('group_id', reference_player.group.id_in_subsession),
         'round_number': formal_round_number(reference_player.round_number),
-        'dynamic_capacity': record.get('dynamic_capacity', reference_player.dynamic_capacity),
+        'dynamic_capacity': export_float(
+            record.get('dynamic_capacity', reference_player.dynamic_capacity)
+        ),
         'dynamic_capacity_state': record.get(
             'dynamic_capacity_state',
             reference_player.dynamic_capacity_state,
         ),
         'departure_slot': record.get('departure_slot', ''),
         'departure_minute': record.get('departure_minute', ''),
-        'queue_delay_minutes': record.get('queue_delay_minutes', 0),
-        'arrival_minute': record.get('arrival_minute', 0),
-        'early_minutes': record.get('early_minutes', 0),
-        'late_minutes': record.get('late_minutes', 0),
-        'total_cost': record.get('total_cost', 0),
-        'payoff': record.get('payoff', 0),
+        'queue_delay_minutes': export_float(record.get('queue_delay_minutes', 0)),
+        'arrival_minute': export_float(record.get('arrival_minute', 0)),
+        'early_minutes': export_float(record.get('early_minutes', 0)),
+        'late_minutes': export_float(record.get('late_minutes', 0)),
+        'slot_load': int(record.get('slot_load', 0) or 0),
+        'total_cost': export_float(record.get('total_cost', 0)),
+        'payoff': export_float(
+            record.get('payoff_unrounded', record.get('payoff', 0))
+        ),
         'decision_source': record.get('decision_source', ''),
         'timeout_happened': False,
         'dropout_event': '',

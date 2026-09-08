@@ -13,6 +13,7 @@ INFO_I1 = 'I1'
 INFO_I2 = 'I2'
 INFORMATION_CONDITIONS = {INFO_I0, INFO_I1, INFO_I2}
 SEQUENCE_BANK_FILE = 'capacity_sequence_bank.json'
+APPROVED_SEQUENCE_IDS = {'S01', 'S02', 'S03', 'S04', 'S05'}
 
 
 class AccidentRiskConfigError(ValueError):
@@ -239,8 +240,30 @@ def load_accident_sequence_bank(path=None):
         payload.get('normal_capacity'),
         'normal_capacity',
     )
-    if normal_capacity <= 0:
-        raise AccidentRiskConfigError('normal_capacity 必须大于0。')
+    approved = AccidentRiskConfig()
+    if not isclose(normal_capacity, approved.normal_capacity, abs_tol=1e-12):
+        raise AccidentRiskConfigError('normal_capacity 必须为批准值 4.0。')
+    incident_probability = _finite_float(
+        payload.get('incident_probability'),
+        'incident_probability',
+    )
+    if not isclose(
+        incident_probability,
+        approved.incident_probability,
+        abs_tol=1e-12,
+    ):
+        raise AccidentRiskConfigError('incident_probability 必须为批准值 0.2。')
+    loss_distribution = payload.get('loss_distribution')
+    if not isinstance(loss_distribution, dict):
+        raise AccidentRiskConfigError('loss_distribution 必须是对象。')
+    if loss_distribution.get('name') != 'beta':
+        raise AccidentRiskConfigError('loss_distribution name 必须为 beta。')
+    loss_alpha = _finite_float(loss_distribution.get('alpha'), 'alpha')
+    loss_beta = _finite_float(loss_distribution.get('beta'), 'beta')
+    if not isclose(loss_alpha, approved.loss_alpha, abs_tol=1e-12):
+        raise AccidentRiskConfigError('alpha 必须为批准值 6.83057。')
+    if not isclose(loss_beta, approved.loss_beta, abs_tol=1e-12):
+        raise AccidentRiskConfigError('beta 必须为批准值 4.05907。')
     if payload.get('formal_rounds') != 60:
         raise AccidentRiskConfigError('事故序列库 formal_rounds 必须为60。')
     raw_sequences = payload.get('sequences')
@@ -265,6 +288,8 @@ def load_accident_sequence_bank(path=None):
             sequence_id=sequence_id,
             normal_capacity=normal_capacity,
         )
+    if set(validated) != APPROVED_SEQUENCE_IDS:
+        raise AccidentRiskConfigError('事故序列库必须恰好包含 S01–S05。')
     return validated
 
 

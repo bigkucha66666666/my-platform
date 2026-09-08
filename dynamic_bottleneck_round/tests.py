@@ -117,6 +117,19 @@ class WarmupRoundPhaseTests(unittest.TestCase):
 
         self.assertEqual(float(formal_payoff_total(player)), 30)
 
+    def test_formal_payoff_total_prefers_unrounded_payoff(self):
+        rounds = [
+            SimpleNamespace(round_number=6, payoff=10, payoff_unrounded=10.25),
+            SimpleNamespace(round_number=7, payoff=20, payoff_unrounded=20.125),
+        ]
+        player = SimpleNamespace(in_all_rounds=lambda: rounds)
+
+        self.assertAlmostEqual(
+            dynamic_app.formal_payoff_total(player),
+            30.375,
+            places=12,
+        )
+
     def test_custom_export_omits_warmup_and_renumbers_formal_rounds(self):
         players = [SimpleNamespace(round_number=value) for value in (1, 5, 6, 7)]
 
@@ -1317,6 +1330,11 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
             column = model.__dict__['dynamic_capacity'].property.columns[0]
             self.assertEqual(str(column.type), 'FLOAT')
 
+    def test_continuous_cost_and_payoff_have_unrounded_float_columns(self):
+        for field_name in ('total_cost', 'payoff_unrounded'):
+            column = dynamic_app.Player.__dict__[field_name].property.columns[0]
+            self.assertEqual(str(column.type), 'FLOAT')
+
 
 class DynamicContinuousQueueTests(unittest.TestCase):
     def test_float_capacity_uses_continuous_batch_duration(self):
@@ -1364,6 +1382,17 @@ class DynamicContinuousQueueTests(unittest.TestCase):
             with self.subTest(function=function.__name__):
                 with self.assertRaisesRegex(ValueError, 'capacity'):
                     function(**args)
+
+    def test_cost_components_preserve_continuous_precision(self):
+        components = dynamic_app.calculate_cost_components(
+            queue_delay=1 / 3,
+            early_minutes=0,
+            late_minutes=0,
+        )
+
+        self.assertAlmostEqual(components['queue_cost'], 2 / 3, places=14)
+        self.assertAlmostEqual(components['total_cost'], 2 / 3, places=14)
+        self.assertNotEqual(components['total_cost'], 0.67)
 
 
 class DynamicAccidentCostTests(unittest.TestCase):
@@ -1429,6 +1458,7 @@ class DynamicAccidentExportTests(unittest.TestCase):
             participant=participant,
             round_number=C.WARMUP_ROUNDS + 1,
             dynamic_capacity=1.50123456789,
+            dynamic_capacity_state='incident',
             incident_occurred=True,
             capacity_loss_ratio=0.6246913580275,
             remaining_capacity_ratio=0.3753086419725,
@@ -1438,7 +1468,13 @@ class DynamicAccidentExportTests(unittest.TestCase):
             actor_composition='H',
             departure_slot=1,
             departure_minute=466,
-            total_cost=12,
+            queue_delay_minutes=1.23456789,
+            arrival_minute=475.23456789,
+            early_minutes=0,
+            late_minutes=1.23456789,
+            slot_load=7,
+            total_cost=8.64197523,
+            payoff=131.35802477,
         )
         player.field_maybe_none = lambda field_name: getattr(
             player,
@@ -1519,6 +1555,49 @@ class DynamicAccidentExportTests(unittest.TestCase):
         self.assertEqual(metadata['remaining_capacity_ratio'], 0.375309)
         self.assertEqual(metadata['dynamic_capacity'], 1.501235)
         self.assertEqual(player.dynamic_capacity, 1.50123456789)
+
+    def test_human_export_rounds_continuous_results_to_six_decimals(self):
+        player, _group = self.make_player_and_group()
+
+        exported = dict(zip(
+            EXPORT_HEADERS,
+            dynamic_app.export_row_for_player(player),
+        ))
+
+        self.assertEqual(exported['queue_delay_minutes'], 1.234568)
+        self.assertEqual(exported['arrival_minute'], 475.234568)
+        self.assertEqual(exported['late_minutes'], 1.234568)
+        self.assertEqual(exported['total_cost'], 8.641975)
+        self.assertEqual(exported['payoff'], 131.358025)
+
+    def test_agent_export_uses_agent_batch_load_and_six_decimal_capacity(self):
+        player, _group = self.make_player_and_group()
+        record = {
+            'group_id': 1,
+            'dynamic_capacity': 1.50123456789,
+            'dynamic_capacity_state': 'incident',
+            'departure_slot': 3,
+            'departure_minute': 468,
+            'queue_delay_minutes': 2.34567891,
+            'arrival_minute': 477.34567891,
+            'early_minutes': 0,
+            'late_minutes': 3.34567891,
+            'slot_load': 3,
+            'total_cost': 21.41975237,
+            'payoff': 118.58024763,
+            'actor_type': 'rl',
+            'agent_id': 'rl-1',
+        }
+
+        exported = dict(zip(
+            EXPORT_HEADERS,
+            dynamic_app.export_row_for_agent_record(record, player),
+        ))
+
+        self.assertEqual(exported['slot_load'], 3)
+        self.assertEqual(exported['dynamic_capacity'], 1.501235)
+        self.assertEqual(exported['queue_delay_minutes'], 2.345679)
+        self.assertEqual(exported['total_cost'], 21.419752)
 
 
 class DynamicAccidentPresentationBackendTests(unittest.TestCase):
@@ -1739,19 +1818,21 @@ class PlayerBot(Bot):
         expect(self.player.coarse_toll_calibration_players, '==', 0)
 
         expected_payoff = (
-            0
+            0.0
             if phase['is_warmup']
             else max(
-                0,
-                round(
-                    C.BASE_POINTS
-                    - float(self.player.total_cost)
-                    + float(self.player.reward_bonus),
-                    2,
-                ),
+                0.0,
+                C.BASE_POINTS
+                - float(self.player.total_cost)
+                + float(self.player.reward_bonus),
             )
         )
-        expect(float(self.player.payoff), '==', expected_payoff)
+        expect(self.player.payoff_unrounded, '==', expected_payoff)
+        expect(
+            float(self.player.payoff),
+            '==',
+            float(dynamic_app.cu(expected_payoff)),
+        )
 
         if self.case == 'same_time':
             actors_by_minute = {chosen_minute: len(self.group.get_players())}
@@ -1798,7 +1879,7 @@ class PlayerBot(Bot):
                 float(self.participant.vars[dynamic_app.TOTAL_PAYOFF_VAR]),
                 '==',
                 sum(
-                    float(round_player.payoff)
+                    round_player.payoff_unrounded
                     for round_player in self.player.in_all_rounds()
                     if not dynamic_app.is_warmup_round(round_player.round_number)
                 ),

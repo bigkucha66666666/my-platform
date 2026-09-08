@@ -176,6 +176,34 @@ class AccidentSequenceBankTests(unittest.TestCase):
         ):
             self._load_payload(self._bank_payload([sequence]))
 
+    def test_rejects_unapproved_probability_metadata(self):
+        payload = self._bank_payload([])
+        payload['incident_probability'] = 0.3
+
+        with self.assertRaisesRegex(
+            AccidentRiskConfigError,
+            'incident_probability',
+        ):
+            self._load_payload(payload)
+
+    def test_rejects_unapproved_beta_metadata(self):
+        payload = self._bank_payload([])
+        payload['loss_distribution']['alpha'] = 7
+
+        with self.assertRaisesRegex(AccidentRiskConfigError, 'alpha'):
+            self._load_payload(payload)
+
+    def test_rejects_bank_without_exactly_s01_through_s05(self):
+        bank_path = Path(__file__).with_name('capacity_sequence_bank.json')
+        payload = json.loads(bank_path.read_text(encoding='utf-8'))
+        payload['sequences'] = payload['sequences'][:-1]
+
+        with self.assertRaisesRegex(
+            AccidentRiskConfigError,
+            'S01–S05',
+        ):
+            self._load_payload(payload)
+
     @staticmethod
     def _bank_payload(sequences):
         return {

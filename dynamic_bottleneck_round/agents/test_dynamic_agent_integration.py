@@ -168,6 +168,33 @@ class DynamicAgentConfigTests(unittest.TestCase):
         validated = app.validate_liu_rel_session_config(session)
         self.assertTrue(validated['rel_parameters_frozen'])
 
+    def test_liu_rel_frozen_flag_accepts_only_zero_or_one(self):
+        base = {
+            'name': 'dynamic_bottleneck_round_demo',
+            'rl_agent_enabled': '1',
+            'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+            'rel_lambda': 0.25,
+            'rel_eta': 14.7445,
+            'rel_capacity_bandwidth': 0.560924,
+            'rel_random_seed': 2026090901,
+            'rel_initial_uniform_rounds': 2,
+        }
+        for invalid in (2, -1, True, 'yes', '2'):
+            with self.subTest(invalid=invalid):
+                session = SimpleNamespace(
+                    config={**base, 'rel_parameters_frozen': invalid}
+                )
+                with self.assertRaisesRegex(ValueError, 'rel_parameters_frozen'):
+                    app.validate_liu_rel_session_config(session)
+
+        for valid, expected in ((0, False), ('0', False), (1, True), ('1', True)):
+            with self.subTest(valid=valid):
+                session = SimpleNamespace(
+                    config={**base, 'rel_parameters_frozen': valid}
+                )
+                parsed = app.validate_liu_rel_session_config(session)
+                self.assertEqual(parsed['rel_parameters_frozen'], expected)
+
     def test_effective_actor_count_includes_each_actor_once(self):
         session = self.make_session('active', 2)
         session.config.update({

@@ -655,7 +655,15 @@ def validate_liu_rel_session_config(session) -> dict:
     if str(raw_uniform_rounds).strip() != str(uniform_rounds) or uniform_rounds != 2:
         raise ValueError('rel_initial_uniform_rounds 必须固定为 2。')
 
-    parameters_frozen = config_flag(config.get('rel_parameters_frozen', 0))
+    raw_frozen = config.get('rel_parameters_frozen', 0)
+    if isinstance(raw_frozen, bool):
+        raise ValueError('rel_parameters_frozen 必须是 0 或 1。')
+    if isinstance(raw_frozen, int) and raw_frozen in {0, 1}:
+        parameters_frozen = bool(raw_frozen)
+    elif isinstance(raw_frozen, str) and raw_frozen.strip() in {'0', '1'}:
+        parameters_frozen = raw_frozen.strip() == '1'
+    else:
+        raise ValueError('rel_parameters_frozen 必须是 0 或 1。')
     if (
         config.get('name') == 'dynamic_bottleneck_round_prod'
         and rl_agent_enabled(session)

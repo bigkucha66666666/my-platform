@@ -1803,7 +1803,14 @@ class PlayerBot(Bot):
             )
             if group_rl_count and not phase['is_warmup']:
                 expect(rl_records[0]['decision_source'], 'in', {
-                    'rl_policy',
+                    'liu_rel_uniform_initial',
+                    'liu_rel_uniform_sparse',
+                    'liu_rel_softmax_i0',
+                    'liu_rel_softmax_i1',
+                    'liu_rel_softmax_i1_backoff_i0',
+                    'liu_rel_softmax_i2_kernel',
+                    'liu_rel_softmax_i2_backoff_i1',
+                    'liu_rel_softmax_i2_backoff_i0',
                     'rl_fallback_lowest_schedule_cost',
                 })
                 rl_states = self.group.get_players()[0].participant.vars.get(

@@ -607,6 +607,75 @@ def validate_rl_agent_count(session) -> int:
     return count
 
 
+def validate_liu_rel_session_config(session) -> dict:
+    config = session.config
+    policy_version = str(config.get('rel_policy_version', '') or '').strip()
+    if policy_version != INDEPENDENT_RL_POLICY_VERSION:
+        raise ValueError(
+            f'rel_policy_version 必须为 {INDEPENDENT_RL_POLICY_VERSION}。'
+        )
+
+    def finite_parameter(name, *, positive=False, non_negative=False):
+        value = config.get(name)
+        if isinstance(value, bool):
+            raise ValueError(f'{name} 必须是有限数。')
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f'{name} 必须是有限数。') from exc
+        if not isfinite(numeric):
+            raise ValueError(f'{name} 必须是有限数。')
+        if positive and numeric <= 0:
+            raise ValueError(f'{name} 必须大于 0。')
+        if non_negative and numeric < 0:
+            raise ValueError(f'{name} 必须大于或等于 0。')
+        return numeric
+
+    rel_lambda = finite_parameter('rel_lambda', non_negative=True)
+    rel_eta = finite_parameter('rel_eta', positive=True)
+    bandwidth = finite_parameter('rel_capacity_bandwidth', positive=True)
+
+    raw_seed = config.get('rel_random_seed')
+    if isinstance(raw_seed, bool):
+        raise ValueError('rel_random_seed 必须是整数。')
+    try:
+        random_seed = int(raw_seed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('rel_random_seed 必须是整数。') from exc
+    if str(raw_seed).strip() != str(random_seed):
+        raise ValueError('rel_random_seed 必须是整数。')
+
+    raw_uniform_rounds = config.get('rel_initial_uniform_rounds')
+    if isinstance(raw_uniform_rounds, bool):
+        raise ValueError('rel_initial_uniform_rounds 必须固定为 2。')
+    try:
+        uniform_rounds = int(raw_uniform_rounds)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('rel_initial_uniform_rounds 必须固定为 2。') from exc
+    if str(raw_uniform_rounds).strip() != str(uniform_rounds) or uniform_rounds != 2:
+        raise ValueError('rel_initial_uniform_rounds 必须固定为 2。')
+
+    parameters_frozen = config_flag(config.get('rel_parameters_frozen', 0))
+    if (
+        config.get('name') == 'dynamic_bottleneck_round_prod'
+        and rl_agent_enabled(session)
+        and not parameters_frozen
+    ):
+        raise ValueError('RL 正式实验启动前必须冻结 Liu-REL 参数。')
+
+    validated = {
+        'rel_policy_version': policy_version,
+        'rel_lambda': rel_lambda,
+        'rel_eta': rel_eta,
+        'rel_capacity_bandwidth': bandwidth,
+        'rel_random_seed': random_seed,
+        'rel_initial_uniform_rounds': uniform_rounds,
+        'rel_parameters_frozen': parameters_frozen,
+    }
+    session.config = {**config, **validated}
+    return validated
+
+
 def effective_group_actor_count(session, human_count, group_id=None) -> int:
     return (
         int(human_count)
@@ -1062,6 +1131,7 @@ def creating_session(subsession):
     if subsession.round_number == 1:
         validate_api_agent_count(subsession.session)
         validate_rl_agent_count(subsession.session)
+        validate_liu_rel_session_config(subsession.session)
         players = subsession.get_players()
         for player in players:
             player.participant.is_dropout = False
@@ -1885,6 +1955,11 @@ def prepare_independent_rl_decisions_for_group(group):
     states, _reference_player = independent_rl_state_store_for_group(group)
     records = []
     phase = round_phase_context(group.round_number)
+    rel_parameters = validate_liu_rel_session_config(group.session)
+    information_condition = parse_accident_risk_config(
+        group.session.config
+    ).information_condition
+    warmup = is_warmup_round(group.round_number)
     for index in range(
         1,
         rl_agent_count_per_group(group.session, group.id_in_subsession) + 1,
@@ -1907,20 +1982,39 @@ def prepare_independent_rl_decisions_for_group(group):
             capacity_states,
         )
         try:
+            policy_kwargs = {
+                'state': state,
+                'available_slots': choice_set.available_slots,
+                'formal_round_number': (
+                    group.round_number
+                    if warmup
+                    else formal_round_number(group.round_number)
+                ),
+                'information_condition': information_condition,
+                'rel_lambda': rel_parameters['rel_lambda'],
+                'rel_eta': rel_parameters['rel_eta'],
+                'rel_capacity_bandwidth': rel_parameters[
+                    'rel_capacity_bandwidth'
+                ],
+                'session_code': group.session.code,
+                'group_id': group.id_in_subsession,
+                'agent_id': agent_id,
+                'rel_random_seed': rel_parameters['rel_random_seed'],
+                'rel_initial_uniform_rounds': rel_parameters[
+                    'rel_initial_uniform_rounds'
+                ],
+                'warmup': warmup,
+            }
+            if information_condition in {INFO_I1, INFO_I2} and not warmup:
+                policy_kwargs['current_incident_occurred'] = (
+                    choice_set.capacity_context['incident_occurred']
+                )
+            if information_condition == INFO_I2 and not warmup:
+                policy_kwargs['current_actual_capacity'] = (
+                    choice_set.capacity_context['actual_capacity']
+                )
             choice = choose_independent_rl_departure(
-                state=state,
-                available_slots=choice_set.available_slots,
-                cost_parameters=choice_set.cost_parameters,
-                capacity_states=capacity_states,
-                tolls=choice_set.tolls,
-                rewards=choice_set.rewards,
-                persona=persona,
-                known_current_capacity=choice_set.capacity_context.get(
-                    'actual_capacity'
-                ),
-                known_incident_status=choice_set.capacity_context.get(
-                    'incident_occurred'
-                ),
+                **policy_kwargs,
             )
             slot = int(choice['departure_slot'])
             decision_source = str(choice['decision_source'])
@@ -1932,13 +2026,54 @@ def prepare_independent_rl_decisions_for_group(group):
             choice = {
                 'policy_version': INDEPENDENT_RL_POLICY_VERSION,
                 'rounds_observed': int(state.get('rounds_observed', 0)),
-                'belief': {},
+                'information_condition': information_condition,
+                'context_level': 'algorithm_error',
+                'propensities': {},
+                'choice_probabilities': {},
+                'selected_probability': None,
+                'distinct_experienced_slots': 0,
+                'effective_observation_count': 0.0,
+                'rel_lambda': rel_parameters['rel_lambda'],
+                'rel_eta': rel_parameters['rel_eta'],
+                'rel_capacity_bandwidth': rel_parameters[
+                    'rel_capacity_bandwidth'
+                ],
+                'random_seed_fingerprint': '',
             }
         departure_minute = departure_minute_for_slot(slot, schedule)
         accident = accident_record_for_group(group)
-        information_condition = parse_accident_risk_config(
-            group.session.config
-        ).information_condition
+        choice_audit = {
+            'agent_id': agent_id,
+            'round_number': phase['display_round_number'],
+            'policy_version': str(choice['policy_version']),
+            'information_condition': information_condition,
+            'context_level': choice.get('context_level'),
+            'propensities': choice.get('propensities', {}),
+            'choice_probabilities': choice.get('choice_probabilities', {}),
+            'selected_probability': choice.get('selected_probability'),
+            'distinct_experienced_slots': int(
+                choice.get('distinct_experienced_slots', 0)
+            ),
+            'effective_observation_count': float(
+                choice.get('effective_observation_count', 0)
+            ),
+            'rel_lambda': choice.get('rel_lambda'),
+            'rel_eta': choice.get('rel_eta'),
+            'rel_capacity_bandwidth': choice.get('rel_capacity_bandwidth'),
+            'random_seed_fingerprint': choice.get(
+                'random_seed_fingerprint',
+                '',
+            ),
+            'rounds_observed': int(choice.get('rounds_observed', 0)),
+        }
+        if information_condition in {INFO_I1, INFO_I2} and not warmup:
+            choice_audit['current_incident_occurred'] = bool(
+                choice_set.capacity_context['incident_occurred']
+            )
+        if information_condition == INFO_I2 and not warmup:
+            choice_audit['current_actual_capacity'] = float(
+                choice_set.capacity_context['actual_capacity']
+            )
         records.append(
             {
                 'actor_type': RL_AGENT_TYPE,
@@ -1969,15 +2104,7 @@ def prepare_independent_rl_decisions_for_group(group):
                 'reason': reason,
                 'raw_response_json': '',
                 'context_json': json.dumps(
-                    {
-                        'agent_id': agent_id,
-                        'round_number': phase['display_round_number'],
-                        'capacity_context': choice_set.capacity_context,
-                        'belief': choice.get('belief', {}),
-                        'rounds_observed': int(
-                            choice.get('rounds_observed', 0)
-                        ),
-                    },
+                    choice_audit,
                     ensure_ascii=False,
                     sort_keys=True,
                 ),
@@ -2010,16 +2137,9 @@ def update_independent_rl_states(group, records):
     feedback = current_public_feedback_for_group(group)
     if feedback is None:
         return
-    observation = public_feedback_observation(feedback)
-    config = parse_accident_risk_config(group.session.config)
-    capacity_states = capacity_state_rows(config)
     states, reference_player = independent_rl_state_store_for_group(group)
     if reference_player is None:
         return
-    group_label = reference_player.participant.vars.get(
-        'assigned_group_label',
-        f'G{group.id_in_subsession:02d}',
-    )
     changed = False
     for record in records:
         if record.get('actor_type') != RL_AGENT_TYPE:
@@ -2027,28 +2147,33 @@ def update_independent_rl_states(group, records):
         agent_id = str(record['agent_id'])
         state = valid_or_initial_independent_rl_state(
             states.get(agent_id),
-            capacity_states,
+            None,
         )
-        if int(state.get('rounds_observed', 0)) >= formal_round_number(group.round_number):
-            continue
-        persona = get_or_create_rl_agent_persona(
-            group.session,
-            group_label,
-            agent_id,
-        )
-        states[agent_id] = observe_independent_rl_outcome(
+        previous_count = len(state.get('experiences', []))
+        updated = observe_independent_rl_outcome(
             state,
-            revealed_capacity=observation['revealed_capacity'],
+            formal_round_number=formal_round_number(group.round_number),
             departure_slot=record['departure_slot'],
             total_cost=record['total_cost'],
-            anonymous_slot_counts=observation['anonymous_slot_counts'],
-            departure_average_costs=observation['departure_average_costs'],
-            group_average_cost=observation['group_average_cost'],
-            own_public_result=public_personal_result_from_record(record),
-            persona=persona,
+            incident_occurred=bool(feedback['incident_occurred']),
+            actual_capacity=float(feedback['dynamic_capacity']),
+            decision_source=record.get('decision_source', ''),
         )
+        if len(updated.get('experiences', [])) == previous_count:
+            continue
+        try:
+            audit = json.loads(record.get('context_json', '') or '{}')
+        except (TypeError, json.JSONDecodeError):
+            audit = {}
+        updated['last_choice_probability'] = audit.get('selected_probability')
+        updated['last_context_level'] = audit.get('context_level')
+        updated['last_propensities'] = deepcopy(audit.get('propensities', {}))
+        updated['last_choice_probabilities'] = deepcopy(
+            audit.get('choice_probabilities', {})
+        )
+        states[agent_id] = updated
         record['state_updated'] = True
-        record['rounds_observed'] = states[agent_id]['rounds_observed']
+        record['rounds_observed'] = updated['rounds_observed']
         changed = True
     if changed:
         reference_player.participant.vars[

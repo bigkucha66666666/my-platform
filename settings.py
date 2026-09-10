@@ -58,7 +58,26 @@ DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED = str(
 DYNAMIC_BOTTLENECK_RL_AGENT_COUNT = str(
     environ.get('DYNAMIC_BOTTLENECK_RL_AGENT_COUNT_PER_GROUP', '1') or '1'
 ).strip()
-DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = 'dynamic_independent_rl_v1'
+DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = 'dynamic_liu_rel_incident_v1'
+DYNAMIC_BOTTLENECK_REL_LAMBDA = environ.get(
+    'DYNAMIC_BOTTLENECK_REL_LAMBDA',
+    0.25,
+)
+DYNAMIC_BOTTLENECK_REL_ETA = environ.get(
+    'DYNAMIC_BOTTLENECK_REL_ETA',
+    14.7445,
+)
+DYNAMIC_BOTTLENECK_REL_CAPACITY_BANDWIDTH = environ.get(
+    'DYNAMIC_BOTTLENECK_REL_CAPACITY_BANDWIDTH',
+    0.560924,
+)
+DYNAMIC_BOTTLENECK_REL_RANDOM_SEED = environ.get(
+    'DYNAMIC_BOTTLENECK_REL_RANDOM_SEED',
+    2026090901,
+)
+DYNAMIC_BOTTLENECK_REL_PARAMETERS_FROZEN = str(
+    environ.get('DYNAMIC_BOTTLENECK_REL_PARAMETERS_FROZEN', '0') or '0'
+).strip()
 DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_ENABLED = str(
     environ.get('DYNAMIC_BOTTLENECK_API_AGENT_LIMITED_MEMORY_ENABLED', '1') or '1'
 ).strip()
@@ -128,6 +147,13 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     rl_agent_enabled=DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED,
     rl_agent_count_per_group=DYNAMIC_BOTTLENECK_RL_AGENT_COUNT,
     rl_agent_policy_version=DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION,
+    rel_policy_version=DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION,
+    rel_lambda=DYNAMIC_BOTTLENECK_REL_LAMBDA,
+    rel_eta=DYNAMIC_BOTTLENECK_REL_ETA,
+    rel_capacity_bandwidth=DYNAMIC_BOTTLENECK_REL_CAPACITY_BANDWIDTH,
+    rel_random_seed=DYNAMIC_BOTTLENECK_REL_RANDOM_SEED,
+    rel_initial_uniform_rounds=2,
+    rel_parameters_frozen=DYNAMIC_BOTTLENECK_REL_PARAMETERS_FROZEN,
     payoff_source_var='dynamic_bottleneck_round_total_payoff',
     final_payoff_label='动态瓶颈服务率实验',
     payoff_source_label='dynamic_bottleneck_round 全 60 轮累计结果',

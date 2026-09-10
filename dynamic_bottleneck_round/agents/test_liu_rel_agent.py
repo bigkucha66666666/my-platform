@@ -50,6 +50,24 @@ class LiuRELStateTests(unittest.TestCase):
 
         self.assertEqual(valid_or_initial_liu_rel_state(stale), initial_liu_rel_state())
 
+    def test_malformed_experience_reinitializes_state(self):
+        damaged = initial_liu_rel_state()
+        damaged['rounds_observed'] = 1
+        damaged['experiences'] = [
+            {
+                'formal_round_number': 1,
+                'departure_slot': 4,
+                'total_cost': 'not-a-number',
+                'incident_occurred': False,
+                'actual_capacity': 4,
+            }
+        ]
+
+        self.assertEqual(
+            valid_or_initial_liu_rel_state(damaged),
+            initial_liu_rel_state(),
+        )
+
     def test_duplicate_formal_round_is_not_appended_twice(self):
         state = append_liu_rel_experience(
             initial_liu_rel_state(),

@@ -1,72 +1,94 @@
+from pathlib import Path
 import unittest
 
 from dynamic_bottleneck_round.agents.independent_rl_agent import (
     INDEPENDENT_RL_POLICY_VERSION,
     choose_independent_rl_departure,
     initial_independent_rl_state,
+    observe_independent_rl_outcome,
+    valid_or_initial_independent_rl_state,
 )
-from dynamic_bottleneck_round.agents.rl_fallback import (
-    RL_POLICY_VERSION,
-    valid_or_initial_state,
-)
+from dynamic_bottleneck_round.agents.liu_rel_agent import LIU_REL_POLICY_VERSION
 
 
 class IndependentRLAgentPolicyTests(unittest.TestCase):
     def setUp(self):
-        self.capacity_states = (
-            {'capacity': 1, 'probability': 1 / 3},
-            {'capacity': 2, 'probability': 1 / 3},
-            {'capacity': 3, 'probability': 1 / 3},
-        )
         self.slots = tuple(
-            {'slot': slot, 'departure_minute': 472 + slot}
-            for slot in range(1, 6)
+            {'slot': slot, 'departure_minute': 465 + slot}
+            for slot in range(1, 17)
         )
-        self.costs = {
-            'fixed_travel_time_cost': 6,
-            'queue_cost_per_minute': 2,
-            'early_cost_per_minute': 1,
-            'late_cost_per_minute': 3,
-            'preferred_arrival_minute': 480,
-            'free_flow_travel_minutes': 6,
-            'capacity_window_minutes': 1,
-        }
-        self.persona = {
-            'traits': {
-                'queue_aversion': 5,
-                'early_arrival_aversion': 5,
-                'late_arrival_aversion': 7,
-                'toll_sensitivity': 5,
-                'reward_sensitivity': 5,
-                'capacity_risk_aversion': 5,
-                'choice_inertia': 5,
-                'adaptation_speed': 5,
-            }
-        }
 
-    def test_choice_uses_independent_policy_identity(self):
-        state = initial_independent_rl_state(self.capacity_states)
+    def test_wrapper_uses_liu_rel_policy_identity(self):
+        self.assertEqual(INDEPENDENT_RL_POLICY_VERSION, LIU_REL_POLICY_VERSION)
+        self.assertEqual(
+            initial_independent_rl_state([])['policy_version'],
+            LIU_REL_POLICY_VERSION,
+        )
 
+    def test_wrapper_no_longer_imports_llm_rl_fallback(self):
+        source = Path(__file__).with_name('independent_rl_agent.py').read_text(
+            encoding='utf-8'
+        )
+
+        self.assertNotIn('rl_fallback', source)
+        self.assertIn('liu_rel_agent', source)
+
+    def test_wrapper_choice_returns_liu_rel_audit(self):
         choice = choose_independent_rl_departure(
-            state=state,
+            state=initial_independent_rl_state([]),
             available_slots=self.slots,
-            cost_parameters=self.costs,
-            capacity_states=self.capacity_states,
-            tolls=(),
-            rewards=(),
-            persona=self.persona,
+            formal_round_number=1,
+            information_condition='I0',
+            rel_lambda=0.25,
+            rel_eta=14.7445,
+            rel_capacity_bandwidth=0.560924,
+            session_code='SESSION01',
+            group_id=1,
+            agent_id='G01_RL_01',
+            rel_random_seed=2026090901,
+            rel_initial_uniform_rounds=2,
         )
 
-        self.assertEqual(choice['decision_source'], 'rl_policy')
-        self.assertEqual(choice['policy_version'], INDEPENDENT_RL_POLICY_VERSION)
+        self.assertEqual(choice['decision_source'], 'liu_rel_uniform_initial')
+        self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
+        self.assertEqual(len(choice['choice_probabilities']), 16)
 
-    def test_independent_state_is_not_accepted_as_fallback_state(self):
-        independent = initial_independent_rl_state(self.capacity_states)
+    def test_wrapper_observation_appends_only_own_experience(self):
+        state = observe_independent_rl_outcome(
+            initial_independent_rl_state([]),
+            formal_round_number=1,
+            departure_slot=7,
+            total_cost=12.5,
+            incident_occurred=True,
+            actual_capacity=1.5,
+            decision_source='rl_fallback_lowest_schedule_cost',
+        )
 
-        fallback = valid_or_initial_state(independent, self.capacity_states)
+        self.assertEqual(state['rounds_observed'], 1)
+        self.assertEqual(
+            state['experiences'],
+            [
+                {
+                    'formal_round_number': 1,
+                    'departure_slot': 7,
+                    'total_cost': 12.5,
+                    'incident_occurred': True,
+                    'actual_capacity': 1.5,
+                    'decision_source': 'rl_fallback_lowest_schedule_cost',
+                }
+            ],
+        )
 
-        self.assertEqual(fallback['policy_version'], RL_POLICY_VERSION)
-        self.assertEqual(fallback['rounds_observed'], 0)
+    def test_wrapper_resets_old_independent_policy_state(self):
+        old = {
+            'policy_version': 'dynamic_independent_rl_v1',
+            'rounds_observed': 20,
+            'experiences': [],
+        }
+
+        current = valid_or_initial_independent_rl_state(old, [])
+
+        self.assertEqual(current, initial_independent_rl_state([]))
 
 
 if __name__ == '__main__':

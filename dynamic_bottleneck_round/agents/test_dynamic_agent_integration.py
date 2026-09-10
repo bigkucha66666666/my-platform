@@ -46,13 +46,28 @@ class DynamicAgentConfigTests(unittest.TestCase):
             self.assertEqual(config['rl_agent_count_per_group'], '1')
             self.assertEqual(
                 config['rl_agent_policy_version'],
-                'dynamic_independent_rl_v1',
+                'dynamic_liu_rel_incident_v1',
             )
+            self.assertEqual(config['rel_lambda'], 0.25)
+            self.assertEqual(config['rel_eta'], 14.7445)
+            self.assertEqual(config['rel_capacity_bandwidth'], 0.560924)
+            self.assertEqual(config['rel_random_seed'], 2026090901)
+            self.assertEqual(config['rel_initial_uniform_rounds'], 2)
             self.assertIn(
                 str(config['api_agent_limited_memory_enabled']).lower(),
                 {'1', 'true', 'on'},
             )
             self.assertEqual(config['api_agent_limited_memory_max_chars'], 400)
+        prod = next(
+            config for config in dynamic_configs
+            if config['name'] == 'dynamic_bottleneck_round_prod'
+        )
+        demo = next(
+            config for config in dynamic_configs
+            if config['name'] == 'dynamic_bottleneck_round_demo'
+        )
+        self.assertEqual(str(prod['rel_parameters_frozen']), '0')
+        self.assertEqual(str(demo['rel_parameters_frozen']), '0')
 
     def test_rl_fallback_flag_is_boolean_config(self):
         enabled = self.make_session('active', 1)
@@ -104,6 +119,54 @@ class DynamicAgentConfigTests(unittest.TestCase):
                 })
                 with self.assertRaisesRegex(ValueError, '1 到 5'):
                     app.validate_rl_agent_count(session)
+
+    def test_liu_rel_parameter_validation_rejects_invalid_values(self):
+        valid = {
+            'name': 'dynamic_bottleneck_round_demo',
+            'rl_agent_enabled': '1',
+            'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+            'rel_lambda': 0.25,
+            'rel_eta': 14.7445,
+            'rel_capacity_bandwidth': 0.560924,
+            'rel_random_seed': 2026090901,
+            'rel_initial_uniform_rounds': 2,
+            'rel_parameters_frozen': '0',
+        }
+        invalid = (
+            ('rel_lambda', -0.1),
+            ('rel_eta', 0),
+            ('rel_capacity_bandwidth', 0),
+            ('rel_random_seed', 1.5),
+            ('rel_initial_uniform_rounds', 3),
+            ('rel_policy_version', 'old'),
+        )
+        for field_name, value in invalid:
+            with self.subTest(field_name=field_name):
+                session = SimpleNamespace(config={**valid, field_name: value})
+                with self.assertRaisesRegex(ValueError, field_name):
+                    app.validate_liu_rel_session_config(session)
+
+    def test_rl_enabled_production_requires_frozen_parameters(self):
+        session = SimpleNamespace(
+            config={
+                'name': 'dynamic_bottleneck_round_prod',
+                'rl_agent_enabled': '1',
+                'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+                'rel_lambda': 0.25,
+                'rel_eta': 14.7445,
+                'rel_capacity_bandwidth': 0.560924,
+                'rel_random_seed': 2026090901,
+                'rel_initial_uniform_rounds': 2,
+                'rel_parameters_frozen': '0',
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, '冻结'):
+            app.validate_liu_rel_session_config(session)
+
+        session.config['rel_parameters_frozen'] = '1'
+        validated = app.validate_liu_rel_session_config(session)
+        self.assertTrue(validated['rel_parameters_frozen'])
 
     def test_effective_actor_count_includes_each_actor_once(self):
         session = self.make_session('active', 2)
@@ -1199,6 +1262,13 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                 'rl_agent_count_per_group': 2,
                 'accident_information_condition': 'I0',
                 'reward_treatment_enabled': 0,
+                'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+                'rel_lambda': 0.25,
+                'rel_eta': 14.7445,
+                'rel_capacity_bandwidth': 0.560924,
+                'rel_random_seed': 2026090901,
+                'rel_initial_uniform_rounds': 2,
+                'rel_parameters_frozen': '0',
             },
         )
         participant = SimpleNamespace(
@@ -1278,16 +1348,23 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             all(record['actor_type'] == 'rl_agent' for record in first)
         )
         self.assertTrue(
-            all(record['decision_source'] == 'rl_policy' for record in first)
-        )
-        self.assertTrue(
             all(
-                'actual_capacity' not in json.loads(record['context_json'])[
-                    'capacity_context'
-                ]
+                record['decision_source'] == 'liu_rel_uniform_initial'
                 for record in first
             )
         )
+        self.assertTrue(
+            all(
+                'current_actual_capacity'
+                not in json.loads(record['context_json'])
+                for record in first
+            )
+        )
+        audit = json.loads(first[0]['context_json'])
+        self.assertEqual(audit['policy_version'], 'dynamic_liu_rel_incident_v1')
+        self.assertEqual(audit['information_condition'], 'I0')
+        self.assertIn('choice_probabilities', audit)
+        self.assertIn('random_seed_fingerprint', audit)
 
     def test_independent_rl_states_update_once_per_agent(self):
         group, participant = self.make_independent_rl_group()
@@ -1298,6 +1375,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             '6': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
+                'incident_occurred': True,
                 'departure_outcomes': [
                     {'slot': 1, 'participant_count': 0, 'average_cost': None},
                     {'slot': 2, 'participant_count': 3, 'average_cost': 11},
@@ -1314,8 +1392,8 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         self.assertEqual(states['G01_RL_01']['rounds_observed'], 1)
         self.assertEqual(states['G01_RL_02']['rounds_observed'], 1)
         self.assertNotEqual(
-            states['G01_RL_01']['last_total_cost'],
-            states['G01_RL_02']['last_total_cost'],
+            states['G01_RL_01']['experiences'][0]['total_cost'],
+            states['G01_RL_02']['experiences'][0]['total_cost'],
         )
 
     def test_independent_rl_learning_uses_public_feedback_snapshot(self):
@@ -1327,6 +1405,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             '6': {
                 'round_number': 1,
                 'dynamic_capacity': 2,
+                'incident_occurred': True,
                 'departure_outcomes': [
                     {'slot': 1, 'participant_count': 1, 'average_cost': 8},
                     {'slot': 2, 'participant_count': 2, 'average_cost': 11},
@@ -1339,10 +1418,83 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         app.update_independent_rl_states(group, records)
 
         states = participant.vars[app.INDEPENDENT_RL_STATE_PARTICIPANT_VAR]
-        self.assertEqual(
-            states['G01_RL_01']['last_anonymous_slot_counts'],
-            {'1': 1, '2': 2, '3': 0},
+        experience = states['G01_RL_01']['experiences'][0]
+        self.assertEqual(experience['actual_capacity'], 2)
+        self.assertEqual(experience['incident_occurred'], True)
+        self.assertNotIn('last_anonymous_slot_counts', states['G01_RL_01'])
+
+    def test_independent_rl_passes_only_condition_permitted_current_information(self):
+        expected = {
+            'I0': (False, False),
+            'I1': (True, False),
+            'I2': (True, True),
+        }
+        for condition, (has_incident, has_capacity) in expected.items():
+            with self.subTest(condition=condition):
+                group, _participant = self.make_independent_rl_group()
+                group.session.config['accident_information_condition'] = condition
+                group.information_condition = condition
+                fake_choice = {
+                    'departure_slot': 1,
+                    'decision_source': 'liu_rel_uniform_initial',
+                    'reason': 'test',
+                    'policy_version': 'dynamic_liu_rel_incident_v1',
+                    'rounds_observed': 0,
+                    'information_condition': condition,
+                    'context_level': 'initial',
+                    'propensities': {},
+                    'choice_probabilities': {'1': 1.0},
+                    'selected_probability': 1.0,
+                    'distinct_experienced_slots': 0,
+                    'effective_observation_count': 0.0,
+                    'rel_lambda': 0.25,
+                    'rel_eta': 14.7445,
+                    'rel_capacity_bandwidth': 0.560924,
+                    'random_seed_fingerprint': 'abcdef123456',
+                }
+
+                with patch.object(
+                    app,
+                    'choose_independent_rl_departure',
+                    return_value=fake_choice,
+                ) as choose:
+                    records = app.prepare_independent_rl_decisions_for_group(group)
+
+                kwargs = choose.call_args_list[0].kwargs
+                self.assertEqual(
+                    'current_incident_occurred' in kwargs,
+                    has_incident,
+                )
+                self.assertEqual(
+                    'current_actual_capacity' in kwargs,
+                    has_capacity,
+                )
+                self.assertNotIn('persona', kwargs)
+                self.assertNotIn('cost_parameters', kwargs)
+                audit = json.loads(records[0]['context_json'])
+                self.assertEqual(
+                    'current_incident_occurred' in audit,
+                    has_incident,
+                )
+                self.assertEqual(
+                    'current_actual_capacity' in audit,
+                    has_capacity,
+                )
+
+    def test_warmup_choice_does_not_pollute_first_formal_state(self):
+        group, participant = self.make_independent_rl_group()
+        group.round_number = 1
+
+        warmup = app.prepare_independent_rl_decisions_for_group(group)
+        app.update_independent_rl_states(group, warmup)
+
+        self.assertTrue(
+            all(
+                record['decision_source'] == 'liu_rel_uniform_warmup'
+                for record in warmup
+            )
         )
+        self.assertNotIn(app.INDEPENDENT_RL_STATE_PARTICIPANT_VAR, participant.vars)
 
     def test_export_uses_virtual_record_actor_type(self):
         reference_player = SimpleNamespace(
@@ -1355,7 +1507,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'actor_type': 'rl_agent',
             'agent_id': 'G01_RL_01',
             'agent_type': 'rl_agent',
-            'policy_version': 'dynamic_independent_rl_v1',
+            'policy_version': 'dynamic_liu_rel_incident_v1',
             'persona_id': 'balanced_v1',
             'persona_label': 'balanced',
             'decision_source': 'rl_policy',
@@ -1371,7 +1523,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         self.assertEqual(
             row[app.EXPORT_HEADERS.index('rl_policy_version')],
-            'dynamic_independent_rl_v1',
+            'dynamic_liu_rel_incident_v1',
         )
 
     def test_group_result_lock_rejects_overlapping_generation(self):

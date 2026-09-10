@@ -60,6 +60,25 @@ def valid_or_initial_liu_rel_state(state) -> dict:
         return initial_liu_rel_state()
     if rounds_observed < 0 or rounds_observed != len(experiences):
         return initial_liu_rel_state()
+    seen_rounds = set()
+    try:
+        for item in experiences:
+            if not isinstance(item, dict):
+                return initial_liu_rel_state()
+            round_number = _positive_int(
+                item.get('formal_round_number'),
+                'formal_round_number',
+            )
+            if round_number in seen_rounds:
+                return initial_liu_rel_state()
+            seen_rounds.add(round_number)
+            _positive_int(item.get('departure_slot'), 'departure_slot')
+            _finite_float(item.get('total_cost'), 'total_cost')
+            _positive_float(item.get('actual_capacity'), 'actual_capacity')
+            if not isinstance(item.get('incident_occurred'), bool):
+                return initial_liu_rel_state()
+    except LiuRELAlgorithmError:
+        return initial_liu_rel_state()
     return deepcopy(state)
 
 

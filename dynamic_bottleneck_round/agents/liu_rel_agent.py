@@ -321,7 +321,10 @@ def choose_liu_rel_departure(
     )
     if not legal_slots:
         raise LiuRELAlgorithmError('Liu-REL has no legal departure slots.')
-    if int(rel_initial_uniform_rounds) != 2:
+    if _explicit_int(
+        rel_initial_uniform_rounds,
+        'rel_initial_uniform_rounds',
+    ) != 2:
         raise LiuRELAlgorithmError('rel_initial_uniform_rounds must equal 2.')
     lambda_value = _finite_float(rel_lambda, 'rel_lambda')
     if lambda_value < 0:

@@ -364,6 +364,14 @@ class LiuRELChoiceTests(unittest.TestCase):
         self.assertEqual(choice['decision_source'], 'liu_rel_uniform_warmup')
         self.assertEqual(choice['rounds_observed'], 0)
 
+    def test_initial_uniform_round_count_rejects_non_integer_two(self):
+        with self.assertRaisesRegex(ValueError, 'rel_initial_uniform_rounds'):
+            choose_liu_rel_departure(
+                state=initial_liu_rel_state(),
+                formal_round_number=1,
+                **{**self.base, 'rel_initial_uniform_rounds': 2.5},
+            )
+
     def test_softmax_choice_returns_complete_audit_without_full_seed(self):
         state = initial_liu_rel_state()
         state['experiences'] = [

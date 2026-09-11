@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from dynamic_bottleneck_round.accident_capacity import (
+    FORMAL_ROUNDS,
     generate_accident_sequence,
     load_accident_sequence_bank,
     parse_accident_risk_config,
@@ -27,7 +28,7 @@ def build_bank_payload():
         config = parse_accident_risk_config({'accident_sequence_seed': seed})
         records = generate_accident_sequence(
             config,
-            rounds=60,
+            rounds=FORMAL_ROUNDS,
             sequence_id=sequence_id,
         )
         incident_rounds = [
@@ -47,7 +48,8 @@ def build_bank_payload():
                 'generation_seed': seed,
                 'incident_rounds': incident_rounds,
                 'mean_actual_capacity': round(
-                    sum(record['actual_capacity'] for record in records) / 60,
+                    sum(record['actual_capacity'] for record in records)
+                    / FORMAL_ROUNDS,
                     12,
                 ),
                 'rounds': records,
@@ -56,7 +58,7 @@ def build_bank_payload():
     return {
         'version': 2,
         'mechanism': 'iid_accident_capacity_loss_beta',
-        'formal_rounds': 60,
+        'formal_rounds': FORMAL_ROUNDS,
         'normal_capacity': 4.0,
         'incident_probability': 0.2,
         'loss_distribution': {

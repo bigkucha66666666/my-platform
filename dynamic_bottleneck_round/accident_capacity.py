@@ -10,8 +10,8 @@ from typing import Mapping
 
 INFO_I0 = 'I0'
 INFO_I1 = 'I1'
-INFO_I2 = 'I2'
-INFORMATION_CONDITIONS = {INFO_I0, INFO_I1, INFO_I2}
+INFORMATION_CONDITIONS = {INFO_I0, INFO_I1}
+FORMAL_ROUNDS = 30
 SEQUENCE_BANK_FILE = 'capacity_sequence_bank.json'
 APPROVED_SEQUENCE_IDS = {'S01', 'S02', 'S03', 'S04', 'S05'}
 
@@ -102,7 +102,7 @@ def parse_accident_risk_config(
     ).strip().upper()
     if information_condition not in INFORMATION_CONDITIONS:
         raise AccidentRiskConfigError(
-            'accident_information_condition 必须是 I0、I1 或 I2。'
+            'accident_information_condition 必须是 I0 或 I1。'
         )
 
     return AccidentRiskConfig(
@@ -184,7 +184,7 @@ def accident_public_context(
         'expected_incident_capacity': expected_incident_capacity,
         'expected_unconditional_capacity': expected_unconditional_capacity,
         'capacity_revealed': bool(
-            after_decision or warmup or config.information_condition == INFO_I2
+            after_decision or warmup
         ),
     }
     if warmup:
@@ -208,10 +208,8 @@ def accident_public_context(
             }
         )
         return context
-    if config.information_condition in {INFO_I1, INFO_I2}:
+    if config.information_condition == INFO_I1:
         context['incident_occurred'] = bool(record['incident_occurred'])
-    if config.information_condition == INFO_I2:
-        context['actual_capacity'] = float(record['actual_capacity'])
     return context
 
 
@@ -264,8 +262,10 @@ def load_accident_sequence_bank(path=None):
         raise AccidentRiskConfigError('alpha 必须为批准值 6.83057。')
     if not isclose(loss_beta, approved.loss_beta, abs_tol=1e-12):
         raise AccidentRiskConfigError('beta 必须为批准值 4.05907。')
-    if payload.get('formal_rounds') != 60:
-        raise AccidentRiskConfigError('事故序列库 formal_rounds 必须为60。')
+    if payload.get('formal_rounds') != FORMAL_ROUNDS:
+        raise AccidentRiskConfigError(
+            f'事故序列库 formal_rounds 必须为{FORMAL_ROUNDS}。'
+        )
     raw_sequences = payload.get('sequences')
     if not isinstance(raw_sequences, list) or not raw_sequences:
         raise AccidentRiskConfigError('事故序列库中没有可用序列。')
@@ -295,9 +295,9 @@ def load_accident_sequence_bank(path=None):
 
 def _validated_bank_sequence(sequence, *, sequence_id, normal_capacity):
     raw_rounds = sequence.get('rounds')
-    if not isinstance(raw_rounds, list) or len(raw_rounds) != 60:
+    if not isinstance(raw_rounds, list) or len(raw_rounds) != FORMAL_ROUNDS:
         raise AccidentRiskConfigError(
-            f'{sequence_id} rounds 必须恰好包含60轮。'
+            f'{sequence_id} rounds 必须恰好包含{FORMAL_ROUNDS}轮。'
         )
     try:
         generation_seed = int(sequence.get('generation_seed'))
@@ -374,7 +374,9 @@ def _validated_bank_sequence(sequence, *, sequence_id, normal_capacity):
 
     if sequence.get('incident_rounds') != incident_rounds:
         raise AccidentRiskConfigError(f'{sequence_id} incident_rounds 不一致。')
-    mean_capacity = sum(record['actual_capacity'] for record in rounds) / 60
+    mean_capacity = (
+        sum(record['actual_capacity'] for record in rounds) / FORMAL_ROUNDS
+    )
     if not isclose(
         _finite_float(sequence.get('mean_actual_capacity'), 'mean_actual_capacity'),
         mean_capacity,

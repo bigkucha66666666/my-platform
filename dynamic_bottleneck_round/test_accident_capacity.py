@@ -5,7 +5,6 @@ import unittest
 
 from dynamic_bottleneck_round.accident_capacity import (
     INFO_I0,
-    INFO_I2,
     AccidentRiskConfigError,
     accident_public_context,
     generate_accident_sequence,
@@ -25,10 +24,15 @@ class AccidentRiskConfigTests(unittest.TestCase):
         self.assertEqual(config.information_condition, INFO_I0)
 
     def test_rejects_invalid_information_condition(self):
-        with self.assertRaisesRegex(AccidentRiskConfigError, 'I0、I1 或 I2'):
-            parse_accident_risk_config(
-                {'accident_information_condition': 'I3'}
-            )
+        for condition in ('I2', 'I3'):
+            with self.subTest(condition=condition):
+                with self.assertRaisesRegex(
+                    AccidentRiskConfigError,
+                    'accident_information_condition 必须是 I0 或 I1',
+                ):
+                    parse_accident_risk_config(
+                        {'accident_information_condition': condition}
+                    )
 
     def test_rejects_non_finite_or_non_positive_parameters(self):
         invalid_cases = (
@@ -54,23 +58,23 @@ class AccidentRiskConfigTests(unittest.TestCase):
         config = parse_accident_risk_config(
             {
                 'accident_sequence_seed': 2026090801,
-                'accident_information_condition': INFO_I2,
+                'accident_information_condition': INFO_I0,
             }
         )
 
         left = generate_accident_sequence(
             config,
-            rounds=60,
+            rounds=30,
             sequence_id='auto',
         )
         right = generate_accident_sequence(
             config,
-            rounds=60,
+            rounds=30,
             sequence_id='auto',
         )
 
         self.assertEqual(left, right)
-        self.assertEqual(len(left), 60)
+        self.assertEqual(len(left), 30)
         self.assertTrue(any(record['incident_occurred'] for record in left))
         for index, record in enumerate(left, start=1):
             self.assertEqual(record['formal_round_number'], index)
@@ -107,7 +111,7 @@ class AccidentSequenceBankTests(unittest.TestCase):
         self.assertEqual(set(bank), {'S01', 'S02', 'S03', 'S04', 'S05'})
         for sequence_id, sequence in bank.items():
             with self.subTest(sequence_id=sequence_id):
-                self.assertEqual(len(sequence['rounds']), 60)
+                self.assertEqual(len(sequence['rounds']), 30)
                 self.assertGreater(len(sequence['incident_rounds']), 0)
                 for index, record in enumerate(sequence['rounds'], start=1):
                     self.assertEqual(record['formal_round_number'], index)
@@ -141,7 +145,7 @@ class AccidentSequenceBankTests(unittest.TestCase):
             'mean_actual_capacity': 4.0,
             'rounds': [
                 {**valid_record, 'formal_round_number': index}
-                for index in range(1, 61)
+                for index in range(1, 31)
             ],
         }
         payload = self._bank_payload([sequence, sequence])
@@ -152,7 +156,7 @@ class AccidentSequenceBankTests(unittest.TestCase):
     def test_rejects_inconsistent_capacity_record(self):
         records = generate_accident_sequence(
             parse_accident_risk_config({'accident_sequence_seed': 99}),
-            rounds=60,
+            rounds=30,
             sequence_id='S01',
         )
         records[0]['actual_capacity'] = 3.5
@@ -209,7 +213,7 @@ class AccidentSequenceBankTests(unittest.TestCase):
         return {
             'version': 2,
             'mechanism': 'iid_accident_capacity_loss_beta',
-            'formal_rounds': 60,
+            'formal_rounds': 30,
             'normal_capacity': 4.0,
             'incident_probability': 0.2,
             'loss_distribution': {
@@ -271,17 +275,6 @@ class AccidentInformationTests(unittest.TestCase):
         self.assertTrue(context['incident_occurred'])
         self.assertFalse(context['capacity_revealed'])
 
-    def test_i2_adds_status_and_actual_capacity_but_not_loss_before_decision(self):
-        context = self.context('I2')
-
-        self.assertEqual(
-            set(context),
-            self.base_fields | {'incident_occurred', 'actual_capacity'},
-        )
-        self.assertEqual(context['actual_capacity'], 1.5)
-        self.assertTrue(context['capacity_revealed'])
-        self.assertNotIn('capacity_loss_ratio', context)
-
     def test_all_conditions_receive_complete_realized_feedback_after_decision(self):
         realized_fields = {
             'incident_occurred',
@@ -289,7 +282,7 @@ class AccidentInformationTests(unittest.TestCase):
             'remaining_capacity_ratio',
             'actual_capacity',
         }
-        for condition in ('I0', 'I1', 'I2'):
+        for condition in ('I0', 'I1'):
             with self.subTest(condition=condition):
                 context = self.context(condition, after_decision=True)
                 self.assertEqual(set(context), self.base_fields | realized_fields)

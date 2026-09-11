@@ -41,7 +41,6 @@ class IndependentRLAgentPolicyTests(unittest.TestCase):
             information_condition='I0',
             rel_lambda=0.25,
             rel_eta=14.7445,
-            rel_capacity_bandwidth=0.560924,
             session_code='SESSION01',
             group_id=1,
             agent_id='G01_RL_01',
@@ -51,7 +50,9 @@ class IndependentRLAgentPolicyTests(unittest.TestCase):
 
         self.assertEqual(choice['decision_source'], 'liu_rel_uniform_initial')
         self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
+        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_incident_v2')
         self.assertEqual(len(choice['choice_probabilities']), 16)
+        self.assertNotIn('rel_capacity_bandwidth', choice)
 
     def test_wrapper_observation_appends_only_own_experience(self):
         state = observe_independent_rl_outcome(

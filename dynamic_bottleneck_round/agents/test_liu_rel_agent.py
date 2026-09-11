@@ -150,15 +150,11 @@ class LiuRELConditioningTests(unittest.TestCase):
             self.history,
             information_condition='I0',
             current_incident_occurred=True,
-            current_actual_capacity=0.5,
-            rel_capacity_bandwidth=0.56,
         )
         second = select_information_conditioned_experiences(
             self.history,
             information_condition='I0',
             current_incident_occurred=False,
-            current_actual_capacity=4,
-            rel_capacity_bandwidth=0.56,
         )
 
         self.assertEqual(first, second)
@@ -170,8 +166,6 @@ class LiuRELConditioningTests(unittest.TestCase):
             self.history,
             information_condition='I1',
             current_incident_occurred=True,
-            current_actual_capacity=4,
-            rel_capacity_bandwidth=0.01,
         )
 
         self.assertEqual(selected['context_level'], 'i1_incident')
@@ -188,64 +182,18 @@ class LiuRELConditioningTests(unittest.TestCase):
             history,
             information_condition='I1',
             current_incident_occurred=True,
-            rel_capacity_bandwidth=0.56,
         )
 
         self.assertEqual(selected['context_level'], 'i1_backoff_i0')
         self.assertEqual(len(selected['experiences']), 3)
 
-    def test_i2_gaussian_kernel_weights_near_capacity_more_heavily(self):
-        selected = select_information_conditioned_experiences(
-            self.history,
-            information_condition='I2',
-            current_incident_occurred=True,
-            current_actual_capacity=1.5,
-            rel_capacity_bandwidth=0.5,
-        )
-        weights = {
-            item['formal_round_number']: item['weight']
-            for item in selected['experiences']
-        }
-
-        self.assertEqual(selected['context_level'], 'i2_kernel')
-        self.assertGreater(weights[3], weights[4])
-        self.assertGreater(weights[4], weights[1])
-
-    def test_i2_falls_back_to_i1_then_i0_then_sparse(self):
-        same_status = select_information_conditioned_experiences(
-            [
-                experience(1, 2, 10, False, 4),
-                experience(2, 5, 12, False, 4),
-                experience(3, 3, 15, True, 1.5),
-                experience(4, 6, 16, True, 2),
-            ],
-            information_condition='I2',
-            current_incident_occurred=True,
-            current_actual_capacity=100,
-            rel_capacity_bandwidth=0.01,
-        )
-        all_history = select_information_conditioned_experiences(
-            [
-                experience(1, 2, 10, False, 4),
-                experience(2, 5, 12, False, 4),
-                experience(3, 3, 15, True, 1.5),
-            ],
-            information_condition='I2',
-            current_incident_occurred=True,
-            current_actual_capacity=100,
-            rel_capacity_bandwidth=0.01,
-        )
-        sparse = select_information_conditioned_experiences(
-            [experience(1, 2, 10, False, 4)],
-            information_condition='I2',
-            current_incident_occurred=True,
-            current_actual_capacity=100,
-            rel_capacity_bandwidth=0.01,
-        )
-
-        self.assertEqual(same_status['context_level'], 'i2_backoff_i1')
-        self.assertEqual(all_history['context_level'], 'i2_backoff_i0')
-        self.assertEqual(sparse['context_level'], 'sparse')
+    def test_i2_is_rejected_by_the_two_condition_policy(self):
+        with self.assertRaisesRegex(ValueError, 'I0 or I1'):
+            select_information_conditioned_experiences(
+                self.history,
+                information_condition='I2',
+                current_incident_occurred=True,
+            )
 
 
 class LiuRELInterpolationAndProbabilityTests(unittest.TestCase):
@@ -288,7 +236,6 @@ class LiuRELChoiceTests(unittest.TestCase):
             'information_condition': 'I0',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
-            'rel_capacity_bandwidth': 0.560924,
             'session_code': 'SESSION01',
             'group_id': 1,
             'agent_id': 'G01_RL_01',
@@ -388,11 +335,13 @@ class LiuRELChoiceTests(unittest.TestCase):
 
         self.assertEqual(choice['decision_source'], 'liu_rel_softmax_i0')
         self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
+        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_incident_v2')
         self.assertEqual(choice['context_level'], 'i0_all')
         self.assertEqual(len(choice['propensities']), 16)
         self.assertEqual(len(choice['choice_probabilities']), 16)
         self.assertIn(str(choice['departure_slot']), choice['choice_probabilities'])
         self.assertNotIn(str(self.base['rel_random_seed']), str(choice))
+        self.assertNotIn('rel_capacity_bandwidth', choice)
 
 
 if __name__ == '__main__':

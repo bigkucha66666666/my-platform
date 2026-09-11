@@ -1,5 +1,7 @@
 # Accident Bottleneck 2×2, 30-Round Implementation Plan
 
+> 2026-09-11 界面结构更正：正式场景已收口为唯一的 `dynamic_bottleneck_round_prod`。本计划中之前将 H-I0、H-I1、HA-I0、HA-I1 和自定义注册为多个 Session config 的步骤已作废。它们现在是管理员创建该场景 Session 时的内部配置选项；以同日 design spec 第 7 节为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the current 2×3, 60-formal-round, 20-actor accident bottleneck runtime with the approved 2×2, 30-formal-round, 30-actor design, including visible I1 accident status on the departure decision page.

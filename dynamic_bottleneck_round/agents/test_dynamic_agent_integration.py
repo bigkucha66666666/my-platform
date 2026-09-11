@@ -38,22 +38,18 @@ class DynamicAgentConfigTests(unittest.TestCase):
             {config['name'] for config in dynamic_configs},
             {
                 'dynamic_bottleneck_round_demo',
-                'dynamic_bottleneck_round_prod_h_i0',
-                'dynamic_bottleneck_round_prod_h_i1',
-                'dynamic_bottleneck_round_prod_ha_i0',
-                'dynamic_bottleneck_round_prod_ha_i1',
-                'dynamic_bottleneck_round_prod_custom',
+                'dynamic_bottleneck_round_prod',
             },
         )
         for config in dynamic_configs:
             self.assertIn(str(config['rl_fallback_enabled']).lower(), {'0', 'false', 'off'})
             self.assertEqual(
                 config['rl_agent_policy_version'],
-                'dynamic_liu_rel_incident_v1',
+                'dynamic_liu_rel_incident_v2',
             )
             self.assertEqual(config['rel_lambda'], 0.25)
             self.assertEqual(config['rel_eta'], 14.7445)
-            self.assertEqual(config['rel_capacity_bandwidth'], 0.560924)
+            self.assertNotIn('rel_capacity_bandwidth', config)
             self.assertEqual(config['rel_random_seed'], 2026090901)
             self.assertEqual(config['rel_initial_uniform_rounds'], 2)
             self.assertIn(
@@ -122,10 +118,9 @@ class DynamicAgentConfigTests(unittest.TestCase):
         valid = {
             'name': 'dynamic_bottleneck_round_demo',
             'rl_agent_enabled': '1',
-            'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+            'rel_policy_version': 'dynamic_liu_rel_incident_v2',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
-            'rel_capacity_bandwidth': 0.560924,
             'rel_random_seed': 2026090901,
             'rel_initial_uniform_rounds': 2,
             'rel_parameters_frozen': '0',
@@ -133,7 +128,6 @@ class DynamicAgentConfigTests(unittest.TestCase):
         invalid = (
             ('rel_lambda', -0.1),
             ('rel_eta', 0),
-            ('rel_capacity_bandwidth', 0),
             ('rel_random_seed', 1.5),
             ('rel_initial_uniform_rounds', 3),
             ('rel_policy_version', 'old'),
@@ -147,12 +141,12 @@ class DynamicAgentConfigTests(unittest.TestCase):
     def test_rl_enabled_production_requires_frozen_parameters(self):
         session = SimpleNamespace(
             config={
-                'name': 'dynamic_bottleneck_round_prod_ha_i0',
+                'name': 'dynamic_bottleneck_round_prod',
+                'group_treatment_spec': 'G01:HA-I0',
                 'rl_agent_enabled': '1',
-                'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+                'rel_policy_version': 'dynamic_liu_rel_incident_v2',
                 'rel_lambda': 0.25,
                 'rel_eta': 14.7445,
-                'rel_capacity_bandwidth': 0.560924,
                 'rel_random_seed': 2026090901,
                 'rel_initial_uniform_rounds': 2,
                 'rel_parameters_frozen': '0',
@@ -170,10 +164,9 @@ class DynamicAgentConfigTests(unittest.TestCase):
         base = {
             'name': 'dynamic_bottleneck_round_demo',
             'rl_agent_enabled': '1',
-            'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+            'rel_policy_version': 'dynamic_liu_rel_incident_v2',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
-            'rel_capacity_bandwidth': 0.560924,
             'rel_random_seed': 2026090901,
             'rel_initial_uniform_rounds': 2,
         }
@@ -255,7 +248,7 @@ class DynamicAgentRevealTests(unittest.TestCase):
     def test_chat_payload_uses_fast_bounded_json_output(self):
         choice_set = AgentChoiceSet(
             round_number=1,
-            total_rounds=60,
+            total_rounds=30,
             available_slots=({'slot': 1, 'departure_minute': 474},),
             cost_parameters={},
             capacity_context={'capacity_revealed': False},
@@ -458,7 +451,7 @@ class DynamicAgentInformationParityTests(unittest.TestCase):
         return player, group
 
     def test_human_and_agent_receive_identical_condition_limited_context(self):
-        for condition in ('I0', 'I1', 'I2'):
+        for condition in ('I0', 'I1'):
             with self.subTest(condition=condition):
                 player, group = self.make_round(condition)
                 preview = [
@@ -505,8 +498,6 @@ class DynamicAgentInformationParityTests(unittest.TestCase):
                 elif condition == 'I1':
                     self.assertTrue(agent_context['incident_occurred'])
                     self.assertNotIn('actual_capacity', agent_context)
-                else:
-                    self.assertEqual(agent_context['actual_capacity'], 1.5)
 
     def test_rl_fallback_receives_i1_incident_signal_without_hidden_capacity(self):
         player, group = self.make_round('I1')
@@ -515,7 +506,7 @@ class DynamicAgentInformationParityTests(unittest.TestCase):
         )
         choice_set = AgentChoiceSet(
             round_number=1,
-            total_rounds=60,
+            total_rounds=30,
             available_slots=({'slot': 1, 'departure_minute': 466},),
             cost_parameters={},
             capacity_context={
@@ -1291,10 +1282,9 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                 'rl_agent_count_per_group': 2,
                 'accident_information_condition': 'I0',
                 'reward_treatment_enabled': 0,
-                'rel_policy_version': 'dynamic_liu_rel_incident_v1',
+                'rel_policy_version': 'dynamic_liu_rel_incident_v2',
                 'rel_lambda': 0.25,
                 'rel_eta': 14.7445,
-                'rel_capacity_bandwidth': 0.560924,
                 'rel_random_seed': 2026090901,
                 'rel_initial_uniform_rounds': 2,
                 'rel_parameters_frozen': '0',
@@ -1390,7 +1380,8 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             )
         )
         audit = json.loads(first[0]['context_json'])
-        self.assertEqual(audit['policy_version'], 'dynamic_liu_rel_incident_v1')
+        self.assertEqual(audit['policy_version'], 'dynamic_liu_rel_incident_v2')
+        self.assertNotIn('rel_capacity_bandwidth', audit)
         self.assertEqual(audit['information_condition'], 'I0')
         self.assertIn('choice_probabilities', audit)
         self.assertIn('random_seed_fingerprint', audit)
@@ -1456,7 +1447,6 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         expected = {
             'I0': (False, False),
             'I1': (True, False),
-            'I2': (True, True),
         }
         for condition, (has_incident, has_capacity) in expected.items():
             with self.subTest(condition=condition):
@@ -1467,7 +1457,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                     'departure_slot': 1,
                     'decision_source': 'liu_rel_uniform_initial',
                     'reason': 'test',
-                    'policy_version': 'dynamic_liu_rel_incident_v1',
+                    'policy_version': 'dynamic_liu_rel_incident_v2',
                     'rounds_observed': 0,
                     'information_condition': condition,
                     'context_level': 'initial',
@@ -1478,7 +1468,6 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                     'effective_observation_count': 0.0,
                     'rel_lambda': 0.25,
                     'rel_eta': 14.7445,
-                    'rel_capacity_bandwidth': 0.560924,
                     'random_seed_fingerprint': 'abcdef123456',
                 }
 
@@ -1536,7 +1525,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'actor_type': 'rl_agent',
             'agent_id': 'G01_RL_01',
             'agent_type': 'rl_agent',
-            'policy_version': 'dynamic_liu_rel_incident_v1',
+            'policy_version': 'dynamic_liu_rel_incident_v2',
             'persona_id': 'balanced_v1',
             'persona_label': 'balanced',
             'decision_source': 'rl_policy',
@@ -1552,7 +1541,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         self.assertEqual(
             row[app.EXPORT_HEADERS.index('rl_policy_version')],
-            'dynamic_liu_rel_incident_v1',
+            'dynamic_liu_rel_incident_v2',
         )
 
     def test_group_result_lock_rejects_overlapping_generation(self):
@@ -1662,6 +1651,14 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             html,
         )
 
+    def test_create_session_page_extends_installed_otree_admin_base(self):
+        html = Path('_templates/otree/CreateSession.html').read_text(
+            encoding='utf-8'
+        )
+
+        self.assertIn('{% extends "otree/BaseAdminRegular.html" %}', html)
+        self.assertNotIn('{% extends "otree/BaseAdmin.html" %}', html)
+
     def test_dynamic_controls_define_fixed_treatments_and_custom_builder(self):
         html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
             encoding='utf-8'
@@ -1685,6 +1682,15 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
                 self.assertIn(value, html)
         self.assertNotIn('data-preset="A"', html)
         self.assertNotIn('15 Human + 5 LLM', html)
+        self.assertIn("'dynamic_bottleneck_round_prod'", html)
+        for retired in (
+            'dynamic_bottleneck_round_prod_h_i0',
+            'dynamic_bottleneck_round_prod_h_i1',
+            'dynamic_bottleneck_round_prod_ha_i0',
+            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod_custom',
+        ):
+            self.assertNotIn(retired, html)
 
     def test_create_session_page_has_dynamic_agent_toggle(self):
         html = Path(
@@ -1692,8 +1698,7 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
         ).read_text(encoding='utf-8')
 
         self.assertIn('是否加入 Agent', html)
-        self.assertIn('dynamic_bottleneck_round_prod_h_i0', html)
-        self.assertIn('dynamic_bottleneck_round_prod_custom', html)
+        self.assertIn('dynamic_bottleneck_round_prod', html)
         self.assertIn('dynamic_bottleneck_round_demo', html)
         self.assertIn('api_agent_mode', html)
         self.assertIn('api_agent_count_per_group', html)

@@ -3,7 +3,7 @@ from otree.api import *
 
 NOTICE_ROUND_CHOICES = [
     ['none', '未发现明显变化'],
-    *[[str(round_number), f'正式第 {round_number} 轮'] for round_number in range(1, 61)],
+    *[[str(round_number), f'正式第 {round_number} 轮'] for round_number in range(1, 31)],
 ]
 
 PATTERN_CHOICES = [

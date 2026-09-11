@@ -58,7 +58,7 @@ DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED = str(
 DYNAMIC_BOTTLENECK_RL_AGENT_COUNT = str(
     environ.get('DYNAMIC_BOTTLENECK_RL_AGENT_COUNT_PER_GROUP', '1') or '1'
 ).strip()
-DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = 'dynamic_liu_rel_incident_v1'
+DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = 'dynamic_liu_rel_incident_v2'
 DYNAMIC_BOTTLENECK_REL_LAMBDA = environ.get(
     'DYNAMIC_BOTTLENECK_REL_LAMBDA',
     0.25,
@@ -66,10 +66,6 @@ DYNAMIC_BOTTLENECK_REL_LAMBDA = environ.get(
 DYNAMIC_BOTTLENECK_REL_ETA = environ.get(
     'DYNAMIC_BOTTLENECK_REL_ETA',
     14.7445,
-)
-DYNAMIC_BOTTLENECK_REL_CAPACITY_BANDWIDTH = environ.get(
-    'DYNAMIC_BOTTLENECK_REL_CAPACITY_BANDWIDTH',
-    0.560924,
 )
 DYNAMIC_BOTTLENECK_REL_RANDOM_SEED = environ.get(
     'DYNAMIC_BOTTLENECK_REL_RANDOM_SEED',
@@ -151,7 +147,6 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     rel_policy_version=DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION,
     rel_lambda=DYNAMIC_BOTTLENECK_REL_LAMBDA,
     rel_eta=DYNAMIC_BOTTLENECK_REL_ETA,
-    rel_capacity_bandwidth=DYNAMIC_BOTTLENECK_REL_CAPACITY_BANDWIDTH,
     rel_random_seed=DYNAMIC_BOTTLENECK_REL_RANDOM_SEED,
     rel_initial_uniform_rounds=2,
     rel_parameters_frozen=DYNAMIC_BOTTLENECK_REL_PARAMETERS_FROZEN,
@@ -168,39 +163,6 @@ DYNAMIC_BOTTLENECK_FORMAL_APP_SEQUENCE = [
     'payment_info',
 ]
 
-
-def dynamic_bottleneck_formal_config(
-    *,
-    name,
-    display_name,
-    treatment,
-    humans,
-    api_count,
-    rl_count,
-    information_condition,
-):
-    return dict(
-        DYNAMIC_BOTTLENECK_ROUND_COMMON,
-        name=name,
-        display_name=display_name,
-        app_sequence=DYNAMIC_BOTTLENECK_FORMAL_APP_SEQUENCE,
-        doc=(
-            '用于真实被试的事故风险动态瓶颈实验。\n'
-            '先完成 5 轮正常容量练习，随后完成 30 轮正式实验。\n'
-            f'处理为 {treatment}，每组总主体数固定为 30。\n'
-            '正式场次必须使用 S01-S05 固定事故序列。'
-        ),
-        participant_password=PROD_PARTICIPANT_PASSWORD,
-        group_treatment_spec=f'G01:{treatment}',
-        accident_information_condition=information_condition,
-        api_agent_mode='active' if api_count else 'off',
-        api_agent_count_per_group=api_count,
-        rl_agent_enabled=1 if rl_count else 0,
-        rl_agent_count_per_group=rl_count,
-        rel_parameters_frozen=1,
-        dynamic_capacity_sequence_preset='S01',
-        num_demo_participants=humans,
-    )
 
 SESSION_CONFIGS = [
     dict(
@@ -279,51 +241,16 @@ SESSION_CONFIGS = [
         api_agent_mode='active',
         num_demo_participants=5,
     ),
-    dynamic_bottleneck_formal_config(
-        name='dynamic_bottleneck_round_prod_h_i0',
-        display_name='正式实验 · H-I0 · 事故未知',
-        treatment='H-I0',
-        humans=30,
-        api_count=0,
-        rl_count=0,
-        information_condition='I0',
-    ),
-    dynamic_bottleneck_formal_config(
-        name='dynamic_bottleneck_round_prod_h_i1',
-        display_name='正式实验 · H-I1 · 事故已知',
-        treatment='H-I1',
-        humans=30,
-        api_count=0,
-        rl_count=0,
-        information_condition='I1',
-    ),
-    dynamic_bottleneck_formal_config(
-        name='dynamic_bottleneck_round_prod_ha_i0',
-        display_name='正式实验 · HA-I0 · 事故未知',
-        treatment='HA-I0',
-        humans=10,
-        api_count=10,
-        rl_count=10,
-        information_condition='I0',
-    ),
-    dynamic_bottleneck_formal_config(
-        name='dynamic_bottleneck_round_prod_ha_i1',
-        display_name='正式实验 · HA-I1 · 事故已知',
-        treatment='HA-I1',
-        humans=10,
-        api_count=10,
-        rl_count=10,
-        information_condition='I1',
-    ),
     dict(
         DYNAMIC_BOTTLENECK_ROUND_COMMON,
-        name='dynamic_bottleneck_round_prod_custom',
-        display_name='正式实验 · 自定义分组',
+        name='dynamic_bottleneck_round_prod',
+        display_name='正式实验 · 事故风险动态瓶颈',
         app_sequence=DYNAMIC_BOTTLENECK_FORMAL_APP_SEQUENCE,
         doc=(
-            '用于一个 Session 内创建多个彼此独立的处理组。\n'
-            '各组可选 H-I0、H-I1、HA-I0 或 HA-I1，'
-            '每轮共享同一条事故容量序列。'
+            '用于真实被试的事故风险动态瓶颈实验。\n'
+            '创建 Session 时再选择 H-I0、H-I1、HA-I0、HA-I1 '
+            '或自定义多组配置。\n'
+            '各组独立排队和结算，同轮共享同一条事故容量序列。'
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
         group_treatment_spec='G01:H-I0',

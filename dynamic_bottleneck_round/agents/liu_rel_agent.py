@@ -9,9 +9,8 @@ import random
 from typing import Iterable, Mapping, Sequence
 
 
-LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_incident_v1'
-INFORMATION_CONDITIONS = {'I0', 'I1', 'I2'}
-WEIGHT_FLOOR = 1e-12
+LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_incident_v2'
+INFORMATION_CONDITIONS = {'I0', 'I1'}
 PHI_FLOOR = 1e-9
 
 
@@ -128,13 +127,11 @@ def select_information_conditioned_experiences(
     experiences: Sequence[Mapping[str, object]],
     *,
     information_condition,
-    rel_capacity_bandwidth,
     current_incident_occurred=None,
-    current_actual_capacity=None,
 ) -> dict:
     condition = str(information_condition or '').strip().upper()
     if condition not in INFORMATION_CONDITIONS:
-        raise LiuRELAlgorithmError('information_condition must be I0, I1, or I2.')
+        raise LiuRELAlgorithmError('information_condition must be I0 or I1.')
     history = [deepcopy(dict(item)) for item in experiences if isinstance(item, Mapping)]
     if condition == 'I0':
         return _selection(_unit_weighted(history), 'i0_all')
@@ -148,34 +145,13 @@ def select_information_conditioned_experiences(
         if bool(item.get('incident_occurred')) == incident
     ]
 
-    if condition == 'I1':
-        if _distinct_slots(same_status) >= 2:
-            return _selection(
-                _unit_weighted(same_status),
-                'i1_incident' if incident else 'i1_normal',
-            )
-        if _distinct_slots(history) >= 2:
-            return _selection(_unit_weighted(history), 'i1_backoff_i0')
-        return _selection([], 'sparse')
-
-    bandwidth = _positive_float(rel_capacity_bandwidth, 'rel_capacity_bandwidth')
-    capacity = _positive_float(current_actual_capacity, 'current_actual_capacity')
-    kernel_weighted = []
-    for item in history:
-        historical_capacity = _positive_float(
-            item.get('actual_capacity'),
-            'historical actual_capacity',
-        )
-        exponent = -((capacity - historical_capacity) ** 2) / (2 * bandwidth ** 2)
-        weight = math.exp(exponent)
-        if weight > WEIGHT_FLOOR:
-            kernel_weighted.append({**item, 'weight': weight})
-    if _distinct_slots(kernel_weighted) >= 2:
-        return _selection(kernel_weighted, 'i2_kernel')
     if _distinct_slots(same_status) >= 2:
-        return _selection(_unit_weighted(same_status), 'i2_backoff_i1')
+        return _selection(
+            _unit_weighted(same_status),
+            'i1_incident' if incident else 'i1_normal',
+        )
     if _distinct_slots(history) >= 2:
-        return _selection(_unit_weighted(history), 'i2_backoff_i0')
+        return _selection(_unit_weighted(history), 'i1_backoff_i0')
     return _selection([], 'sparse')
 
 
@@ -305,7 +281,6 @@ def choose_liu_rel_departure(
     information_condition,
     rel_lambda,
     rel_eta,
-    rel_capacity_bandwidth,
     session_code,
     group_id,
     agent_id,
@@ -313,7 +288,6 @@ def choose_liu_rel_departure(
     rel_initial_uniform_rounds=2,
     warmup=False,
     current_incident_occurred=None,
-    current_actual_capacity=None,
 ) -> dict:
     current = valid_or_initial_liu_rel_state(state)
     legal_slots = sorted(
@@ -330,7 +304,6 @@ def choose_liu_rel_departure(
     if lambda_value < 0:
         raise LiuRELAlgorithmError('rel_lambda must be non-negative.')
     eta = _positive_float(rel_eta, 'rel_eta')
-    bandwidth = _positive_float(rel_capacity_bandwidth, 'rel_capacity_bandwidth')
     random_seed = _explicit_int(rel_random_seed, 'rel_random_seed')
     decision_round = int(formal_round_number)
     seed_material = '|'.join(
@@ -363,8 +336,6 @@ def choose_liu_rel_departure(
             current['experiences'],
             information_condition=information_condition,
             current_incident_occurred=current_incident_occurred,
-            current_actual_capacity=current_actual_capacity,
-            rel_capacity_bandwidth=bandwidth,
         )
         context_level = selection['context_level']
         weighted = selection['experiences']
@@ -408,7 +379,6 @@ def choose_liu_rel_departure(
         'effective_observation_count': effective_count,
         'rel_lambda': lambda_value,
         'rel_eta': eta,
-        'rel_capacity_bandwidth': bandwidth,
         'random_seed_fingerprint': digest[:12],
     }
 
@@ -419,9 +389,6 @@ def _softmax_source(context_level):
         'i1_incident': 'liu_rel_softmax_i1',
         'i1_normal': 'liu_rel_softmax_i1',
         'i1_backoff_i0': 'liu_rel_softmax_i1_backoff_i0',
-        'i2_kernel': 'liu_rel_softmax_i2_kernel',
-        'i2_backoff_i1': 'liu_rel_softmax_i2_backoff_i1',
-        'i2_backoff_i0': 'liu_rel_softmax_i2_backoff_i0',
     }[context_level]
 
 

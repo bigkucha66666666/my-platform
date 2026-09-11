@@ -233,10 +233,10 @@ class GroupSpecificAgentConfigTests(unittest.TestCase):
 
     def test_group_spec_rejects_agent_count_above_limit(self):
         session = self.make_session(
-            group_agent_spec='G01:api=0,rl=0;G02:api=6,rl=0'
+            group_agent_spec='G01:api=0,rl=0;G02:api=11,rl=0'
         )
 
-        with self.assertRaisesRegex(ValueError, '0 到 5'):
+        with self.assertRaisesRegex(ValueError, '0 到 10'):
             dynamic_app.validate_group_agent_configuration(
                 session,
                 [[object()], [object()]],
@@ -876,12 +876,12 @@ class PersistentDropoutSuspensionTests(unittest.TestCase):
 
 
 class DynamicPresentationContextTests(unittest.TestCase):
-    def test_reveal_description_matches_i2(self):
+    def test_reveal_description_matches_i1(self):
         config = dynamic_app.parse_accident_risk_config(
-            {'accident_information_condition': 'I2'}
+            {'accident_information_condition': 'I1'}
         )
 
-        self.assertIn('实际服务率', capacity_reveal_description(config))
+        self.assertIn('事故是否发生', capacity_reveal_description(config))
 
     def test_reveal_description_matches_i0(self):
         config = dynamic_app.parse_accident_risk_config(
@@ -966,7 +966,11 @@ class TemplateContractTests(unittest.TestCase):
         html = self.template_text('Decision.html')
 
         self.assertIn('{{ if capacity_revealed }}', html)
+        self.assertIn('{{ elif incident_status_revealed }}', html)
         self.assertIn('本轮真实瓶颈服务率', html)
+        self.assertIn('本轮事故状态', html)
+        self.assertIn('本轮发生事故', html)
+        self.assertIn('本轮未发生事故', html)
         self.assertIn('本轮服务率将在提交后公布', html)
         self.assertIn('请根据已经公布的历史结果作出选择', html)
         self.assertNotIn('{{ item.probability_percent }}%', html)
@@ -1009,7 +1013,7 @@ class TemplateContractTests(unittest.TestCase):
         self.assertTrue(formal_path.exists())
         self.assertIn('热身环节开始', warmup_path.read_text(encoding='utf-8'))
         self.assertIn('热身已结束', formal_path.read_text(encoding='utf-8'))
-        self.assertIn('正式实验共 60 轮', formal_path.read_text(encoding='utf-8'))
+        self.assertIn('正式实验共 30 轮', formal_path.read_text(encoding='utf-8'))
 
     def test_round_pages_use_phase_labels_instead_of_raw_round_numbers(self):
         round_sync = self.template_text('RoundStartSync.html')
@@ -1061,11 +1065,7 @@ class SettingsContractTests(unittest.TestCase):
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         dynamic_names = {
             'dynamic_bottleneck_round_demo',
-            'dynamic_bottleneck_round_prod_h_i0',
-            'dynamic_bottleneck_round_prod_h_i1',
-            'dynamic_bottleneck_round_prod_ha_i0',
-            'dynamic_bottleneck_round_prod_ha_i1',
-            'dynamic_bottleneck_round_prod_custom',
+            'dynamic_bottleneck_round_prod',
         }
         for name in dynamic_names:
             self.assertIn(name, configs)
@@ -1103,13 +1103,7 @@ class AccidentExperimentContractTests(unittest.TestCase):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
-        formal_names = (
-            'dynamic_bottleneck_round_prod_h_i0',
-            'dynamic_bottleneck_round_prod_h_i1',
-            'dynamic_bottleneck_round_prod_ha_i0',
-            'dynamic_bottleneck_round_prod_ha_i1',
-            'dynamic_bottleneck_round_prod_custom',
-        )
+        formal_names = ('dynamic_bottleneck_round_prod',)
         demo = configs['dynamic_bottleneck_round_demo']
         for config in [configs[name] for name in formal_names] + [demo]:
             self.assertEqual(config['accident_normal_capacity'], 4.0)
@@ -1123,27 +1117,26 @@ class AccidentExperimentContractTests(unittest.TestCase):
             self.assertEqual(configs[name]['dynamic_capacity_sequence_preset'], 'S01')
         self.assertEqual(demo['dynamic_capacity_sequence_preset'], 'auto')
 
-    def test_formal_session_defaults_match_the_four_treatments(self):
+    def test_one_formal_scenario_contains_session_level_treatment_defaults(self):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
-        expected = {
-            'dynamic_bottleneck_round_prod_h_i0': (30, 0, 0, 'I0'),
-            'dynamic_bottleneck_round_prod_h_i1': (30, 0, 0, 'I1'),
-            'dynamic_bottleneck_round_prod_ha_i0': (10, 10, 10, 'I0'),
-            'dynamic_bottleneck_round_prod_ha_i1': (10, 10, 10, 'I1'),
-        }
-        for name, (humans, llm, rl, condition) in expected.items():
-            with self.subTest(name=name):
-                config = configs[name]
-                self.assertEqual(config['num_demo_participants'], humans)
-                self.assertEqual(config['api_agent_count_per_group'], llm)
-                self.assertEqual(config['rl_agent_count_per_group'], rl)
-                self.assertEqual(config['accident_information_condition'], condition)
-                self.assertEqual(config['payoff_rounds'], 30)
-        custom = configs['dynamic_bottleneck_round_prod_custom']
-        self.assertEqual(custom['group_treatment_spec'], 'G01:H-I0')
-        self.assertEqual(custom['num_demo_participants'], 30)
+        formal = configs['dynamic_bottleneck_round_prod']
+        self.assertEqual(formal['display_name'], '正式实验 · 事故风险动态瓶颈')
+        self.assertEqual(formal['group_treatment_spec'], 'G01:H-I0')
+        self.assertEqual(formal['num_demo_participants'], 30)
+        self.assertEqual(formal['api_agent_count_per_group'], 0)
+        self.assertEqual(formal['rl_agent_count_per_group'], 0)
+        self.assertEqual(formal['accident_information_condition'], 'I0')
+        self.assertEqual(formal['payoff_rounds'], 30)
+        for retired in (
+            'dynamic_bottleneck_round_prod_h_i0',
+            'dynamic_bottleneck_round_prod_h_i1',
+            'dynamic_bottleneck_round_prod_ha_i0',
+            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod_custom',
+        ):
+            self.assertNotIn(retired, configs)
 
     def test_rounds_costs_and_fixed_action_space_match_approved_design(self):
         self.assertEqual(C.WARMUP_ROUNDS, 5)
@@ -1161,24 +1154,33 @@ class AccidentExperimentContractTests(unittest.TestCase):
         self.assertEqual(schedule['last_departure_time'], '08:01')
 
     @staticmethod
-    def make_session(name, *, api_mode='off', api_count=0, rl_enabled='0', rl_count=0):
+    def make_session(
+        name,
+        *,
+        treatment='H-I0',
+        api_mode='off',
+        api_count=0,
+        rl_enabled='0',
+        rl_count=0,
+    ):
         return SimpleNamespace(
             config={
                 'name': name,
                 'accident_information_condition': (
-                    'I1' if name.endswith('_i1') else 'I0'
+                    'I1' if treatment.endswith('I1') else 'I0'
                 ),
                 'api_agent_mode': api_mode,
                 'api_agent_count_per_group': api_count,
                 'rl_agent_enabled': rl_enabled,
                 'rl_agent_count_per_group': rl_count,
                 'group_agent_spec': '',
+                'group_treatment_spec': f'G01:{treatment}',
             },
             vars={},
         )
 
     def test_formal_human_only_composition_is_exactly_thirty_humans(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_h_i0')
+        session = self.make_session('dynamic_bottleneck_round_prod')
 
         result = dynamic_app.validate_formal_actor_composition(
             session,
@@ -1189,7 +1191,8 @@ class AccidentExperimentContractTests(unittest.TestCase):
 
     def test_formal_human_agent_composition_is_ten_plus_ten_plus_ten(self):
         session = self.make_session(
-            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod',
+            treatment='HA-I1',
             api_mode='active',
             api_count=10,
             rl_enabled='1',
@@ -1205,16 +1208,18 @@ class AccidentExperimentContractTests(unittest.TestCase):
 
     def test_formal_composition_rejects_any_other_actor_counts(self):
         invalid = (
-            self.make_session('dynamic_bottleneck_round_prod_h_i0'),
+            self.make_session('dynamic_bottleneck_round_prod'),
             self.make_session(
-                'dynamic_bottleneck_round_prod_ha_i1',
+                'dynamic_bottleneck_round_prod',
+                treatment='HA-I1',
                 api_mode='active',
                 api_count=2,
                 rl_enabled='1',
                 rl_count=2,
             ),
             self.make_session(
-                'dynamic_bottleneck_round_prod_ha_i0',
+                'dynamic_bottleneck_round_prod',
+                treatment='HA-I0',
                 api_mode='active',
                 api_count=2,
             ),
@@ -1230,7 +1235,7 @@ class AccidentExperimentContractTests(unittest.TestCase):
                     dynamic_app.validate_formal_actor_composition(session, matrix)
 
     def test_custom_treatment_spec_builds_variable_human_groups(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_custom')
+        session = self.make_session('dynamic_bottleneck_round_prod')
         session.config['group_treatment_spec'] = (
             'G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1'
         )
@@ -1248,14 +1253,14 @@ class AccidentExperimentContractTests(unittest.TestCase):
         self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 4), 10)
 
     def test_custom_treatment_spec_rejects_non_contiguous_groups(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_custom')
+        session = self.make_session('dynamic_bottleneck_round_prod')
         session.config['group_treatment_spec'] = 'G01:H-I0;G03:HA-I1'
 
         with self.assertRaisesRegex(ValueError, 'G01.*连续'):
             dynamic_app.configure_formal_treatments(session)
 
     def test_custom_treatment_matrix_rejects_wrong_human_total(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_custom')
+        session = self.make_session('dynamic_bottleneck_round_prod')
         session.config['group_treatment_spec'] = 'G01:H-I0;G02:HA-I1'
         treatments = dynamic_app.configure_formal_treatments(session)
 
@@ -1265,9 +1270,10 @@ class AccidentExperimentContractTests(unittest.TestCase):
                 treatments,
             )
 
-    def test_fixed_config_rejects_mismatched_condition(self):
+    def test_formal_scenario_derives_runtime_condition_from_selected_treatment(self):
         session = self.make_session(
-            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod',
+            treatment='HA-I1',
             api_mode='active',
             api_count=10,
             rl_enabled='1',
@@ -1275,11 +1281,10 @@ class AccidentExperimentContractTests(unittest.TestCase):
         )
         session.config['accident_information_condition'] = 'I0'
 
-        with self.assertRaisesRegex(ValueError, '配置名.*I1'):
-            dynamic_app.validate_formal_actor_composition(
-                session,
-                [[object() for _ in range(10)]],
-            )
+        dynamic_app.configure_formal_treatments(session)
+
+        self.assertEqual(session.config['accident_information_condition'], 'I1')
+        self.assertEqual(dynamic_app.information_condition_for_group(session, 1), 'I1')
 
     def test_demo_allows_smaller_actor_count(self):
         session = self.make_session('dynamic_bottleneck_round_demo')
@@ -1314,13 +1319,13 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         return SimpleNamespace(participant=SimpleNamespace(vars={}))
 
     def test_production_rejects_auto_sequence(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_h_i0', 'auto')
+        session = self.make_session('dynamic_bottleneck_round_prod', 'auto')
 
         with self.assertRaisesRegex(ValueError, '正式.*S01-S05'):
             dynamic_app.accident_sequence_for_session(session)
 
     def test_named_sequence_loads_frozen_bank_records(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_h_i0', 'S01')
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
 
         records = dynamic_app.accident_sequence_for_session(session)
 
@@ -1387,7 +1392,9 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         self.assertEqual(player.dynamic_capacity, 4.0)
 
     def test_formal_round_reads_corresponding_frozen_record(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_h_i1', 'S01')
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+        session.config['group_treatment_spec'] = 'G01:H-I1'
+        dynamic_app.configure_formal_treatments(session)
         records = dynamic_app.accident_sequence_for_session(session)
         session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR] = records
         player = self.make_player()
@@ -1407,7 +1414,7 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         self.assertEqual(player.information_condition, 'I1')
 
     def test_custom_groups_share_capacity_but_keep_distinct_information(self):
-        session = self.make_session('dynamic_bottleneck_round_prod_custom', 'S01')
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
         session.config.update(
             {
                 'group_treatment_spec': 'G01:H-I0;G02:H-I1',
@@ -1720,6 +1727,66 @@ class DynamicAccidentExportTests(unittest.TestCase):
 
 
 class DynamicAccidentPresentationBackendTests(unittest.TestCase):
+    @staticmethod
+    def decision_context(information_condition, incident_occurred):
+        group = SimpleNamespace(
+            round_number=C.WARMUP_ROUNDS + 1,
+            id_in_subsession=1,
+            incident_occurred=incident_occurred,
+            dynamic_capacity=1.5 if incident_occurred else 4.0,
+            capacity_loss_ratio=0.625 if incident_occurred else 0.0,
+            remaining_capacity_ratio=0.375 if incident_occurred else 1.0,
+            accident_sequence_id='S01',
+            accident_sequence_seed=20260901,
+            session=SimpleNamespace(
+                config={
+                    'accident_information_condition': information_condition,
+                    'accident_normal_capacity': 4.0,
+                },
+                vars={},
+            ),
+        )
+        player = SimpleNamespace(
+            group=group,
+            round_number=group.round_number,
+        )
+        with (
+            patch.object(dynamic_app, 'departure_schedule_for_player', return_value={
+                'first_departure_time': '07:40',
+                'last_departure_time': '08:00',
+            }),
+            patch.object(dynamic_app, 'choice_preview', return_value=[]),
+            patch.object(dynamic_app.Decision, 'get_timeout_seconds', return_value=90),
+            patch.object(
+                dynamic_app,
+                'coarse_toll_description_for_player',
+                return_value='当前未开启粗收费。',
+            ),
+        ):
+            return dynamic_app.Decision.vars_for_template(player)
+
+    def test_i1_decision_context_discloses_only_incident_boolean(self):
+        incident = self.decision_context('I1', True)
+        normal = self.decision_context('I1', False)
+
+        self.assertTrue(incident['incident_status_revealed'])
+        self.assertEqual(incident['incident_status_text'], '本轮发生事故')
+        self.assertTrue(incident['incident_occurred'])
+        self.assertFalse(incident['capacity_revealed'])
+        self.assertNotIn('actual_capacity', incident)
+        self.assertNotIn('capacity_loss_ratio', incident)
+        self.assertEqual(normal['incident_status_text'], '本轮未发生事故')
+        self.assertFalse(normal['incident_occurred'])
+
+    def test_i0_decision_context_does_not_disclose_incident_status(self):
+        context = self.decision_context('I0', True)
+
+        self.assertFalse(context['incident_status_revealed'])
+        self.assertEqual(context['incident_status_text'], '')
+        self.assertNotIn('incident_occurred', context)
+        self.assertNotIn('actual_capacity', context)
+        self.assertNotIn('capacity_loss_ratio', context)
+
     def test_capacity_rows_describe_iid_normal_and_incident_distribution(self):
         config = dynamic_app.parse_accident_risk_config(
             {
@@ -1741,19 +1808,18 @@ class DynamicAccidentPresentationBackendTests(unittest.TestCase):
             config.expected_incident_capacity,
         )
 
-    def test_information_descriptions_match_i0_i1_i2(self):
+    def test_information_descriptions_match_i0_i1(self):
         descriptions = {
             condition: dynamic_app.capacity_reveal_description(
                 dynamic_app.parse_accident_risk_config(
                     {'accident_information_condition': condition}
                 )
             )
-            for condition in ('I0', 'I1', 'I2')
+            for condition in ('I0', 'I1')
         }
 
         self.assertIn('长期分布', descriptions['I0'])
         self.assertIn('事故是否发生', descriptions['I1'])
-        self.assertIn('实际服务率', descriptions['I2'])
 
     def test_warmup_capacity_is_normal_capacity(self):
         config = dynamic_app.parse_accident_risk_config({'normal_capacity': 4.0})
@@ -1806,7 +1872,7 @@ class PlayerBot(Bot):
 
         if self.round_number == C.WARMUP_ROUNDS + 1:
             expect('热身已结束', 'in', self.html)
-            expect('正式实验共 60 轮', 'in', self.html)
+            expect('正式实验共 30 轮', 'in', self.html)
             yield Submission(FormalStart, check_html=False)
 
         expect('等待本轮参与者进入', 'in', self.html)
@@ -1823,9 +1889,9 @@ class PlayerBot(Bot):
         if phase['is_warmup']:
             expect('本轮真实瓶颈服务率', 'in', self.html)
             expect(self.player.dynamic_capacity, '==', accident_config.normal_capacity)
-        elif accident_config.information_condition == 'I2':
-            expect('本轮真实瓶颈服务率', 'in', self.html)
-            expect(f'{self.player.dynamic_capacity} 人 / 1 分钟', 'in', self.html)
+        elif accident_config.information_condition == 'I1':
+            status = '本轮发生事故' if self.player.incident_occurred else '本轮未发生事故'
+            expect(status, 'in', self.html)
 
         if self.case == 'same_time':
             chosen_minute = 474

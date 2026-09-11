@@ -103,14 +103,9 @@ Liu-REL 的历史成本倾向、插值/外推、Softmax 抽样、独立随机序
 
 ## 7. Session 配置
 
-提供四个明确的正式 Session 配置：
+首页只提供一个正式事故风险动态瓶颈场景：`dynamic_bottleneck_round_prod`。H-I0、H-I1、HA-I0、HA-I1 和自定义多组不得分别注册成首页场景，而应在管理员创建该场景 Session 时选择。
 
-- `dynamic_bottleneck_round_prod_h_i0`：30 Human，I0；
-- `dynamic_bottleneck_round_prod_h_i1`：30 Human，I1；
-- `dynamic_bottleneck_round_prod_ha_i0`：10 Human + 10 LLM + 10 RL，I0；
-- `dynamic_bottleneck_round_prod_ha_i1`：10 Human + 10 LLM + 10 RL，I1。
-
-另提供 `dynamic_bottleneck_round_prod_custom` 正式自定义配置。其核心字段 `group_treatment_spec` 使用连续组号和四种合法处理，例如：
+该场景的核心字段 `group_treatment_spec` 使用连续组号和四种合法处理，例如：
 
 ```text
 G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1
@@ -118,11 +113,11 @@ G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1
 
 组号必须从 G01 开始连续，处理值只能是 `H-I0`、`H-I1`、`HA-I0`、`HA-I1`。后台按声明顺序将登录的 Human 分入各组：H 消耗 30 个真人席位，HA 消耗 10 个真人席位并为该组加入 10 LLM 和 10 RL。
 
-每个配置默认使用 S01，创建时允许实验组织者在 S01–S05 之间选择，正式 Session 继续禁止 `auto` 序列。
+该场景默认为单组 H-I0 和 30 个 Human 登录席位。创建时允许实验组织者在 S01–S05 之间选择，正式 Session 继续禁止 `auto` 序列。
 
-管理员创建 Session 页面上的旧 A/B/C/D 快捷实验方案退出，替换为 H-I0、H-I1、HA-I0、HA-I1 四个固定快捷卡片和一个“自定义分组”卡片。点击固定卡片时应切换到对应的单组正式 Session 配置，并自动填写真实登录人数、LLM/RL 数量和 I0/I1 条件。页面摘要必须显示“总主体数 30”及具体构成，避免将 oTree 真实登录人数误解为总主体数。
+管理员创建 Session 页面在选中 `dynamic_bottleneck_round_prod` 后，展示 H-I0、H-I1、HA-I0、HA-I1 四个固定快捷卡片和一个“自定义分组”卡片。卡片只修改当前场景 Session 的处理参数，不切换或创建其他首页场景。点击固定卡片时自动填写真实登录人数、LLM/RL 数量和 I0/I1 条件。页面摘要必须显示“总主体数 30”及具体构成，避免将 oTree 真实登录人数误解为总主体数。
 
-自定义卡片切换到 `dynamic_bottleneck_round_prod_custom`，并展示：
+自定义卡片在当前场景内展示：
 
 - “是否分组”开关；
 - 分组时的组数输入；
@@ -132,7 +127,7 @@ G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1
 
 未启用分组时固定为一个组配置；启用分组时按组数生成对应数量的下拉框。管理界面将选择序列化为 `group_treatment_spec`，并将 Human 席位之和写入 `num_participants`。
 
-四个正式配置名与处理绑定。例如 `dynamic_bottleneck_round_prod_ha_i1` 必须是 10 Human + 10 LLM + 10 RL 且信息条件为 I1；即使管理员在完整配置表中手动改值，创建阶段也必须拒绝与配置名不一致的处理，不得仅校验“是否属于两种合法主体构成之一”。
+后端以 `group_treatment_spec` 为各组处理的唯一权威来源，并在创建阶段由它推导信息条件和 Agent 数量。即使完整配置表中的旧字段被手动改动，也不得覆盖处理定义。
 
 演示配置保留一个通用入口，默认 I0、30 个 Human 主体且可使用 `auto` 序列。演示模式若启用 HA，同样应遵守 10/10/10 的目标构成，但不影响正式 Session 的严格校验。
 
@@ -165,14 +160,15 @@ G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1
 8. 五条冻结序列均恰好 30 轮，内容等于旧序列的前 30 轮；
 9. 自动生成序列产生 30 轮；
 10. H 只接受 30/0/0，HA 只接受 10/10/10；
-11. 四个正式 Session 配置的默认真人席位、Agent 数量和信息条件正确；
-12. 旧 A/B/C/D 快捷配置不再出现，新四张固定处理卡片能切换正确 Session 配置并填写正确参数；
-13. 配置名与主体构成或信息条件不匹配时创建失败；
+11. 首页只出现一个正式事故风险动态瓶颈场景，默认为单组 H-I0 和 30 个 Human 席位；
+12. 旧 A/B/C/D 和独立的 H-I0/H-I1/HA-I0/HA-I1 首页场景不再出现，四张固定处理卡片只在该场景的 Session 创建表单中填写正确参数；
+13. 后端以 `group_treatment_spec` 推导并校验每组主体构成与信息条件；
 14. 自定义卡片可切换是否分组、调整组数、为每组选择四种合法处理之一，并自动计算真实登录人数；
 15. 自定义多组 Session 的各组分别结算和学习，但同一轮的事故布尔值、损失比例和实际容量完全相同；
 16. 支付、页面显示轮号、数据导出和最终状态在第 30 个正式轮结束；
 17. Liu-REL 前两个正式轮均匀抽样、I0 历史使用、I1 同状态筛选和稀疏回退仍正确；
-18. `single_bottleneck` 和其他未改造 app 的回归测试通过。
+18. `single_bottleneck` 和其他未改造 app 的回归测试通过；
+19. 管理员的 Create session 页面在当前 oTree 版本下可正常渲染，不返回 500。
 
 验收时还应用 conda 创建的 oTree 环境完成一次全 35 轮演示流程的 Session 创建与后端运行检查，并分别验证 H-I0、H-I1、HA-I0 和 HA-I1 的配置能成功创建。
 

@@ -248,18 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
   ]);
   const dynamicAgentConfigs = new Set([
     'dynamic_bottleneck_round_demo',
-    'dynamic_bottleneck_round_prod_h_i0',
-    'dynamic_bottleneck_round_prod_h_i1',
-    'dynamic_bottleneck_round_prod_ha_i0',
-    'dynamic_bottleneck_round_prod_ha_i1',
-    'dynamic_bottleneck_round_prod_custom',
+    'dynamic_bottleneck_round_prod',
   ]);
   const formalDynamicConfigs = new Set([
-    'dynamic_bottleneck_round_prod_h_i0',
-    'dynamic_bottleneck_round_prod_h_i1',
-    'dynamic_bottleneck_round_prod_ha_i0',
-    'dynamic_bottleneck_round_prod_ha_i1',
-    'dynamic_bottleneck_round_prod_custom',
+    'dynamic_bottleneck_round_prod',
   ]);
   const dropdown = document.querySelector('[name="session_config"]');
   const participantInput = document.querySelector('[name="num_participants"]');
@@ -334,33 +326,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentConfig = '';
   let applyingPreset = false;
+  let selectedPreset = 'H-I0';
   let customSelections = ['H-I0'];
   const presets = {
     'H-I0': {
-      configName: 'dynamic_bottleneck_round_prod_h_i0',
       humans: 30,
       groups: [['G01 · H-I0', '30 Human · 总主体数 30']],
     },
     'H-I1': {
-      configName: 'dynamic_bottleneck_round_prod_h_i1',
       humans: 30,
       groups: [['G01 · H-I1', '30 Human · 总主体数 30']],
     },
     'HA-I0': {
-      configName: 'dynamic_bottleneck_round_prod_ha_i0',
       humans: 10,
       groups: [['G01 · HA-I0', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
     },
     'HA-I1': {
-      configName: 'dynamic_bottleneck_round_prod_ha_i1',
       humans: 10,
       groups: [['G01 · HA-I1', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
     },
   };
-  const customConfigName = 'dynamic_bottleneck_round_prod_custom';
-  const presetByConfig = Object.fromEntries(
-    Object.entries(presets).map(([code, preset]) => [preset.configName, code])
-  );
+  const formalScenarioConfig = 'dynamic_bottleneck_round_prod';
   const treatmentOptions = ['H-I0', 'H-I1', 'HA-I0', 'HA-I1'];
 
   function setSource(fieldName, value) {
@@ -436,11 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function syncVisibleControls() {
     const dynamicVisible = dynamicAgentConfigs.has(currentConfig);
     const formalVisible = formalDynamicConfigs.has(currentConfig);
-    const customVisible = currentConfig === customConfigName;
     const singleVisible = activeAgentConfigs.has(currentConfig);
-    shortcutPanel.hidden = !dynamicVisible;
+    shortcutPanel.hidden = !formalVisible;
     dynamicControl.hidden = !dynamicVisible || formalVisible;
-    customBuilder.hidden = !customVisible;
     singleControl.hidden = !singleVisible;
     if (singleVisible) singleCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
     if (dynamicVisible) {
@@ -458,18 +442,24 @@ document.addEventListener('DOMContentLoaded', () => {
       independentRlCountInput.value = readSource('rl_agent_count_per_group', '1') || '1';
       dynamicCountWrap.hidden = !dynamicEnabled.checked;
       independentRlCountWrap.hidden = !independentRlEnabled.checked;
-      if (customVisible) {
+      if (formalVisible) {
         customSelections = parseStoredTreatments();
-        customGroupingEnabled.checked = customSelections.length > 1;
+        selectedPreset = customSelections.length === 1
+          ? customSelections[0]
+          : 'CUSTOM';
+        customGroupingEnabled.checked = selectedPreset === 'CUSTOM';
         customGroupCount.disabled = !customGroupingEnabled.checked;
         customGroupCount.value = String(customSelections.length);
-        renderCustomRows();
-        markPresetSelected('CUSTOM');
-      } else if (presetByConfig[currentConfig]) {
-        const code = presetByConfig[currentConfig];
-        participantInput.value = String(presets[code].humans);
-        showPresetSummary(presets[code]);
-        markPresetSelected(code);
+        customBuilder.hidden = selectedPreset !== 'CUSTOM';
+        if (selectedPreset === 'CUSTOM') {
+          renderCustomRows();
+        } else {
+          syncCustomSpec();
+          showPresetSummary(presets[selectedPreset]);
+        }
+        markPresetSelected(selectedPreset);
+      } else {
+        customBuilder.hidden = true;
       }
     }
   }
@@ -479,11 +469,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (!dynamicAgentConfigs.has(currentConfig)) return;
     setSource('dynamic_capacity_sequence_preset', sequencePreset.value || 'auto');
-    if (currentConfig === customConfigName) {
+    if (formalDynamicConfigs.has(currentConfig)) {
       syncCustomSpec();
       return;
     }
-    if (formalDynamicConfigs.has(currentConfig)) return;
     setSource('api_agent_mode', dynamicEnabled.checked ? 'active' : 'off');
     setSource('api_agent_count_per_group', dynamicEnabled.checked ? (dynamicCountInput.value || 1) : 0);
     setSource('rl_fallback_enabled', dynamicEnabled.checked && fallbackEnabled.checked ? 1 : 0);
@@ -502,17 +491,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   function applyPreset(code) {
+    if (currentConfig !== formalScenarioConfig) return;
     const preset = presets[code];
-    const targetConfig = code === 'CUSTOM' ? customConfigName : preset?.configName;
-    if (!targetConfig) return;
+    if (code !== 'CUSTOM' && !preset) return;
     applyingPreset = true;
-    dropdown.value = targetConfig;
-    dropdown.dispatchEvent(new Event('change', {bubbles: true}));
+    selectedPreset = code;
     if (code === 'CUSTOM') {
-      customSelections = parseStoredTreatments();
+      customGroupingEnabled.checked = customSelections.length > 1;
+      customGroupCount.disabled = !customGroupingEnabled.checked;
+      customBuilder.hidden = false;
       renderCustomRows();
     } else {
+      customSelections = [code];
+      customGroupingEnabled.checked = false;
+      customGroupCount.disabled = true;
+      customGroupCount.value = '1';
+      customBuilder.hidden = true;
       participantInput.value = String(preset.humans);
+      syncCustomSpec();
       showPresetSummary(preset);
       markPresetSelected(code);
     }

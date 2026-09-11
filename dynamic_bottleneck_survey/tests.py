@@ -38,8 +38,8 @@ class SurveyModelTests(unittest.TestCase):
         self.assertIsNotNone(choices)
         self.assertEqual(choices[0], ['none', '未发现明显变化'])
         self.assertEqual(choices[1], ['1', '正式第 1 轮'])
-        self.assertEqual(choices[-1], ['60', '正式第 60 轮'])
-        self.assertEqual(len(choices), 61)
+        self.assertEqual(choices[-1], ['30', '正式第 30 轮'])
+        self.assertEqual(len(choices), 31)
 
     def test_human_only_and_human_agent_receive_different_second_page_fields(self):
         page = getattr(survey_app, 'StrategySurvey', None)
@@ -128,13 +128,7 @@ class SurveyFlowContractTests(unittest.TestCase):
         settings = importlib.import_module('settings')
         configs = {item['name']: item for item in settings.SESSION_CONFIGS}
 
-        for name in (
-            'dynamic_bottleneck_round_prod_h_i0',
-            'dynamic_bottleneck_round_prod_h_i1',
-            'dynamic_bottleneck_round_prod_ha_i0',
-            'dynamic_bottleneck_round_prod_ha_i1',
-            'dynamic_bottleneck_round_prod_custom',
-        ):
+        for name in ('dynamic_bottleneck_round_prod',):
             with self.subTest(name=name):
                 self.assertEqual(
                     configs[name]['app_sequence'],

@@ -87,17 +87,7 @@ API_AGENT_MEMORY_PARTICIPANT_VAR = 'dynamic_bottleneck_round_api_agent_memory_v1
 GROUP_AGENT_COUNTS_SESSION_VAR = 'dynamic_bottleneck_round_group_agent_counts_v1'
 GROUP_TREATMENTS_SESSION_VAR = 'dynamic_bottleneck_round_group_treatments_v1'
 FORMAL_SESSION_CONFIG_NAMES = {
-    'dynamic_bottleneck_round_prod_h_i0',
-    'dynamic_bottleneck_round_prod_h_i1',
-    'dynamic_bottleneck_round_prod_ha_i0',
-    'dynamic_bottleneck_round_prod_ha_i1',
-    'dynamic_bottleneck_round_prod_custom',
-}
-FIXED_FORMAL_TREATMENTS = {
-    'dynamic_bottleneck_round_prod_h_i0': 'H-I0',
-    'dynamic_bottleneck_round_prod_h_i1': 'H-I1',
-    'dynamic_bottleneck_round_prod_ha_i0': 'HA-I0',
-    'dynamic_bottleneck_round_prod_ha_i1': 'HA-I1',
+    'dynamic_bottleneck_round_prod',
 }
 TREATMENT_DEFINITIONS = {
     'H-I0': {
@@ -500,35 +490,7 @@ def parse_group_treatment_spec(spec):
 
 def configure_formal_treatments(session):
     name = session.config.get('name')
-    if name in FIXED_FORMAL_TREATMENTS:
-        treatment = FIXED_FORMAL_TREATMENTS[name]
-        expected = TREATMENT_DEFINITIONS[treatment]
-        configured_condition = parse_accident_risk_config(
-            session.config
-        ).information_condition
-        configured_api = (
-            config_int(session.config.get('api_agent_count_per_group', 0), 0)
-            if api_agent_mode(session) == API_AGENT_MODE_ACTIVE
-            else 0
-        )
-        configured_rl = (
-            config_int(session.config.get('rl_agent_count_per_group', 0), 0)
-            if rl_agent_enabled(session)
-            else 0
-        )
-        if (
-            configured_condition != expected['information_condition']
-            or configured_api != expected['api']
-            or configured_rl != expected['rl']
-        ):
-            raise ValueError(
-                f'正式配置名 {name} 必须对应 {treatment}：'
-                f'{expected["human"]} Human + {expected["api"]} LLM + '
-                f'{expected["rl"]} RL，信息条件为 '
-                f'{expected["information_condition"]}。'
-            )
-        parsed = parse_group_treatment_spec(f'G01:{treatment}')
-    elif name == 'dynamic_bottleneck_round_prod_custom':
+    if name == 'dynamic_bottleneck_round_prod':
         parsed = parse_group_treatment_spec(
             session.config.get('group_treatment_spec', '')
         )
@@ -543,22 +505,23 @@ def configure_formal_treatments(session):
     }
     has_api = any(values['api'] for values in parsed.values())
     has_rl = any(values['rl'] for values in parsed.values())
-    if name == 'dynamic_bottleneck_round_prod_custom':
-        session.config = {
-            **session.config,
-            'api_agent_mode': (
-                API_AGENT_MODE_ACTIVE if has_api else API_AGENT_MODE_OFF
-            ),
-            'api_agent_count_per_group': 10 if has_api else 0,
-            'rl_agent_enabled': '1' if has_rl else '0',
-            'rl_agent_count_per_group': 10 if has_rl else 0,
-        }
+    first_group = parsed['G01']
+    session.config = {
+        **session.config,
+        'accident_information_condition': first_group['information_condition'],
+        'api_agent_mode': (
+            API_AGENT_MODE_ACTIVE if has_api else API_AGENT_MODE_OFF
+        ),
+        'api_agent_count_per_group': 10 if has_api else 0,
+        'rl_agent_enabled': '1' if has_rl else '0',
+        'rl_agent_count_per_group': 10 if has_rl else 0,
+    }
     return parsed
 
 
 def group_treatment_for_session(session, group_id):
     label = _canonical_group_label(group_id)
-    stored = session.vars.get(GROUP_TREATMENTS_SESSION_VAR, {})
+    stored = getattr(session, 'vars', {}).get(GROUP_TREATMENTS_SESSION_VAR, {})
     if not isinstance(stored, dict) or label not in stored:
         if is_formal_session(session):
             stored = configure_formal_treatments(session)
@@ -632,7 +595,7 @@ def parse_group_agent_spec(spec):
             except ValueError as exc:
                 raise ValueError('group_agent_spec 中 Agent 数量必须是整数。') from exc
             if not 0 <= count <= API_AGENT_COUNT_MAX:
-                raise ValueError('group_agent_spec 中 Agent 数量必须在 0 到 5 之间。')
+                raise ValueError('group_agent_spec 中 Agent 数量必须在 0 到 10 之间。')
             counts[key] = count
         if set(counts) != {'api', 'rl'}:
             raise ValueError('group_agent_spec 每组必须同时配置 api 和 rl 数量。')
@@ -818,7 +781,6 @@ def validate_liu_rel_session_config(session) -> dict:
 
     rel_lambda = finite_parameter('rel_lambda', non_negative=True)
     rel_eta = finite_parameter('rel_eta', positive=True)
-    bandwidth = finite_parameter('rel_capacity_bandwidth', positive=True)
 
     raw_seed = config.get('rel_random_seed')
     if isinstance(raw_seed, bool):
@@ -860,7 +822,6 @@ def validate_liu_rel_session_config(session) -> dict:
         'rel_policy_version': policy_version,
         'rel_lambda': rel_lambda,
         'rel_eta': rel_eta,
-        'rel_capacity_bandwidth': bandwidth,
         'rel_random_seed': random_seed,
         'rel_initial_uniform_rounds': uniform_rounds,
         'rel_parameters_frozen': int(parameters_frozen),
@@ -2243,9 +2204,6 @@ def prepare_independent_rl_decisions_for_group(group):
                 'information_condition': information_condition,
                 'rel_lambda': rel_parameters['rel_lambda'],
                 'rel_eta': rel_parameters['rel_eta'],
-                'rel_capacity_bandwidth': rel_parameters[
-                    'rel_capacity_bandwidth'
-                ],
                 'session_code': group.session.code,
                 'group_id': group.id_in_subsession,
                 'agent_id': agent_id,
@@ -2281,9 +2239,6 @@ def prepare_independent_rl_decisions_for_group(group):
                 'effective_observation_count': 0.0,
                 'rel_lambda': rel_parameters['rel_lambda'],
                 'rel_eta': rel_parameters['rel_eta'],
-                'rel_capacity_bandwidth': rel_parameters[
-                    'rel_capacity_bandwidth'
-                ],
                 'random_seed_fingerprint': '',
             }
         departure_minute = departure_minute_for_slot(slot, schedule)
@@ -2305,7 +2260,6 @@ def prepare_independent_rl_decisions_for_group(group):
             ),
             'rel_lambda': choice.get('rel_lambda'),
             'rel_eta': choice.get('rel_eta'),
-            'rel_capacity_bandwidth': choice.get('rel_capacity_bandwidth'),
             'random_seed_fingerprint': choice.get(
                 'random_seed_fingerprint',
                 '',
@@ -3449,11 +3403,25 @@ class Decision(Page):
     @staticmethod
     def vars_for_template(player):
         context = public_accident_context_for_group(player.group)
+        incident_status_revealed = bool(
+            not is_warmup_round(player.round_number)
+            and context.get('information_condition') == INFO_I1
+            and 'incident_occurred' in context
+        )
+        incident_status_text = ''
+        if incident_status_revealed:
+            incident_status_text = (
+                '本轮发生事故'
+                if context['incident_occurred']
+                else '本轮未发生事故'
+            )
         schedule = departure_schedule_for_player(player)
         preview = choice_preview(player)
         return {
             **context,
             **round_phase_context(player.round_number),
+            'incident_status_revealed': incident_status_revealed,
+            'incident_status_text': incident_status_text,
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'departure_time_min': schedule['first_departure_time'],
             'departure_time_max': schedule['last_departure_time'],

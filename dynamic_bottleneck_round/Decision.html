@@ -377,6 +377,29 @@
     </div>
     <div class="round-tag">R{{ display_round_number }} / {{ display_total_rounds }}</div>
   </section>
+  {{ elif incident_status_revealed }}
+  <section class="capacity-panel is-known">
+    <div class="capacity-copy">
+      <p class="capacity-kicker">本轮事故状态</p>
+      <p class="capacity-value">{{ if incident_occurred }}本轮发生事故{{ else }}本轮未发生事故{{ endif }}</p>
+      {{ if incident_occurred }}
+      <p class="capacity-note">事故影响程度与实际服务率将在提交后公布。</p>
+      {{ else }}
+      <p class="capacity-note">本轮无事故，具体结果将在提交后公布。</p>
+      {{ endif }}
+    </div>
+    <div class="capacity-road-scene" aria-hidden="true">
+      <span class="road-dash"></span>
+      <svg class="commute-car capacity-car" viewBox="0 0 64 40">
+        <path class="car-body" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/>
+        <path class="car-base" d="M8 25h48v8H8z"/>
+        <path class="car-window" d="M22 14h19l2 7H19l3-7Z"/>
+        <circle class="car-wheel" cx="18" cy="33" r="5"/>
+        <circle class="car-wheel" cx="46" cy="33" r="5"/>
+      </svg>
+    </div>
+    <div class="round-tag">R{{ display_round_number }} / {{ display_total_rounds }}</div>
+  </section>
   {{ else }}
   <section class="capacity-panel">
     <div class="capacity-copy">

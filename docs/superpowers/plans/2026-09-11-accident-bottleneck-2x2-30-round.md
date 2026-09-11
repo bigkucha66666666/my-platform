@@ -4,7 +4,7 @@
 
 **Goal:** Replace the current 2×3, 60-formal-round, 20-actor accident bottleneck runtime with the approved 2×2, 30-formal-round, 30-actor design, including visible I1 accident status on the departure decision page.
 
-**Architecture:** Keep accident generation, settlement, and page flow intact while narrowing the public information contract to I0/I1, truncating the frozen bank deterministically, and enforcing four explicit production Session presets. Treat Human, LLM, and Liu-REL inputs as consumers of one condition-limited public context so the I1 signal is visible without leaking loss severity or actual capacity.
+**Architecture:** Keep accident generation, settlement, and page flow intact while narrowing the public information contract to I0/I1, truncating the frozen bank deterministically, and enforcing four explicit production Session presets plus one validated custom multi-group preset. Groups in one Session retain independent queues, feedback, payoffs, and Agent states but read the same Session-level frozen capacity record each round; Human, LLM, and Liu-REL inputs consume a group-specific condition-limited public context.
 
 **Tech Stack:** Python 3 in conda environment `otree`, oTree, Django templates, `unittest`, JSON sequence bank.
 
@@ -15,11 +15,11 @@
 - Modify `dynamic_bottleneck_round/accident_capacity.py`: define the legal information conditions and validate 30-round frozen sequences.
 - Modify `dynamic_bottleneck_round/capacity_sequence_bank.json`: retain exactly the first 30 records of S01–S05 and recompute metadata.
 - Modify `dynamic_bottleneck_round/generate_accident_sequence_bank.py`: generate future banks with 30 formal rounds.
-- Modify `dynamic_bottleneck_round/__init__.py`: set round constants, recognize all production presets, enforce actor composition, build public context, and remove I2 from RL integration.
+- Modify `dynamic_bottleneck_round/__init__.py`: set round constants, parse group treatment specs, build variable-size group matrices, enforce per-group actor composition, resolve group-specific information, build public context, and remove I2 from RL integration.
 - Modify `dynamic_bottleneck_round/agents/liu_rel_agent.py`: expose only I0/I1 and retire capacity-bandwidth behavior.
 - Modify `dynamic_bottleneck_round/agents/independent_rl_agent.py`: align the wrapper and policy version with Liu-REL v2.
-- Modify `settings.py`: provide four explicit formal Session configs with the correct Human/LLM/RL defaults and 30-round payoff metadata.
-- Modify `_templates/otree/includes/DynamicSessionControls.html`: recognize the new config names and describe 30-round fixed sequences while preserving existing sequence-selector edits.
+- Modify `settings.py`: provide four explicit formal Session configs plus one custom multi-group config with the correct defaults and 30-round payoff metadata.
+- Modify `_templates/otree/includes/DynamicSessionControls.html`: replace old quick cards, add a custom group builder, recognize the new config names, and describe 30-round fixed sequences while preserving existing sequence-selector edits.
 - Modify `dynamic_bottleneck_round/Decision.html`: render the I1 Boolean accident signal before submission without numeric capacity.
 - Modify `dynamic_bottleneck_round/FormalStart.html`: change formal-round copy to 30.
 - Modify `dynamic_bottleneck_survey/__init__.py`: constrain round-reference choices to 1–30.
@@ -124,9 +124,21 @@ def test_formal_compositions_are_fixed_at_thirty_actors(self):
     )
     self.assertEqual(validate_formal_actor_composition(human, [[object()] * 30]), 'H')
     self.assertEqual(validate_formal_actor_composition(mixed, [[object()] * 10]), 'HA')
+
+def test_custom_treatment_spec_builds_variable_human_groups(self):
+    session = self.make_session(
+        'dynamic_bottleneck_round_prod_custom',
+        group_treatment_spec='G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1',
+    )
+    matrix = build_treatment_group_matrix([object()] * 80, session)
+    self.assertEqual([len(group) for group in matrix], [30, 30, 10, 10])
+    self.assertEqual(information_condition_for_group(session, 1), 'I0')
+    self.assertEqual(information_condition_for_group(session, 2), 'I1')
+    self.assertEqual(api_agent_count_per_group(session, 3), 10)
+    self.assertEqual(rl_agent_count_per_group(session, 4), 10)
 ```
 
-Also assert that 20/0/0, 16/2/2, 30/10/10, multiple groups, and any use of `group_agent_spec` are rejected for production configs.
+Also assert that 20/0/0, 16/2/2, and 30/10/10 are rejected; custom specs reject missing/duplicate/non-contiguous group ids, unknown treatments, and Human totals that do not match the Session participant count. Assert two groups in the same formal Session read identical accident records while their queue and state objects remain separate.
 
 - [ ] **Step 2: Run the focused tests and verify RED**
 
@@ -146,13 +158,14 @@ FORMAL_SESSION_CONFIG_NAMES = {
     'dynamic_bottleneck_round_prod_h_i1',
     'dynamic_bottleneck_round_prod_ha_i0',
     'dynamic_bottleneck_round_prod_ha_i1',
+    'dynamic_bottleneck_round_prod_custom',
 }
 
 def is_formal_session(session):
     return session.config.get('name') in FORMAL_SESSION_CONFIG_NAMES
 ```
 
-Set `C.FORMAL_ROUNDS = 30`. Replace every exact comparison with the old production name by `is_formal_session(...)`. Validate only `(30, 0, 0)` as `H` and `(10, 10, 10)` as `HA`, retaining the one-group and empty-`group_agent_spec` restrictions.
+Set `C.FORMAL_ROUNDS = 30`. Replace every exact comparison with the old production name by `is_formal_session(...)`. Add a strict `parse_group_treatment_spec()` returning ordered records with treatment, Human count, LLM count, RL count, and condition. For the custom config, partition players sequentially by the parsed Human counts; resolve per-group Agent counts and information condition from the same records. Fixed configs resolve to one implicit record. Validate only `(30, 0, 0)` as H and `(10, 10, 10)` as HA. Keep the accident sequence stored once per Session and indexed only by formal round so all groups share the same shock.
 
 - [ ] **Step 4: Run the complete app tests and verify GREEN**
 
@@ -169,7 +182,7 @@ git add dynamic_bottleneck_round/__init__.py dynamic_bottleneck_round/tests.py
 git commit -m "feat: enforce thirty-round thirty-actor sessions"
 ```
 
-### Task 3: Add Four Safe Formal Session Presets
+### Task 3: Add Four Fixed Presets and a Custom Group Builder
 
 **Files:**
 - Modify: `settings.py`
@@ -197,9 +210,13 @@ for name, (humans, llm, rl, condition) in expected.items():
     self.assertEqual(config['accident_information_condition'], condition)
     self.assertEqual(config['payoff_rounds'], 30)
     self.assertEqual(config['dynamic_capacity_sequence_preset'], 'S01')
+
+custom = configs['dynamic_bottleneck_round_prod_custom']
+self.assertEqual(custom['group_treatment_spec'], 'G01:H-I0')
+self.assertEqual(custom['num_demo_participants'], 30)
 ```
 
-Assert the old `dynamic_bottleneck_round_prod` is absent and all four new names appear in the admin controls. Assert the old A/B/C/D card labels and 20 Human / 15 Human + 5 Agent summaries are absent, while the four new treatment labels and exact 30-subject compositions are present.
+Assert the old `dynamic_bottleneck_round_prod` is absent and all five new names appear in the admin controls. Assert the old A/B/C/D card labels and 20 Human / 15 Human + 5 Agent summaries are absent, while the four fixed treatment labels, `自定义分组`, `是否分组`, group-count input, group-treatment row template, and exact 30-subject compositions are present.
 
 - [ ] **Step 2: Run config tests and verify RED**
 
@@ -211,9 +228,9 @@ Expected: failures identify the missing four configs and remaining old name/roun
 
 - [ ] **Step 3: Implement settings and admin-control defaults**
 
-Replace the single production dict with four dicts using the shared dynamic configuration. H configs set `api_agent_mode='off'`, both Agent counts to 0, and `num_demo_participants=30`. HA configs set `api_agent_mode='active'`, both Agent counts to 10, `rl_agent_enabled=1`, and `num_demo_participants=10`. All four set S01 and their exact I0/I1 condition. Set payoff label/rounds to 30. In production validation, map each config name to its exact required `(actor_composition, information_condition)` pair and reject manual values that conflict with the selected name.
+Replace the single production dict with four fixed dicts and one custom dict using the shared dynamic configuration. H configs set `api_agent_mode='off'`, both Agent counts to 0, and `num_demo_participants=30`. HA configs set `api_agent_mode='active'`, both Agent counts to 10, `rl_agent_enabled=1`, and `num_demo_participants=10`. All fixed configs set S01 and their exact I0/I1 condition. The custom config defaults to `group_treatment_spec='G01:H-I0'`, S01, and 30 Human logins. Set payoff label/rounds to 30. In production validation, map each fixed config name to its exact required pair and validate the custom config from its canonical spec.
 
-In `DynamicSessionControls.html`, replace the old A/B/C/D cards with H-I0, H-I1, HA-I0, and HA-I1 cards. Each card must switch the `session_config` dropdown to its matching formal config, dispatch the normal change synchronization, set Human login seats to 30 or 10, and show `30 Human` or `10 Human + 10 LLM + 10 RL` plus `总主体数 30`. Make the dynamic config set contain the demo plus all four production names, change Agent input maxima from 5 to 10, and change fixed-sequence help text to `固定30轮序列`. Preserve the existing custom sequence selector and its form-field synchronization; remove the old cross-group `group_agent_spec` presets and the custom D card.
+In `DynamicSessionControls.html`, replace the old A/B/C/D cards with H-I0, H-I1, HA-I0, HA-I1, and `自定义分组`. Each fixed card switches the `session_config` dropdown to its matching formal config, dispatches normal synchronization, sets Human login seats to 30 or 10, and shows `30 Human` or `10 Human + 10 LLM + 10 RL` plus `总主体数 30`. The custom card switches to the custom config and reveals a grouping toggle, group-count input, and one treatment select per group. Serialize rows as `G01:H-I0;...`, calculate `num_participants` as 30 per H row plus 10 per HA row, and show total Human/LLM/RL counts. When grouping is off, force one row. Make the dynamic config set contain the demo plus all five production names, change Agent input maxima from 5 to 10, and change fixed-sequence help text to `固定30轮序列`. Preserve the sequence selector; remove old cross-group `group_agent_spec` presets and the custom D card.
 
 - [ ] **Step 4: Re-run config tests and verify GREEN**
 

@@ -89,6 +89,8 @@ s_r=
 
 Liu-REL 的历史成本倾向、插值/外推、Softmax 抽样、独立随机序列和“练习轮不学习”保持不变。
 
+新策略版本记为 `dynamic_liu_rel_incident_v2`。由于 I2 退出，`rel_capacity_bandwidth` 不再是必需的正式 Session 参数，也不再进入策略状态或审计记录。保留 `rel_lambda`、`rel_eta`、`rel_random_seed`、`rel_initial_uniform_rounds` 和 `rel_parameters_frozen`。
+
 - I0 使用该 RL Agent 全部已结算的正式历史经验，不读取当轮事故状态或容量。
 - I1 决策前只接收当轮事故布尔状态，优先使用与当轮事故状态相同的历史经验；若不足两个不同出发时刻，整体回退到 I0 全部历史经验。
 - I1 不得接收或根据当轮 `actual_capacity` 选择历史样本。

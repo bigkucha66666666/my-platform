@@ -128,15 +128,23 @@ class SurveyFlowContractTests(unittest.TestCase):
         settings = importlib.import_module('settings')
         configs = {item['name']: item for item in settings.SESSION_CONFIGS}
 
-        self.assertEqual(
-            configs['dynamic_bottleneck_round_prod']['app_sequence'],
-            [
-                'access_gate',
-                'dynamic_bottleneck_round',
-                'dynamic_bottleneck_survey',
-                'payment_info',
-            ],
-        )
+        for name in (
+            'dynamic_bottleneck_round_prod_h_i0',
+            'dynamic_bottleneck_round_prod_h_i1',
+            'dynamic_bottleneck_round_prod_ha_i0',
+            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod_custom',
+        ):
+            with self.subTest(name=name):
+                self.assertEqual(
+                    configs[name]['app_sequence'],
+                    [
+                        'access_gate',
+                        'dynamic_bottleneck_round',
+                        'dynamic_bottleneck_survey',
+                        'payment_info',
+                    ],
+                )
         self.assertEqual(
             configs['dynamic_bottleneck_round_demo']['app_sequence'],
             ['dynamic_bottleneck_round', 'dynamic_bottleneck_survey'],

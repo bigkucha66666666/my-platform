@@ -1059,14 +1059,22 @@ class SettingsContractTests(unittest.TestCase):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
-        for name in ('dynamic_bottleneck_round_demo', 'dynamic_bottleneck_round_prod'):
+        dynamic_names = {
+            'dynamic_bottleneck_round_demo',
+            'dynamic_bottleneck_round_prod_h_i0',
+            'dynamic_bottleneck_round_prod_h_i1',
+            'dynamic_bottleneck_round_prod_ha_i0',
+            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod_custom',
+        }
+        for name in dynamic_names:
             self.assertIn(name, configs)
             config = configs[name]
             self.assertNotIn('dynamic_capacity_draw_mode', config)
             self.assertNotIn('dynamic_capacity_transition_matrix', config)
             self.assertNotIn('coarse_toll_enabled', config)
             self.assertNotIn('reward_treatment_enabled', config)
-            self.assertEqual(config['payoff_rounds'], 60)
+            self.assertEqual(config['payoff_rounds'], 30)
         self.assertEqual(C.WARMUP_ROUNDS, 5)
         self.assertEqual(C.FORMAL_ROUNDS, 30)
         self.assertEqual(C.NUM_ROUNDS, 35)
@@ -1095,19 +1103,47 @@ class AccidentExperimentContractTests(unittest.TestCase):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
-        prod = configs['dynamic_bottleneck_round_prod']
+        formal_names = (
+            'dynamic_bottleneck_round_prod_h_i0',
+            'dynamic_bottleneck_round_prod_h_i1',
+            'dynamic_bottleneck_round_prod_ha_i0',
+            'dynamic_bottleneck_round_prod_ha_i1',
+            'dynamic_bottleneck_round_prod_custom',
+        )
         demo = configs['dynamic_bottleneck_round_demo']
-        for config in (prod, demo):
+        for config in [configs[name] for name in formal_names] + [demo]:
             self.assertEqual(config['accident_normal_capacity'], 4.0)
             self.assertEqual(config['accident_probability'], 0.20)
             self.assertEqual(config['accident_loss_alpha'], 6.83057)
             self.assertEqual(config['accident_loss_beta'], 4.05907)
-            self.assertEqual(config['accident_information_condition'], 'I0')
             self.assertNotIn('dynamic_capacity_draw_mode', config)
             self.assertNotIn('dynamic_capacity_transition_matrix', config)
             self.assertNotIn('dynamic_capacity_values', config)
-        self.assertEqual(prod['dynamic_capacity_sequence_preset'], 'S01')
+        for name in formal_names:
+            self.assertEqual(configs[name]['dynamic_capacity_sequence_preset'], 'S01')
         self.assertEqual(demo['dynamic_capacity_sequence_preset'], 'auto')
+
+    def test_formal_session_defaults_match_the_four_treatments(self):
+        import settings
+
+        configs = {config['name']: config for config in settings.SESSION_CONFIGS}
+        expected = {
+            'dynamic_bottleneck_round_prod_h_i0': (30, 0, 0, 'I0'),
+            'dynamic_bottleneck_round_prod_h_i1': (30, 0, 0, 'I1'),
+            'dynamic_bottleneck_round_prod_ha_i0': (10, 10, 10, 'I0'),
+            'dynamic_bottleneck_round_prod_ha_i1': (10, 10, 10, 'I1'),
+        }
+        for name, (humans, llm, rl, condition) in expected.items():
+            with self.subTest(name=name):
+                config = configs[name]
+                self.assertEqual(config['num_demo_participants'], humans)
+                self.assertEqual(config['api_agent_count_per_group'], llm)
+                self.assertEqual(config['rl_agent_count_per_group'], rl)
+                self.assertEqual(config['accident_information_condition'], condition)
+                self.assertEqual(config['payoff_rounds'], 30)
+        custom = configs['dynamic_bottleneck_round_prod_custom']
+        self.assertEqual(custom['group_treatment_spec'], 'G01:H-I0')
+        self.assertEqual(custom['num_demo_participants'], 30)
 
     def test_rounds_costs_and_fixed_action_space_match_approved_design(self):
         self.assertEqual(C.WARMUP_ROUNDS, 5)

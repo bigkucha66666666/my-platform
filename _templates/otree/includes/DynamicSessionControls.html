@@ -18,7 +18,7 @@
   .session-shortcuts__heading p { margin: 0; color: #66756f; font-size: 12px; }
   .session-presets {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 9px;
   }
   .session-preset {
@@ -68,6 +68,51 @@
     color: #53645f;
     font-size: 12px;
   }
+  .session-sequence-control {
+    display: grid;
+    grid-template-columns: minmax(210px, 320px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: end;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #d5dfdc;
+  }
+  .session-sequence-control label {
+    display: block;
+    margin-bottom: 6px;
+    color: #263a35;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .session-sequence-control__hint {
+    margin: 0 0 7px;
+    color: #5d6e68;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .custom-group-builder {
+    margin-top: 15px;
+    padding: 15px;
+    border: 1px solid #cbd7d3;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .custom-group-builder__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .custom-group-builder__rows { display: grid; gap: 9px; }
+  .custom-group-row {
+    display: grid;
+    grid-template-columns: 80px minmax(220px, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+  .custom-group-row label { margin: 0; font-weight: 700; }
+  .custom-group-builder__totals { margin: 12px 0 0; color: #40544e; }
   .session-agent-control {
     margin: 0 0 20px;
     padding: 15px 17px;
@@ -86,7 +131,8 @@
   @media (max-width: 520px) {
     .session-shortcuts__heading { display: block; }
     .session-shortcuts__heading p { margin-top: 5px; }
-    .session-presets, .session-preset-summary, .session-agent-control__grid { grid-template-columns: 1fr; }
+    .session-presets, .session-preset-summary, .session-agent-control__grid,
+    .session-sequence-control, .custom-group-row { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -96,28 +142,63 @@
     <p>点击后自动填写；完整参数仍可在下方继续修改</p>
   </div>
   <div class="session-presets" role="group" aria-label="动态瓶颈快捷实验方案">
-    <button type="button" class="session-preset" data-preset="A">
-      <span class="session-preset__tag">A · 基准</span>
-      <strong>单组纯参与者</strong>
-      <small>20 Human，不加入 Agent</small>
+    <button type="button" class="session-preset" data-preset="H-I0">
+      <span class="session-preset__tag">H-I0</span>
+      <strong>Human · 事故未知</strong>
+      <small>30 Human · 总主体数 30</small>
     </button>
-    <button type="button" class="session-preset" data-preset="B">
-      <span class="session-preset__tag">B · 推荐</span>
-      <strong>Human vs Human + LLM</strong>
-      <small>20 Human 对比 15 Human + 5 LLM</small>
+    <button type="button" class="session-preset" data-preset="H-I1">
+      <span class="session-preset__tag">H-I1</span>
+      <strong>Human · 事故已知</strong>
+      <small>30 Human · 总主体数 30</small>
     </button>
-    <button type="button" class="session-preset" data-preset="C">
-      <span class="session-preset__tag">C · 学习</span>
-      <strong>Human vs Human + RL</strong>
-      <small>20 Human 对比 15 Human + 5 RL</small>
+    <button type="button" class="session-preset" data-preset="HA-I0">
+      <span class="session-preset__tag">HA-I0</span>
+      <strong>Human-Agent · 事故未知</strong>
+      <small>10 Human + 10 LLM + 10 RL</small>
     </button>
-    <button type="button" class="session-preset" data-preset="D">
-      <span class="session-preset__tag">D · 高级</span>
-      <strong>自定义结构</strong>
-      <small>不覆盖参数，使用完整配置表</small>
+    <button type="button" class="session-preset" data-preset="HA-I1">
+      <span class="session-preset__tag">HA-I1</span>
+      <strong>Human-Agent · 事故已知</strong>
+      <small>10 Human + 10 LLM + 10 RL</small>
+    </button>
+    <button type="button" class="session-preset" data-preset="CUSTOM">
+      <span class="session-preset__tag">自定义分组</span>
+      <strong>多组匹配对比</strong>
+      <small>每组选 H-I0 / H-I1 / HA-I0 / HA-I1</small>
     </button>
   </div>
   <div id="session-preset-summary" class="session-preset-summary" hidden></div>
+  <div id="custom-group-builder" class="custom-group-builder" hidden>
+    <div class="custom-group-builder__head">
+      <div class="form-check form-switch">
+        <input id="custom-grouping-enabled" class="form-check-input" type="checkbox" role="switch">
+        <label class="form-check-label" for="custom-grouping-enabled">是否分组</label>
+      </div>
+      <div>
+        <label for="custom-group-count">组数</label>
+        <input id="custom-group-count" class="form-control w-auto" type="number" min="1" step="1" value="1" disabled>
+      </div>
+    </div>
+    <div id="custom-group-rows" class="custom-group-builder__rows"></div>
+    <p id="custom-group-totals" class="custom-group-builder__totals"></p>
+  </div>
+  <div class="session-sequence-control">
+    <div>
+      <label for="dynamic-capacity-sequence-preset">服务率序列</label>
+      <select id="dynamic-capacity-sequence-preset" class="form-select">
+        <option value="auto">自动生成（当前算法）</option>
+        <option value="S01">S01 · 固定序列1</option>
+        <option value="S02">S02 · 固定序列2</option>
+        <option value="S03">S03 · 固定序列3</option>
+        <option value="S04">S04 · 固定序列4</option>
+        <option value="S05">S05 · 固定序列5</option>
+      </select>
+    </div>
+    <p id="dynamic-capacity-sequence-hint" class="session-sequence-control__hint">
+      自动模式按下方完整配置生成序列。
+    </p>
+  </div>
 </section>
 
 <section id="agent-count-control" class="session-agent-control" hidden>
@@ -135,7 +216,7 @@
       </div>
       <div id="dynamic-agent-count-wrap" hidden>
         <label for="dynamic-agent-count-per-group">每组 Agent 数量</label>
-        <input id="dynamic-agent-count-per-group" class="form-control w-auto" type="number" min="1" max="5" step="1">
+        <input id="dynamic-agent-count-per-group" class="form-control w-auto" type="number" min="1" max="10" step="1">
         <p class="help-block">默认不分组时，该数量为整个 Session 的 Agent 总数。</p>
         <p class="help-block text-warning">DeepSeek 不可用时，Agent 会使用所选备用策略。</p>
         <div class="form-check form-switch mt-2">
@@ -152,7 +233,7 @@
       </div>
       <div id="dynamic-independent-rl-count-wrap" hidden>
         <label for="dynamic-independent-rl-count">独立 RL 参与者数量（每组）</label>
-        <input id="dynamic-independent-rl-count" class="form-control w-auto" type="number" min="1" max="5" step="1">
+        <input id="dynamic-independent-rl-count" class="form-control w-auto" type="number" min="1" max="10" step="1">
         <p class="help-block">每个参与者独立学习；本地运行，不会增加 API 等待时间。</p>
       </div>
     </div>
@@ -166,8 +247,19 @@ document.addEventListener('DOMContentLoaded', () => {
     'single_bottleneck_demo_agent_active',
   ]);
   const dynamicAgentConfigs = new Set([
-    'dynamic_bottleneck_round_prod',
     'dynamic_bottleneck_round_demo',
+    'dynamic_bottleneck_round_prod_h_i0',
+    'dynamic_bottleneck_round_prod_h_i1',
+    'dynamic_bottleneck_round_prod_ha_i0',
+    'dynamic_bottleneck_round_prod_ha_i1',
+    'dynamic_bottleneck_round_prod_custom',
+  ]);
+  const formalDynamicConfigs = new Set([
+    'dynamic_bottleneck_round_prod_h_i0',
+    'dynamic_bottleneck_round_prod_h_i1',
+    'dynamic_bottleneck_round_prod_ha_i0',
+    'dynamic_bottleneck_round_prod_ha_i1',
+    'dynamic_bottleneck_round_prod_custom',
   ]);
   const dropdown = document.querySelector('[name="session_config"]');
   const participantInput = document.querySelector('[name="num_participants"]');
@@ -184,12 +276,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const independentRlEnabled = document.getElementById('dynamic-independent-rl-enabled');
   const independentRlCountWrap = document.getElementById('dynamic-independent-rl-count-wrap');
   const independentRlCountInput = document.getElementById('dynamic-independent-rl-count');
+  const sequencePreset = document.getElementById('dynamic-capacity-sequence-preset');
+  const sequenceHint = document.getElementById('dynamic-capacity-sequence-hint');
+  const customBuilder = document.getElementById('custom-group-builder');
+  const customGroupingEnabled = document.getElementById('custom-grouping-enabled');
+  const customGroupCount = document.getElementById('custom-group-count');
+  const customGroupRows = document.getElementById('custom-group-rows');
+  const customGroupTotals = document.getElementById('custom-group-totals');
 
   if (!dropdown || !participantInput || !createButton || !shortcutPanel
       || !singleControl || !singleCountInput || !dynamicControl
       || !dynamicEnabled || !dynamicCountWrap || !dynamicCountInput
       || !fallbackEnabled || !independentRlEnabled
-      || !independentRlCountWrap || !independentRlCountInput) {
+      || !independentRlCountWrap || !independentRlCountInput
+      || !sequencePreset || !sequenceHint || !customBuilder
+      || !customGroupingEnabled || !customGroupCount || !customGroupRows
+      || !customGroupTotals) {
     return;
   }
 
@@ -197,7 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
     'rl_agent_enabled', 'rl_agent_count_per_group', 'cohort_size',
     'grouping_enabled', 'manual_grouping_spec', 'group_agent_spec',
-    'dynamic_capacity_sequence_scope',
+    'group_treatment_spec', 'accident_information_condition',
+    'dynamic_capacity_sequence_scope', 'dynamic_capacity_sequence_preset',
   ];
   const replacedAgentFields = new Set([
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
@@ -213,6 +316,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (source) sources.set(sourceKey(configName, fieldName), source);
     }
   }
+  for (const configName of dynamicAgentConfigs) {
+    sourceFor(configName, 'dynamic_capacity_sequence_preset')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
+    sourceFor(configName, 'group_treatment_spec')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
+  }
   if ([...activeAgentConfigs, ...dynamicAgentConfigs].some(
     configName => !sourceFor(configName, 'api_agent_count_per_group')
   )) return;
@@ -225,53 +334,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentConfig = '';
   let applyingPreset = false;
+  let customSelections = ['H-I0'];
   const presets = {
-    A: {
-      fields: {
-        num_participants: 20, cohort_size: 0, grouping_enabled: 0,
-        manual_grouping_spec: '', group_agent_spec: '', api_agent_mode: 'off',
-        api_agent_count_per_group: 0, rl_fallback_enabled: 0,
-        rl_agent_enabled: 0, rl_agent_count_per_group: 0,
-        dynamic_capacity_sequence_scope: 'session',
-      },
-      groups: [['G01 · 纯参与者组', '20 Human']],
+    'H-I0': {
+      configName: 'dynamic_bottleneck_round_prod_h_i0',
+      humans: 30,
+      groups: [['G01 · H-I0', '30 Human · 总主体数 30']],
     },
-    B: {
-      // Exact B contract:
-      // num_participants=35; cohort_size=20; grouping_enabled=0;
-      // manual_grouping_spec='';
-      // group_agent_spec='G01:api=0,rl=0;G02:api=5,rl=0';
-      // api_agent_mode='active'; api_agent_count_per_group=5;
-      // rl_fallback_enabled=0; rl_agent_enabled=0; rl_agent_count_per_group=0;
-      // dynamic_capacity_sequence_scope='session'.
-      fields: {
-        num_participants: 35, cohort_size: 20, grouping_enabled: 0,
-        manual_grouping_spec: '',
-        group_agent_spec: 'G01:api=0,rl=0;G02:api=5,rl=0',
-        api_agent_mode: 'active', api_agent_count_per_group: 5,
-        rl_fallback_enabled: 0, rl_agent_enabled: 0, rl_agent_count_per_group: 0,
-        dynamic_capacity_sequence_scope: 'session',
-      },
-      groups: [
-        ['G01 · 纯参与者组', '20 Human'],
-        ['G02 · 人机混合组', '15 Human + 5 LLM'],
-      ],
+    'H-I1': {
+      configName: 'dynamic_bottleneck_round_prod_h_i1',
+      humans: 30,
+      groups: [['G01 · H-I1', '30 Human · 总主体数 30']],
     },
-    C: {
-      fields: {
-        num_participants: 35, cohort_size: 20, grouping_enabled: 0,
-        manual_grouping_spec: '',
-        group_agent_spec: 'G01:api=0,rl=0;G02:api=0,rl=5',
-        api_agent_mode: 'off', api_agent_count_per_group: 0,
-        rl_fallback_enabled: 0, rl_agent_enabled: 1, rl_agent_count_per_group: 5,
-        dynamic_capacity_sequence_scope: 'session',
-      },
-      groups: [
-        ['G01 · 纯参与者组', '20 Human'],
-        ['G02 · 学习型混合组', '15 Human + 5 RL'],
-      ],
+    'HA-I0': {
+      configName: 'dynamic_bottleneck_round_prod_ha_i0',
+      humans: 10,
+      groups: [['G01 · HA-I0', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
+    },
+    'HA-I1': {
+      configName: 'dynamic_bottleneck_round_prod_ha_i1',
+      humans: 10,
+      groups: [['G01 · HA-I1', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
     },
   };
+  const customConfigName = 'dynamic_bottleneck_round_prod_custom';
+  const presetByConfig = Object.fromEntries(
+    Object.entries(presets).map(([code, preset]) => [preset.configName, code])
+  );
+  const treatmentOptions = ['H-I0', 'H-I1', 'HA-I0', 'HA-I1'];
 
   function setSource(fieldName, value) {
     const source = sourceFor(currentConfig, fieldName);
@@ -280,14 +370,87 @@ document.addEventListener('DOMContentLoaded', () => {
   function readSource(fieldName, fallback = '') {
     return sourceFor(currentConfig, fieldName)?.value ?? fallback;
   }
+  function updateSequenceHint() {
+    sequenceHint.textContent = sequencePreset.value === 'auto'
+      ? '自动模式按下方完整配置生成序列。'
+      : `创建后将加载 ${sequencePreset.value} 的固定30轮序列，并让同一 Session 内各组共用。`;
+  }
+  function parseStoredTreatments() {
+    const raw = readSource('group_treatment_spec', 'G01:H-I0');
+    const values = raw.split(';').map(item => item.split(':')[1]).filter(
+      value => treatmentOptions.includes(value)
+    );
+    return values.length ? values : ['H-I0'];
+  }
+  function syncCustomSpec() {
+    const count = customGroupingEnabled.checked
+      ? Math.max(1, Number.parseInt(customGroupCount.value, 10) || 1)
+      : 1;
+    customSelections = customSelections.slice(0, count);
+    while (customSelections.length < count) customSelections.push('H-I0');
+    const spec = customSelections.map(
+      (treatment, index) => `G${String(index + 1).padStart(2, '0')}:${treatment}`
+    ).join(';');
+    const haGroups = customSelections.filter(value => value.startsWith('HA-')).length;
+    const hGroups = count - haGroups;
+    const humans = hGroups * 30 + haGroups * 10;
+    const agents = haGroups * 20;
+    participantInput.value = String(humans);
+    setSource('group_treatment_spec', spec);
+    setSource('grouping_enabled', count > 1 ? 1 : 0);
+    setSource('cohort_size', 0);
+    setSource('manual_grouping_spec', '');
+    setSource('group_agent_spec', '');
+    setSource('api_agent_mode', haGroups ? 'active' : 'off');
+    setSource('api_agent_count_per_group', haGroups ? 10 : 0);
+    setSource('rl_agent_enabled', haGroups ? 1 : 0);
+    setSource('rl_agent_count_per_group', haGroups ? 10 : 0);
+    setSource('accident_information_condition', customSelections[0].endsWith('I1') ? 'I1' : 'I0');
+    customGroupTotals.textContent = `共 ${count} 组：${humans} 个 Human 登录席位 + ${agents} 个虚拟 Agent；每组总主体数 30。`;
+    summary.innerHTML = customSelections.map((treatment, index) => {
+      const members = treatment.startsWith('HA-')
+        ? '10 Human + 10 LLM + 10 RL'
+        : '30 Human';
+      return `<div class="session-preset-summary__group"><b>G${String(index + 1).padStart(2, '0')} · ${treatment}</b><span>${members} · 总主体数 30</span></div>`;
+    }).join('') + '<p class="session-preset-summary__note">各组独立排队与结算，同轮共享上方选定的事故容量序列。</p>';
+    summary.hidden = false;
+  }
+  function renderCustomRows() {
+    const count = customGroupingEnabled.checked
+      ? Math.max(1, Number.parseInt(customGroupCount.value, 10) || 1)
+      : 1;
+    customGroupCount.value = String(count);
+    customSelections = customSelections.slice(0, count);
+    while (customSelections.length < count) customSelections.push('H-I0');
+    customGroupRows.innerHTML = customSelections.map((selected, index) => (
+      `<div class="custom-group-row"><label for="custom-group-${index + 1}">G${String(index + 1).padStart(2, '0')}</label><select id="custom-group-${index + 1}" class="form-select custom-group-treatment" data-index="${index}">${treatmentOptions.map(value => `<option value="${value}"${value === selected ? ' selected' : ''}>${value}</option>`).join('')}</select></div>`
+    )).join('');
+    customGroupRows.querySelectorAll('.custom-group-treatment').forEach(select => {
+      select.addEventListener('change', () => {
+        customSelections[Number(select.dataset.index)] = select.value;
+        syncCustomSpec();
+      });
+    });
+    syncCustomSpec();
+  }
   function syncVisibleControls() {
     const dynamicVisible = dynamicAgentConfigs.has(currentConfig);
+    const formalVisible = formalDynamicConfigs.has(currentConfig);
+    const customVisible = currentConfig === customConfigName;
     const singleVisible = activeAgentConfigs.has(currentConfig);
     shortcutPanel.hidden = !dynamicVisible;
-    dynamicControl.hidden = !dynamicVisible;
+    dynamicControl.hidden = !dynamicVisible || formalVisible;
+    customBuilder.hidden = !customVisible;
     singleControl.hidden = !singleVisible;
     if (singleVisible) singleCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
     if (dynamicVisible) {
+      const storedSequence = readSource('dynamic_capacity_sequence_preset', 'auto') || 'auto';
+      sequencePreset.options[0].disabled = formalVisible;
+      sequencePreset.value = [...sequencePreset.options].some(
+        option => option.value === storedSequence
+      ) && !(formalVisible && storedSequence === 'auto') ? storedSequence : (formalVisible ? 'S01' : 'auto');
+      setSource('dynamic_capacity_sequence_preset', sequencePreset.value);
+      updateSequenceHint();
       dynamicEnabled.checked = readSource('api_agent_mode', 'off') === 'active';
       dynamicCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
       fallbackEnabled.checked = readSource('rl_fallback_enabled', '0') === '1';
@@ -295,6 +458,19 @@ document.addEventListener('DOMContentLoaded', () => {
       independentRlCountInput.value = readSource('rl_agent_count_per_group', '1') || '1';
       dynamicCountWrap.hidden = !dynamicEnabled.checked;
       independentRlCountWrap.hidden = !independentRlEnabled.checked;
+      if (customVisible) {
+        customSelections = parseStoredTreatments();
+        customGroupingEnabled.checked = customSelections.length > 1;
+        customGroupCount.disabled = !customGroupingEnabled.checked;
+        customGroupCount.value = String(customSelections.length);
+        renderCustomRows();
+        markPresetSelected('CUSTOM');
+      } else if (presetByConfig[currentConfig]) {
+        const code = presetByConfig[currentConfig];
+        participantInput.value = String(presets[code].humans);
+        showPresetSummary(presets[code]);
+        markPresetSelected(code);
+      }
     }
   }
   function storeVisibleControls() {
@@ -302,6 +478,12 @@ document.addEventListener('DOMContentLoaded', () => {
       setSource('api_agent_count_per_group', singleCountInput.value || 1);
     }
     if (!dynamicAgentConfigs.has(currentConfig)) return;
+    setSource('dynamic_capacity_sequence_preset', sequencePreset.value || 'auto');
+    if (currentConfig === customConfigName) {
+      syncCustomSpec();
+      return;
+    }
+    if (formalDynamicConfigs.has(currentConfig)) return;
     setSource('api_agent_mode', dynamicEnabled.checked ? 'active' : 'off');
     setSource('api_agent_count_per_group', dynamicEnabled.checked ? (dynamicCountInput.value || 1) : 0);
     setSource('rl_fallback_enabled', dynamicEnabled.checked && fallbackEnabled.checked ? 1 : 0);
@@ -320,29 +502,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   function applyPreset(code) {
-    if (code === 'D') {
-      markPresetSelected(code);
-      summary.innerHTML = '<p class="session-preset-summary__note">自定义模式不会覆盖当前参数，请展开下方完整配置。</p>';
-      summary.hidden = false;
-      return;
-    }
     const preset = presets[code];
-    if (!preset || !dynamicAgentConfigs.has(currentConfig)) return;
+    const targetConfig = code === 'CUSTOM' ? customConfigName : preset?.configName;
+    if (!targetConfig) return;
     applyingPreset = true;
-    participantInput.value = String(preset.fields.num_participants);
-    for (const [fieldName, value] of Object.entries(preset.fields)) {
-      if (fieldName !== 'num_participants') setSource(fieldName, value);
+    dropdown.value = targetConfig;
+    dropdown.dispatchEvent(new Event('change', {bubbles: true}));
+    if (code === 'CUSTOM') {
+      customSelections = parseStoredTreatments();
+      renderCustomRows();
+    } else {
+      participantInput.value = String(preset.humans);
+      showPresetSummary(preset);
+      markPresetSelected(code);
     }
-    syncVisibleControls();
-    showPresetSummary(preset);
-    markPresetSelected(code);
     applyingPreset = false;
   }
   function switchToCustomAgentConfiguration() {
     if (applyingPreset || !dynamicAgentConfigs.has(currentConfig)) return;
     setSource('group_agent_spec', '');
-    markPresetSelected('D');
-    summary.innerHTML = '<p class="session-preset-summary__note">Agent 设置已改为统一的自定义配置，请检查下方完整参数。</p>';
+    markPresetSelected('');
+    summary.innerHTML = '<p class="session-preset-summary__note">演示配置的 Agent 数量已手动调整。</p>';
     summary.hidden = false;
   }
 
@@ -376,6 +556,16 @@ document.addEventListener('DOMContentLoaded', () => {
     switchToCustomAgentConfiguration();
     storeVisibleControls();
   });
+  sequencePreset.addEventListener('change', () => {
+    setSource('dynamic_capacity_sequence_preset', sequencePreset.value || 'auto');
+    updateSequenceHint();
+  });
+  customGroupingEnabled.addEventListener('change', () => {
+    customGroupCount.disabled = !customGroupingEnabled.checked;
+    if (!customGroupingEnabled.checked) customGroupCount.value = '1';
+    renderCustomRows();
+  });
+  customGroupCount.addEventListener('input', renderCustomRows);
   createButton.addEventListener('click', event => {
     storeVisibleControls();
     const activeCountInput = activeAgentConfigs.has(currentConfig)

@@ -90,6 +90,7 @@ SINGLE_BOTTLENECK_COMMON = dict(
     cohort_size=0,
     grouping_enabled=0,
     manual_grouping_spec='',
+    group_treatment_spec='',
     reward_treatment_enabled=0,
     rewarded_slot_spec='',
     reward_bonus_points=8,
@@ -156,9 +157,50 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     rel_parameters_frozen=DYNAMIC_BOTTLENECK_REL_PARAMETERS_FROZEN,
     payoff_source_var='dynamic_bottleneck_round_total_payoff',
     final_payoff_label='动态瓶颈服务率实验',
-    payoff_source_label='dynamic_bottleneck_round 全 60 轮累计结果',
-    payoff_rounds=60,
+    payoff_source_label='dynamic_bottleneck_round 全 30 轮累计结果',
+    payoff_rounds=30,
 )
+
+DYNAMIC_BOTTLENECK_FORMAL_APP_SEQUENCE = [
+    'access_gate',
+    'dynamic_bottleneck_round',
+    'dynamic_bottleneck_survey',
+    'payment_info',
+]
+
+
+def dynamic_bottleneck_formal_config(
+    *,
+    name,
+    display_name,
+    treatment,
+    humans,
+    api_count,
+    rl_count,
+    information_condition,
+):
+    return dict(
+        DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        name=name,
+        display_name=display_name,
+        app_sequence=DYNAMIC_BOTTLENECK_FORMAL_APP_SEQUENCE,
+        doc=(
+            '用于真实被试的事故风险动态瓶颈实验。\n'
+            '先完成 5 轮正常容量练习，随后完成 30 轮正式实验。\n'
+            f'处理为 {treatment}，每组总主体数固定为 30。\n'
+            '正式场次必须使用 S01-S05 固定事故序列。'
+        ),
+        participant_password=PROD_PARTICIPANT_PASSWORD,
+        group_treatment_spec=f'G01:{treatment}',
+        accident_information_condition=information_condition,
+        api_agent_mode='active' if api_count else 'off',
+        api_agent_count_per_group=api_count,
+        rl_agent_enabled=1 if rl_count else 0,
+        rl_agent_count_per_group=rl_count,
+        rel_parameters_frozen=1,
+        dynamic_capacity_sequence_preset='S01',
+        num_demo_participants=humans,
+    )
 
 SESSION_CONFIGS = [
     dict(
@@ -237,37 +279,78 @@ SESSION_CONFIGS = [
         api_agent_mode='active',
         num_demo_participants=5,
     ),
-    dict(
-        name='dynamic_bottleneck_round_prod',
-        display_name="正式实验 · 动态瓶颈服务率",
-        app_sequence=[
-            'access_gate',
-            'dynamic_bottleneck_round',
-            'dynamic_bottleneck_survey',
-            'payment_info',
-        ],
-        doc=(
-            "用于真实被试的事故风险动态瓶颈实验。\n"
-            "先完成 5 轮正常容量练习，随后完成 60 轮独立事故风险正式实验。\n"
-            "正式场次必须使用 S01-S05 固定事故序列，并选择 I0、I1 或 I2 信息条件。\n"
-            "主体构成必须为 20 Human，或 16 Human + 2 LLM + 2 RL。"
-        ),
-        participant_password=PROD_PARTICIPANT_PASSWORD,
-        **DYNAMIC_BOTTLENECK_ROUND_COMMON,
-        dynamic_capacity_sequence_preset='S01',
-        num_demo_participants=1,
+    dynamic_bottleneck_formal_config(
+        name='dynamic_bottleneck_round_prod_h_i0',
+        display_name='正式实验 · H-I0 · 事故未知',
+        treatment='H-I0',
+        humans=30,
+        api_count=0,
+        rl_count=0,
+        information_condition='I0',
+    ),
+    dynamic_bottleneck_formal_config(
+        name='dynamic_bottleneck_round_prod_h_i1',
+        display_name='正式实验 · H-I1 · 事故已知',
+        treatment='H-I1',
+        humans=30,
+        api_count=0,
+        rl_count=0,
+        information_condition='I1',
+    ),
+    dynamic_bottleneck_formal_config(
+        name='dynamic_bottleneck_round_prod_ha_i0',
+        display_name='正式实验 · HA-I0 · 事故未知',
+        treatment='HA-I0',
+        humans=10,
+        api_count=10,
+        rl_count=10,
+        information_condition='I0',
+    ),
+    dynamic_bottleneck_formal_config(
+        name='dynamic_bottleneck_round_prod_ha_i1',
+        display_name='正式实验 · HA-I1 · 事故已知',
+        treatment='HA-I1',
+        humans=10,
+        api_count=10,
+        rl_count=10,
+        information_condition='I1',
     ),
     dict(
+        DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        name='dynamic_bottleneck_round_prod_custom',
+        display_name='正式实验 · 自定义分组',
+        app_sequence=DYNAMIC_BOTTLENECK_FORMAL_APP_SEQUENCE,
+        doc=(
+            '用于一个 Session 内创建多个彼此独立的处理组。\n'
+            '各组可选 H-I0、H-I1、HA-I0 或 HA-I1，'
+            '每轮共享同一条事故容量序列。'
+        ),
+        participant_password=PROD_PARTICIPANT_PASSWORD,
+        group_treatment_spec='G01:H-I0',
+        accident_information_condition='I0',
+        api_agent_mode='off',
+        api_agent_count_per_group=0,
+        rl_agent_enabled=0,
+        rl_agent_count_per_group=0,
+        rel_parameters_frozen=1,
+        dynamic_capacity_sequence_preset='S01',
+        num_demo_participants=30,
+    ),
+    dict(
+        DYNAMIC_BOTTLENECK_ROUND_COMMON,
         name='dynamic_bottleneck_round_demo',
         display_name="演示测试 · 动态瓶颈服务率",
         app_sequence=['dynamic_bottleneck_round', 'dynamic_bottleneck_survey'],
         doc=(
-            "用于 5 轮练习 + 60 轮事故风险动态瓶颈正式实验的流程走查。\n"
+            "用于 5 轮练习 + 30 轮事故风险动态瓶颈正式实验的流程走查。\n"
             "默认按固定种子生成可复现事故序列；可切换 S01-S05 固定序列。"
         ),
-        **DYNAMIC_BOTTLENECK_ROUND_COMMON,
+        api_agent_mode='off',
+        api_agent_count_per_group=0,
+        rl_agent_enabled=0,
+        rl_agent_count_per_group=0,
         dynamic_capacity_sequence_preset='auto',
-        num_demo_participants=5,
+        num_demo_participants=30,
     ),
 ]
 

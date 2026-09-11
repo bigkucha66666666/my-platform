@@ -27,7 +27,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
             }
         )
 
-    def test_dynamic_configs_default_to_agent_off_without_extra_scenarios(self):
+    def test_dynamic_configs_define_fixed_and_custom_treatments(self):
         dynamic_configs = [
             config
             for config in settings.SESSION_CONFIGS
@@ -36,14 +36,17 @@ class DynamicAgentConfigTests(unittest.TestCase):
 
         self.assertEqual(
             {config['name'] for config in dynamic_configs},
-            {'dynamic_bottleneck_round_demo', 'dynamic_bottleneck_round_prod'},
+            {
+                'dynamic_bottleneck_round_demo',
+                'dynamic_bottleneck_round_prod_h_i0',
+                'dynamic_bottleneck_round_prod_h_i1',
+                'dynamic_bottleneck_round_prod_ha_i0',
+                'dynamic_bottleneck_round_prod_ha_i1',
+                'dynamic_bottleneck_round_prod_custom',
+            },
         )
         for config in dynamic_configs:
-            self.assertEqual(config['api_agent_mode'], 'off')
-            self.assertEqual(config['api_agent_count_per_group'], '1')
             self.assertIn(str(config['rl_fallback_enabled']).lower(), {'0', 'false', 'off'})
-            self.assertIn(str(config['rl_agent_enabled']).lower(), {'0', 'false', 'off'})
-            self.assertEqual(config['rl_agent_count_per_group'], '1')
             self.assertEqual(
                 config['rl_agent_policy_version'],
                 'dynamic_liu_rel_incident_v1',
@@ -58,15 +61,10 @@ class DynamicAgentConfigTests(unittest.TestCase):
                 {'1', 'true', 'on'},
             )
             self.assertEqual(config['api_agent_limited_memory_max_chars'], 400)
-        prod = next(
-            config for config in dynamic_configs
-            if config['name'] == 'dynamic_bottleneck_round_prod'
-        )
         demo = next(
             config for config in dynamic_configs
             if config['name'] == 'dynamic_bottleneck_round_demo'
         )
-        self.assertEqual(str(prod['rel_parameters_frozen']), '0')
         self.assertEqual(str(demo['rel_parameters_frozen']), '0')
 
     def test_rl_fallback_flag_is_boolean_config(self):
@@ -79,16 +77,16 @@ class DynamicAgentConfigTests(unittest.TestCase):
         self.assertFalse(app.rl_fallback_enabled(disabled))
 
     def test_active_mode_validates_agent_count(self):
-        for count in (1, 5, '3'):
+        for count in (1, 5, 10, '3'):
             with self.subTest(count=count):
                 self.assertEqual(
                     app.validate_api_agent_count(self.make_session('active', count)),
                     int(count),
                 )
 
-        for count in (0, 6, '2.5', True):
+        for count in (0, 11, '2.5', True):
             with self.subTest(count=count):
-                with self.assertRaisesRegex(ValueError, '1 到 5'):
+                with self.assertRaisesRegex(ValueError, '1 到 10'):
                     app.validate_api_agent_count(self.make_session('active', count))
 
     def test_agent_count_is_added_to_group_calibration_population(self):
@@ -101,7 +99,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
         )
 
     def test_independent_rl_count_validation(self):
-        for count in (1, 5, '3'):
+        for count in (1, 5, 10, '3'):
             with self.subTest(count=count):
                 session = self.make_session('off', 1)
                 session.config.update({
@@ -110,14 +108,14 @@ class DynamicAgentConfigTests(unittest.TestCase):
                 })
                 self.assertEqual(app.validate_rl_agent_count(session), int(count))
 
-        for count in (0, 6, '2.5', True):
+        for count in (0, 11, '2.5', True):
             with self.subTest(count=count):
                 session = self.make_session('off', 1)
                 session.config.update({
                     'rl_agent_enabled': '1',
                     'rl_agent_count_per_group': count,
                 })
-                with self.assertRaisesRegex(ValueError, '1 到 5'):
+                with self.assertRaisesRegex(ValueError, '1 到 10'):
                     app.validate_rl_agent_count(session)
 
     def test_liu_rel_parameter_validation_rejects_invalid_values(self):
@@ -149,7 +147,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
     def test_rl_enabled_production_requires_frozen_parameters(self):
         session = SimpleNamespace(
             config={
-                'name': 'dynamic_bottleneck_round_prod',
+                'name': 'dynamic_bottleneck_round_prod_ha_i0',
                 'rl_agent_enabled': '1',
                 'rel_policy_version': 'dynamic_liu_rel_incident_v1',
                 'rel_lambda': 0.25,
@@ -194,6 +192,10 @@ class DynamicAgentConfigTests(unittest.TestCase):
                 )
                 parsed = app.validate_liu_rel_session_config(session)
                 self.assertEqual(parsed['rel_parameters_frozen'], expected)
+                session.config = json.loads(json.dumps(session.config))
+                reparsed = app.validate_liu_rel_session_config(session)
+                self.assertEqual(reparsed, parsed)
+                self.assertIs(type(session.config['rel_parameters_frozen']), int)
 
     def test_effective_actor_count_includes_each_actor_once(self):
         session = self.make_session('active', 2)
@@ -1660,30 +1662,29 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             html,
         )
 
-    def test_dynamic_controls_define_four_presets_and_exact_b_values(self):
+    def test_dynamic_controls_define_fixed_treatments_and_custom_builder(self):
         html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
             encoding='utf-8'
         )
 
-        for preset in ('A', 'B', 'C', 'D'):
+        for preset in ('H-I0', 'H-I1', 'HA-I0', 'HA-I1', 'CUSTOM'):
             with self.subTest(preset=preset):
                 self.assertIn(f'data-preset="{preset}"', html)
 
         for value in (
-            'num_participants=35',
-            'cohort_size=20',
-            'grouping_enabled=0',
-            "manual_grouping_spec=''",
-            "group_agent_spec='G01:api=0,rl=0;G02:api=5,rl=0'",
-            "api_agent_mode='active'",
-            'api_agent_count_per_group=5',
-            'rl_fallback_enabled=0',
-            'rl_agent_enabled=0',
-            'rl_agent_count_per_group=0',
-            "dynamic_capacity_sequence_scope='session'",
+            '自定义分组',
+            '是否分组',
+            'custom-group-count',
+            'custom-group-rows',
+            'group_treatment_spec',
+            '30 Human',
+            '10 Human + 10 LLM + 10 RL',
+            '总主体数 30',
         ):
             with self.subTest(value=value):
                 self.assertIn(value, html)
+        self.assertNotIn('data-preset="A"', html)
+        self.assertNotIn('15 Human + 5 LLM', html)
 
     def test_create_session_page_has_dynamic_agent_toggle(self):
         html = Path(
@@ -1691,7 +1692,8 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
         ).read_text(encoding='utf-8')
 
         self.assertIn('是否加入 Agent', html)
-        self.assertIn('dynamic_bottleneck_round_prod', html)
+        self.assertIn('dynamic_bottleneck_round_prod_h_i0', html)
+        self.assertIn('dynamic_bottleneck_round_prod_custom', html)
         self.assertIn('dynamic_bottleneck_round_demo', html)
         self.assertIn('api_agent_mode', html)
         self.assertIn('api_agent_count_per_group', html)

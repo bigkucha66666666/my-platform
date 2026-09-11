@@ -35,10 +35,10 @@ from . import (
 
 
 class WarmupRoundPhaseTests(unittest.TestCase):
-    def test_five_warmup_rounds_precede_sixty_formal_rounds(self):
+    def test_five_warmup_rounds_precede_thirty_formal_rounds(self):
         self.assertEqual(getattr(C, 'WARMUP_ROUNDS', None), 5)
-        self.assertEqual(getattr(C, 'FORMAL_ROUNDS', None), 60)
-        self.assertEqual(C.NUM_ROUNDS, 65)
+        self.assertEqual(getattr(C, 'FORMAL_ROUNDS', None), 30)
+        self.assertEqual(C.NUM_ROUNDS, 35)
 
     def test_raw_rounds_map_to_warmup_and_formal_round_numbers(self):
         is_warmup_round = getattr(dynamic_app, 'is_warmup_round', None)
@@ -53,7 +53,7 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         self.assertIsNone(formal_round_number(1))
         self.assertIsNone(formal_round_number(5))
         self.assertEqual(formal_round_number(6), 1)
-        self.assertEqual(formal_round_number(65), 60)
+        self.assertEqual(formal_round_number(35), 30)
 
     def test_warmup_capacity_is_the_normal_accident_capacity(self):
         parse_warmup_capacity = getattr(dynamic_app, 'parse_warmup_capacity', None)
@@ -87,7 +87,7 @@ class WarmupRoundPhaseTests(unittest.TestCase):
                 'is_warmup': False,
                 'phase_name': 'formal',
                 'display_round_number': 1,
-                'display_total_rounds': 60,
+                'display_total_rounds': 30,
                 'round_label': '正式第 1 轮',
             },
         )
@@ -1068,8 +1068,8 @@ class SettingsContractTests(unittest.TestCase):
             self.assertNotIn('reward_treatment_enabled', config)
             self.assertEqual(config['payoff_rounds'], 60)
         self.assertEqual(C.WARMUP_ROUNDS, 5)
-        self.assertEqual(C.FORMAL_ROUNDS, 60)
-        self.assertEqual(C.NUM_ROUNDS, 65)
+        self.assertEqual(C.FORMAL_ROUNDS, 30)
+        self.assertEqual(C.NUM_ROUNDS, 35)
         self.assertEqual(C.SYNC_POLL_INTERVAL_SECONDS, 1.5)
 
         for name in ('single_bottleneck_demo', 'single_bottleneck_prod'):
@@ -1111,8 +1111,8 @@ class AccidentExperimentContractTests(unittest.TestCase):
 
     def test_rounds_costs_and_fixed_action_space_match_approved_design(self):
         self.assertEqual(C.WARMUP_ROUNDS, 5)
-        self.assertEqual(C.FORMAL_ROUNDS, 60)
-        self.assertEqual(C.NUM_ROUNDS, 65)
+        self.assertEqual(C.FORMAL_ROUNDS, 30)
+        self.assertEqual(C.NUM_ROUNDS, 35)
         self.assertEqual(C.NUM_DEPARTURE_SLOTS, 16)
         self.assertEqual(C.FIXED_TRAVEL_TIME_COST, 0)
         self.assertEqual(C.QUEUE_COST_PER_MINUTE, 2)
@@ -1129,6 +1129,9 @@ class AccidentExperimentContractTests(unittest.TestCase):
         return SimpleNamespace(
             config={
                 'name': name,
+                'accident_information_condition': (
+                    'I1' if name.endswith('_i1') else 'I0'
+                ),
                 'api_agent_mode': api_mode,
                 'api_agent_count_per_group': api_count,
                 'rl_agent_enabled': rl_enabled,
@@ -1138,66 +1141,108 @@ class AccidentExperimentContractTests(unittest.TestCase):
             vars={},
         )
 
-    def test_formal_human_only_composition_is_exactly_twenty_humans(self):
-        session = self.make_session('dynamic_bottleneck_round_prod')
+    def test_formal_human_only_composition_is_exactly_thirty_humans(self):
+        session = self.make_session('dynamic_bottleneck_round_prod_h_i0')
 
         result = dynamic_app.validate_formal_actor_composition(
             session,
-            [[object() for _ in range(20)]],
+            [[object() for _ in range(30)]],
         )
 
         self.assertEqual(result, 'H')
 
-    def test_formal_human_agent_composition_is_sixteen_plus_two_plus_two(self):
+    def test_formal_human_agent_composition_is_ten_plus_ten_plus_ten(self):
         session = self.make_session(
-            'dynamic_bottleneck_round_prod',
+            'dynamic_bottleneck_round_prod_ha_i1',
             api_mode='active',
-            api_count=2,
+            api_count=10,
             rl_enabled='1',
-            rl_count=2,
+            rl_count=10,
         )
 
         result = dynamic_app.validate_formal_actor_composition(
             session,
-            [[object() for _ in range(16)]],
+            [[object() for _ in range(10)]],
         )
 
         self.assertEqual(result, 'HA')
 
     def test_formal_composition_rejects_any_other_actor_counts(self):
         invalid = (
-            self.make_session('dynamic_bottleneck_round_prod'),
+            self.make_session('dynamic_bottleneck_round_prod_h_i0'),
             self.make_session(
-                'dynamic_bottleneck_round_prod',
+                'dynamic_bottleneck_round_prod_ha_i1',
                 api_mode='active',
                 api_count=2,
                 rl_enabled='1',
                 rl_count=2,
             ),
             self.make_session(
-                'dynamic_bottleneck_round_prod',
+                'dynamic_bottleneck_round_prod_ha_i0',
                 api_mode='active',
                 api_count=2,
             ),
         )
         matrices = (
-            [[object() for _ in range(19)]],
             [[object() for _ in range(20)]],
-            [[object() for _ in range(18)]],
+            [[object() for _ in range(16)]],
+            [[object() for _ in range(30)]],
         )
         for session, matrix in zip(invalid, matrices):
             with self.subTest(config=session.config):
-                with self.assertRaisesRegex(ValueError, '20 Human|16 Human'):
+                with self.assertRaisesRegex(ValueError, '30 Human|10 Human'):
                     dynamic_app.validate_formal_actor_composition(session, matrix)
 
-    def test_formal_composition_rejects_group_specific_agent_configuration(self):
-        session = self.make_session('dynamic_bottleneck_round_prod')
-        session.config['group_agent_spec'] = 'G01:api=0,rl=0'
+    def test_custom_treatment_spec_builds_variable_human_groups(self):
+        session = self.make_session('dynamic_bottleneck_round_prod_custom')
+        session.config['group_treatment_spec'] = (
+            'G01:H-I0;G02:H-I1;G03:HA-I0;G04:HA-I1'
+        )
+        players = [object() for _ in range(80)]
 
-        with self.assertRaisesRegex(ValueError, 'group_agent_spec'):
+        treatments = dynamic_app.configure_formal_treatments(session)
+        matrix = dynamic_app.build_treatment_group_matrix(players, treatments)
+        result = dynamic_app.validate_formal_actor_composition(session, matrix)
+
+        self.assertEqual([len(group) for group in matrix], [30, 30, 10, 10])
+        self.assertEqual(result, {'G01': 'H', 'G02': 'H', 'G03': 'HA', 'G04': 'HA'})
+        self.assertEqual(dynamic_app.information_condition_for_group(session, 1), 'I0')
+        self.assertEqual(dynamic_app.information_condition_for_group(session, 2), 'I1')
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 3), 10)
+        self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 4), 10)
+
+    def test_custom_treatment_spec_rejects_non_contiguous_groups(self):
+        session = self.make_session('dynamic_bottleneck_round_prod_custom')
+        session.config['group_treatment_spec'] = 'G01:H-I0;G03:HA-I1'
+
+        with self.assertRaisesRegex(ValueError, 'G01.*连续'):
+            dynamic_app.configure_formal_treatments(session)
+
+    def test_custom_treatment_matrix_rejects_wrong_human_total(self):
+        session = self.make_session('dynamic_bottleneck_round_prod_custom')
+        session.config['group_treatment_spec'] = 'G01:H-I0;G02:HA-I1'
+        treatments = dynamic_app.configure_formal_treatments(session)
+
+        with self.assertRaisesRegex(ValueError, '需要 40 名 Human'):
+            dynamic_app.build_treatment_group_matrix(
+                [object() for _ in range(39)],
+                treatments,
+            )
+
+    def test_fixed_config_rejects_mismatched_condition(self):
+        session = self.make_session(
+            'dynamic_bottleneck_round_prod_ha_i1',
+            api_mode='active',
+            api_count=10,
+            rl_enabled='1',
+            rl_count=10,
+        )
+        session.config['accident_information_condition'] = 'I0'
+
+        with self.assertRaisesRegex(ValueError, '配置名.*I1'):
             dynamic_app.validate_formal_actor_composition(
                 session,
-                [[object() for _ in range(20)]],
+                [[object() for _ in range(10)]],
             )
 
     def test_demo_allows_smaller_actor_count(self):
@@ -1233,19 +1278,19 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         return SimpleNamespace(participant=SimpleNamespace(vars={}))
 
     def test_production_rejects_auto_sequence(self):
-        session = self.make_session('dynamic_bottleneck_round_prod', 'auto')
+        session = self.make_session('dynamic_bottleneck_round_prod_h_i0', 'auto')
 
         with self.assertRaisesRegex(ValueError, '正式.*S01-S05'):
             dynamic_app.accident_sequence_for_session(session)
 
     def test_named_sequence_loads_frozen_bank_records(self):
-        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+        session = self.make_session('dynamic_bottleneck_round_prod_h_i0', 'S01')
 
         records = dynamic_app.accident_sequence_for_session(session)
 
-        self.assertEqual(len(records), 60)
+        self.assertEqual(len(records), 30)
         self.assertEqual(records[0]['sequence_id'], 'S01')
-        self.assertEqual(records[-1]['formal_round_number'], 60)
+        self.assertEqual(records[-1]['formal_round_number'], 30)
 
     def test_initialization_stores_one_session_sequence_for_all_groups(self):
         session = self.make_session()
@@ -1267,7 +1312,7 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         dynamic_app.initialize_group_capacity_sequences(subsession)
 
         stored = session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR]
-        self.assertEqual(len(stored), 60)
+        self.assertEqual(len(stored), 30)
         self.assertNotIn(
             'dynamic_bottleneck_round_capacity_sequence',
             group_one.get_players()[0].participant.vars,
@@ -1289,7 +1334,7 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
                 'sequence_id': 'auto',
                 'sequence_seed': 2026090801,
             }
-        ] * 60
+        ] * 30
         player = self.make_player()
         group = SimpleNamespace(
             round_number=5,
@@ -1306,7 +1351,7 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         self.assertEqual(player.dynamic_capacity, 4.0)
 
     def test_formal_round_reads_corresponding_frozen_record(self):
-        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+        session = self.make_session('dynamic_bottleneck_round_prod_h_i1', 'S01')
         records = dynamic_app.accident_sequence_for_session(session)
         session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR] = records
         player = self.make_player()
@@ -1324,6 +1369,44 @@ class DynamicAccidentLifecycleTests(unittest.TestCase):
         self.assertEqual(group.capacity_loss_ratio, expected['capacity_loss_ratio'])
         self.assertEqual(group.accident_sequence_id, 'S01')
         self.assertEqual(player.information_condition, 'I1')
+
+    def test_custom_groups_share_capacity_but_keep_distinct_information(self):
+        session = self.make_session('dynamic_bottleneck_round_prod_custom', 'S01')
+        session.config.update(
+            {
+                'group_treatment_spec': 'G01:H-I0;G02:H-I1',
+                'api_agent_mode': 'off',
+                'api_agent_count_per_group': 0,
+                'rl_agent_enabled': '0',
+                'rl_agent_count_per_group': 0,
+            }
+        )
+        dynamic_app.configure_formal_treatments(session)
+        records = dynamic_app.accident_sequence_for_session(session)
+        session.vars[dynamic_app.ACCIDENT_SEQUENCE_SESSION_VAR] = records
+        player_i0 = self.make_player()
+        player_i1 = self.make_player()
+        group_i0 = SimpleNamespace(
+            id_in_subsession=1,
+            round_number=C.WARMUP_ROUNDS + 1,
+            session=session,
+            get_players=lambda: [player_i0],
+        )
+        group_i1 = SimpleNamespace(
+            id_in_subsession=2,
+            round_number=C.WARMUP_ROUNDS + 1,
+            session=session,
+            get_players=lambda: [player_i1],
+        )
+
+        dynamic_app.apply_round_capacity(group_i0)
+        dynamic_app.apply_round_capacity(group_i1)
+
+        self.assertEqual(group_i0.dynamic_capacity, group_i1.dynamic_capacity)
+        self.assertEqual(group_i0.incident_occurred, group_i1.incident_occurred)
+        self.assertEqual(group_i0.capacity_loss_ratio, group_i1.capacity_loss_ratio)
+        self.assertEqual(group_i0.information_condition, 'I0')
+        self.assertEqual(group_i1.information_condition, 'I1')
 
     def test_capacity_model_fields_are_float_columns(self):
         for model in (dynamic_app.Group, dynamic_app.Player):

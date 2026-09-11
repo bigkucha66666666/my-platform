@@ -15,7 +15,6 @@ from otree.api import *
 from .accident_capacity import (
     INFO_I0,
     INFO_I1,
-    INFO_I2,
     AccidentRiskConfig,
     AccidentRiskConfigError,
     accident_public_context,
@@ -74,18 +73,62 @@ API_AGENT_MODE_ACTIVE = 'active'
 API_AGENT_TYPE_DEEPSEEK = 'deepseek_api_agent'
 API_AGENT_LEGACY_ACTOR_TYPE = 'api_agent'
 API_AGENT_COUNT_MIN = 1
-API_AGENT_COUNT_MAX = 5
-API_AGENT_COUNT_ERROR = '每组 Agent 数量必须是 1 到 5 之间的整数。'
+API_AGENT_COUNT_MAX = 10
+API_AGENT_COUNT_ERROR = '每组 Agent 数量必须是 1 到 10 之间的整数。'
 RL_AGENT_TYPE = 'rl_agent'
 RL_AGENT_COUNT_MIN = 1
-RL_AGENT_COUNT_MAX = 5
-RL_AGENT_COUNT_ERROR = '每组独立 RL Agent 数量必须是 1 到 5 之间的整数。'
+RL_AGENT_COUNT_MAX = 10
+RL_AGENT_COUNT_ERROR = '每组独立 RL Agent 数量必须是 1 到 10 之间的整数。'
 AGENT_DECISIONS_PARTICIPANT_VAR = 'dynamic_bottleneck_round_agent_decisions_by_round_v1'
 INDEPENDENT_RL_DECISIONS_PARTICIPANT_VAR = (
     'dynamic_bottleneck_round_independent_rl_decisions_by_round_v1'
 )
 API_AGENT_MEMORY_PARTICIPANT_VAR = 'dynamic_bottleneck_round_api_agent_memory_v1'
 GROUP_AGENT_COUNTS_SESSION_VAR = 'dynamic_bottleneck_round_group_agent_counts_v1'
+GROUP_TREATMENTS_SESSION_VAR = 'dynamic_bottleneck_round_group_treatments_v1'
+FORMAL_SESSION_CONFIG_NAMES = {
+    'dynamic_bottleneck_round_prod_h_i0',
+    'dynamic_bottleneck_round_prod_h_i1',
+    'dynamic_bottleneck_round_prod_ha_i0',
+    'dynamic_bottleneck_round_prod_ha_i1',
+    'dynamic_bottleneck_round_prod_custom',
+}
+FIXED_FORMAL_TREATMENTS = {
+    'dynamic_bottleneck_round_prod_h_i0': 'H-I0',
+    'dynamic_bottleneck_round_prod_h_i1': 'H-I1',
+    'dynamic_bottleneck_round_prod_ha_i0': 'HA-I0',
+    'dynamic_bottleneck_round_prod_ha_i1': 'HA-I1',
+}
+TREATMENT_DEFINITIONS = {
+    'H-I0': {
+        'actor_composition': 'H',
+        'human': 30,
+        'api': 0,
+        'rl': 0,
+        'information_condition': INFO_I0,
+    },
+    'H-I1': {
+        'actor_composition': 'H',
+        'human': 30,
+        'api': 0,
+        'rl': 0,
+        'information_condition': INFO_I1,
+    },
+    'HA-I0': {
+        'actor_composition': 'HA',
+        'human': 10,
+        'api': 10,
+        'rl': 10,
+        'information_condition': INFO_I0,
+    },
+    'HA-I1': {
+        'actor_composition': 'HA',
+        'human': 10,
+        'api': 10,
+        'rl': 10,
+        'information_condition': INFO_I1,
+    },
+}
 RL_AGENT_STATE_PARTICIPANT_VAR = 'dynamic_bottleneck_round_rl_agent_state_v1'
 DROPOUT_AUDIT_PARTICIPANT_VAR = 'dynamic_bottleneck_round_dropout_audit_v1'
 INDEPENDENT_RL_STATE_PARTICIPANT_VAR = (
@@ -124,8 +167,6 @@ def service_batch_wait_minutes(
 
 
 def capacity_reveal_description(config: AccidentRiskConfig) -> str:
-    if config.information_condition == INFO_I2:
-        return '选择前公布本轮事故是否发生及实际服务率。'
     if config.information_condition == INFO_I1:
         return '选择前公布本轮事故是否发生，实际服务率在选择后公布。'
     return '选择前仅提供事故风险的长期分布，本轮结果在选择后公布。'
@@ -165,7 +206,7 @@ class C(BaseConstants):
     NAME_IN_URL = 'dynamic_bottleneck_round'
     PLAYERS_PER_GROUP = None
     WARMUP_ROUNDS = 5
-    FORMAL_ROUNDS = 60
+    FORMAL_ROUNDS = 30
     NUM_ROUNDS = WARMUP_ROUNDS + FORMAL_ROUNDS
 
     DECISION_TIMEOUT_SECONDS = 60
@@ -417,6 +458,150 @@ def _canonical_group_label(group_id) -> str:
     return f'G{numeric_id:02d}'
 
 
+def is_formal_session(session) -> bool:
+    return session.config.get('name') in FORMAL_SESSION_CONFIG_NAMES
+
+
+def parse_group_treatment_spec(spec):
+    parsed = {}
+    entries = [
+        item.strip()
+        for item in str(spec or '').replace('\n', ';').split(';')
+        if item.strip()
+    ]
+    if not entries:
+        raise ValueError(
+            'group_treatment_spec 必须至少配置 G01 一个实验组。'
+        )
+    for index, entry in enumerate(entries, start=1):
+        if ':' not in entry:
+            raise ValueError(
+                'group_treatment_spec 格式应为 G01:H-I0;G02:HA-I1。'
+            )
+        raw_label, raw_treatment = entry.split(':', 1)
+        label = _canonical_group_label(raw_label)
+        expected_label = f'G{index:02d}'
+        if label != expected_label:
+            raise ValueError(
+                'group_treatment_spec 组号必须从 G01 开始连续配置。'
+            )
+        treatment = raw_treatment.strip().upper()
+        if treatment not in TREATMENT_DEFINITIONS:
+            raise ValueError(
+                'group_treatment_spec 处理必须是 '
+                'H-I0、H-I1、HA-I0 或 HA-I1。'
+            )
+        parsed[label] = {
+            'treatment_condition': treatment,
+            **TREATMENT_DEFINITIONS[treatment],
+        }
+    return parsed
+
+
+def configure_formal_treatments(session):
+    name = session.config.get('name')
+    if name in FIXED_FORMAL_TREATMENTS:
+        treatment = FIXED_FORMAL_TREATMENTS[name]
+        expected = TREATMENT_DEFINITIONS[treatment]
+        configured_condition = parse_accident_risk_config(
+            session.config
+        ).information_condition
+        configured_api = (
+            config_int(session.config.get('api_agent_count_per_group', 0), 0)
+            if api_agent_mode(session) == API_AGENT_MODE_ACTIVE
+            else 0
+        )
+        configured_rl = (
+            config_int(session.config.get('rl_agent_count_per_group', 0), 0)
+            if rl_agent_enabled(session)
+            else 0
+        )
+        if (
+            configured_condition != expected['information_condition']
+            or configured_api != expected['api']
+            or configured_rl != expected['rl']
+        ):
+            raise ValueError(
+                f'正式配置名 {name} 必须对应 {treatment}：'
+                f'{expected["human"]} Human + {expected["api"]} LLM + '
+                f'{expected["rl"]} RL，信息条件为 '
+                f'{expected["information_condition"]}。'
+            )
+        parsed = parse_group_treatment_spec(f'G01:{treatment}')
+    elif name == 'dynamic_bottleneck_round_prod_custom':
+        parsed = parse_group_treatment_spec(
+            session.config.get('group_treatment_spec', '')
+        )
+    else:
+        session.vars.pop(GROUP_TREATMENTS_SESSION_VAR, None)
+        return {}
+
+    session.vars[GROUP_TREATMENTS_SESSION_VAR] = deepcopy(parsed)
+    session.vars[GROUP_AGENT_COUNTS_SESSION_VAR] = {
+        label: {'api': values['api'], 'rl': values['rl']}
+        for label, values in parsed.items()
+    }
+    has_api = any(values['api'] for values in parsed.values())
+    has_rl = any(values['rl'] for values in parsed.values())
+    if name == 'dynamic_bottleneck_round_prod_custom':
+        session.config = {
+            **session.config,
+            'api_agent_mode': (
+                API_AGENT_MODE_ACTIVE if has_api else API_AGENT_MODE_OFF
+            ),
+            'api_agent_count_per_group': 10 if has_api else 0,
+            'rl_agent_enabled': '1' if has_rl else '0',
+            'rl_agent_count_per_group': 10 if has_rl else 0,
+        }
+    return parsed
+
+
+def group_treatment_for_session(session, group_id):
+    label = _canonical_group_label(group_id)
+    stored = session.vars.get(GROUP_TREATMENTS_SESSION_VAR, {})
+    if not isinstance(stored, dict) or label not in stored:
+        if is_formal_session(session):
+            stored = configure_formal_treatments(session)
+    treatment = stored.get(label) if isinstance(stored, dict) else None
+    return deepcopy(treatment) if isinstance(treatment, dict) else None
+
+
+def information_condition_for_group(session, group_id):
+    treatment = group_treatment_for_session(session, group_id)
+    if treatment is not None:
+        return treatment['information_condition']
+    return parse_accident_risk_config(session.config).information_condition
+
+
+def accident_config_for_group(group):
+    condition = information_condition_for_group(
+        group.session,
+        getattr(group, 'id_in_subsession', 1),
+    )
+    return parse_accident_risk_config(
+        {
+            **group.session.config,
+            'accident_information_condition': condition,
+        }
+    )
+
+
+def accident_config_for_player(player):
+    condition = player.participant.vars.get(
+        'dynamic_bottleneck_information_condition'
+    )
+    if not condition:
+        condition = parse_accident_risk_config(
+            player.session.config
+        ).information_condition
+    return parse_accident_risk_config(
+        {
+            **player.session.config,
+            'accident_information_condition': condition,
+        }
+    )
+
+
 def parse_group_agent_spec(spec):
     parsed = {}
     for raw_group in str(spec or '').replace('\n', ';').split(';'):
@@ -665,7 +850,7 @@ def validate_liu_rel_session_config(session) -> dict:
     else:
         raise ValueError('rel_parameters_frozen 必须是 0 或 1。')
     if (
-        config.get('name') == 'dynamic_bottleneck_round_prod'
+        is_formal_session(session)
         and rl_agent_enabled(session)
         and not parameters_frozen
     ):
@@ -678,7 +863,7 @@ def validate_liu_rel_session_config(session) -> dict:
         'rel_capacity_bandwidth': bandwidth,
         'rel_random_seed': random_seed,
         'rel_initial_uniform_rounds': uniform_rounds,
-        'rel_parameters_frozen': parameters_frozen,
+        'rel_parameters_frozen': int(parameters_frozen),
     }
     session.config = {**config, **validated}
     return validated
@@ -693,33 +878,42 @@ def effective_group_actor_count(session, human_count, group_id=None) -> int:
 
 
 def validate_formal_actor_composition(session, matrix):
-    if session.config.get('name') != 'dynamic_bottleneck_round_prod':
+    if not is_formal_session(session):
         return 'demo'
-    if str(session.config.get('group_agent_spec', '') or '').strip():
+    treatments = configure_formal_treatments(session)
+    if len(matrix) != len(treatments):
         raise ValueError(
-            '事故风险正式实验不允许使用 group_agent_spec 按组改变主体构成。'
+            '正式 Session 的实际分组数必须与 '
+            'group_treatment_spec 一致。'
         )
-    if len(matrix) != 1:
-        raise ValueError(
-            '事故风险正式实验每个 Session 必须且只能包含一个实验组。'
+    validated = {}
+    for group_id, group_players in enumerate(matrix, start=1):
+        label = f'G{group_id:02d}'
+        expected = treatments[label]
+        actual = (
+            len(group_players),
+            api_agent_count_per_group(session, group_id),
+            rl_agent_count_per_group(session, group_id),
         )
-
-    human_count = len(matrix[0])
-    api_count = api_agent_count_per_group(session, 1)
-    rl_count = rl_agent_count_per_group(session, 1)
-    if (human_count, api_count, rl_count) == (20, 0, 0):
-        return 'H'
-    if (human_count, api_count, rl_count) == (16, 2, 2):
-        return 'HA'
-    raise ValueError(
-        '事故风险正式实验主体构成只能是 20 Human，'
-        '或 16 Human + 2 LLM + 2 RL。'
-    )
+        required = (
+            expected['human'],
+            expected['api'],
+            expected['rl'],
+        )
+        if actual != required:
+            raise ValueError(
+                '事故风险正式实验每组主体构成只能是 '
+                '30 Human，或 10 Human + 10 LLM + 10 RL。'
+            )
+        validated[label] = expected['actor_composition']
+    if len(validated) == 1:
+        return next(iter(validated.values()))
+    return validated
 
 
 def accident_record_for_group(group):
     config = (
-        parse_accident_risk_config(group.session.config)
+        accident_config_for_group(group)
         if hasattr(group, 'session')
         else AccidentRiskConfig()
     )
@@ -748,7 +942,7 @@ def accident_record_for_group(group):
 
 
 def public_accident_context_for_group(group, *, after_decision=False):
-    config = parse_accident_risk_config(group.session.config)
+    config = accident_config_for_group(group)
     context = accident_public_context(
         config,
         accident_record_for_group(group),
@@ -923,6 +1117,26 @@ def build_auto_group_matrix(players, cohort_size):
     return [players[index:index + cohort_size] for index in range(0, len(players), cohort_size)]
 
 
+def build_treatment_group_matrix(players, treatments):
+    if not isinstance(treatments, dict) or not treatments:
+        raise ValueError('group_treatment_spec 没有可用的实验组。')
+    required_humans = sum(
+        int(treatment['human']) for treatment in treatments.values()
+    )
+    if len(players) != required_humans:
+        raise ValueError(
+            f'group_treatment_spec 需要 {required_humans} 名 Human，'
+            f'当前 Session 有 {len(players)} 名。'
+        )
+    matrix = []
+    start = 0
+    for treatment in treatments.values():
+        end = start + int(treatment['human'])
+        matrix.append(players[start:end])
+        start = end
+    return matrix
+
+
 def parse_manual_grouping_spec(spec):
     groups = []
     for raw_group in str(spec or '').replace('\n', ';').split(';'):
@@ -969,13 +1183,28 @@ def assign_group_treatment_metadata(session, matrix):
     for group_id, group_players in enumerate(matrix, start=1):
         api_count = api_agent_count_per_group(session, group_id)
         rl_count = rl_agent_count_per_group(session, group_id)
-        treatment_group = 'HA' if api_count + rl_count > 0 else 'H'
+        configured = group_treatment_for_session(session, group_id)
+        treatment_group = (
+            configured['actor_composition']
+            if configured is not None
+            else ('HA' if api_count + rl_count > 0 else 'H')
+        )
+        information_condition = (
+            configured['information_condition']
+            if configured is not None
+            else parse_accident_risk_config(
+                session.config
+            ).information_condition
+        )
         for player in group_players:
             player.participant.vars['dynamic_bottleneck_treatment_group'] = (
                 treatment_group
             )
             player.participant.vars['dynamic_bottleneck_api_agent_count'] = api_count
             player.participant.vars['dynamic_bottleneck_rl_agent_count'] = rl_count
+            player.participant.vars[
+                'dynamic_bottleneck_information_condition'
+            ] = information_condition
 
 
 def accident_sequence_for_session(session):
@@ -984,7 +1213,7 @@ def accident_sequence_for_session(session):
         session.config.get('dynamic_capacity_sequence_preset', 'auto') or 'auto'
     ).strip()
     if raw_preset.lower() == 'auto':
-        if session.config.get('name') == 'dynamic_bottleneck_round_prod':
+        if is_formal_session(session):
             raise ValueError('事故风险正式实验必须选择 S01-S05 固定事故序列。')
         return generate_accident_sequence(
             config,
@@ -1033,7 +1262,7 @@ def _warmup_accident_record(group, config):
 
 
 def apply_round_capacity(group, config=None):
-    config = config or parse_accident_risk_config(group.session.config)
+    config = config or accident_config_for_group(group)
     players = group.get_players()
     if not players:
         return
@@ -1137,10 +1366,33 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=
 def creating_session(subsession):
     config = parse_accident_risk_config(subsession.session.config)
     if subsession.round_number == 1:
+        players = subsession.get_players()
+        if is_formal_session(subsession.session):
+            treatments = configure_formal_treatments(subsession.session)
+            matrix = build_treatment_group_matrix(players, treatments)
+            grouping_enabled = len(matrix) > 1
+        else:
+            grouping_enabled = config_flag(
+                subsession.session.config.get('grouping_enabled', 0)
+            )
+            manual_spec = str(
+                subsession.session.config.get('manual_grouping_spec', '') or ''
+            ).strip()
+            if grouping_enabled:
+                matrix = build_manual_group_matrix(players, manual_spec)
+            else:
+                try:
+                    cohort_size = int(
+                        subsession.session.config.get('cohort_size', 0) or 0
+                    )
+                except (TypeError, ValueError) as exc:
+                    raise ValueError('cohort_size 必须是非负整数。') from exc
+                if cohort_size < 0:
+                    raise ValueError('cohort_size 必须是非负整数。')
+                matrix = build_auto_group_matrix(players, cohort_size)
         validate_api_agent_count(subsession.session)
         validate_rl_agent_count(subsession.session)
         validate_liu_rel_session_config(subsession.session)
-        players = subsession.get_players()
         for player in players:
             player.participant.is_dropout = False
             player.participant.dropout_active = False
@@ -1154,19 +1406,8 @@ def creating_session(subsession):
             player.participant.finished = False
             player.participant.vars[DROPOUT_AUDIT_PARTICIPANT_VAR] = {}
 
-        grouping_enabled = config_flag(subsession.session.config.get('grouping_enabled', 0))
-        manual_spec = str(subsession.session.config.get('manual_grouping_spec', '') or '').strip()
-        if grouping_enabled:
-            matrix = build_manual_group_matrix(players, manual_spec)
-        else:
-            try:
-                cohort_size = int(subsession.session.config.get('cohort_size', 0) or 0)
-            except (TypeError, ValueError) as exc:
-                raise ValueError('cohort_size 必须是非负整数。') from exc
-            if cohort_size < 0:
-                raise ValueError('cohort_size 必须是非负整数。')
-            matrix = build_auto_group_matrix(players, cohort_size)
-        validate_group_agent_configuration(subsession.session, matrix)
+        if not is_formal_session(subsession.session):
+            validate_group_agent_configuration(subsession.session, matrix)
         validate_formal_actor_composition(subsession.session, matrix)
         apply_fixed_departure_schedules(subsession.session, matrix)
         subsession.set_group_matrix(matrix)
@@ -1198,7 +1439,7 @@ def creating_session(subsession):
         group.round_started = False
         group.decision_deadline_ts = 0
         group.results_ready = False
-        apply_round_capacity(group, config)
+        apply_round_capacity(group)
         apply_round_toll(group)
 
 
@@ -1635,7 +1876,7 @@ def maybe_prepare_results(group):
 
 
 def access_allowed(player):
-    if player.session.config.get('name') != 'dynamic_bottleneck_round_prod':
+    if not is_formal_session(player.session):
         return True
     return bool(player.participant.vars.get('access_granted'))
 
@@ -1964,9 +2205,10 @@ def prepare_independent_rl_decisions_for_group(group):
     records = []
     phase = round_phase_context(group.round_number)
     rel_parameters = validate_liu_rel_session_config(group.session)
-    information_condition = parse_accident_risk_config(
-        group.session.config
-    ).information_condition
+    information_condition = information_condition_for_group(
+        group.session,
+        group.id_in_subsession,
+    )
     warmup = is_warmup_round(group.round_number)
     for index in range(
         1,
@@ -2013,13 +2255,9 @@ def prepare_independent_rl_decisions_for_group(group):
                 ],
                 'warmup': warmup,
             }
-            if information_condition in {INFO_I1, INFO_I2} and not warmup:
+            if information_condition == INFO_I1 and not warmup:
                 policy_kwargs['current_incident_occurred'] = (
                     choice_set.capacity_context['incident_occurred']
-                )
-            if information_condition == INFO_I2 and not warmup:
-                policy_kwargs['current_actual_capacity'] = (
-                    choice_set.capacity_context['actual_capacity']
                 )
             choice = choose_independent_rl_departure(
                 **policy_kwargs,
@@ -2074,13 +2312,9 @@ def prepare_independent_rl_decisions_for_group(group):
             ),
             'rounds_observed': int(choice.get('rounds_observed', 0)),
         }
-        if information_condition in {INFO_I1, INFO_I2} and not warmup:
+        if information_condition == INFO_I1 and not warmup:
             choice_audit['current_incident_occurred'] = bool(
                 choice_set.capacity_context['incident_occurred']
-            )
-        if information_condition == INFO_I2 and not warmup:
-            choice_audit['current_actual_capacity'] = float(
-                choice_set.capacity_context['actual_capacity']
             )
         records.append(
             {
@@ -2269,7 +2503,7 @@ def update_rl_shadow_states(group, agent_records):
     if feedback is None:
         return
     observation = public_feedback_observation(feedback)
-    config = parse_accident_risk_config(group.session.config)
+    config = accident_config_for_group(group)
     capacity_states = capacity_state_rows(config)
     store, reference_player = rl_state_store_for_group(group)
     if reference_player is None:
@@ -2367,9 +2601,10 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
     records = []
     phase = round_phase_context(group.round_number)
     accident = accident_record_for_group(group)
-    information_condition = parse_accident_risk_config(
-        group.session.config
-    ).information_condition
+    information_condition = information_condition_for_group(
+        group.session,
+        group.id_in_subsession,
+    )
     for (agent_id, choice_set), choice in zip(prepared_agents, choices):
         slot = int(choice.departure_slot)
         departure_minute = departure_minute_for_slot(slot, schedule)
@@ -2604,7 +2839,10 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
         getattr(
             group,
             'information_condition',
-            parse_accident_risk_config(group.session.config).information_condition
+            information_condition_for_group(
+                group.session,
+                getattr(group, 'id_in_subsession', 1),
+            )
             if hasattr(group, 'session')
             else INFO_I0,
         )
@@ -3037,7 +3275,7 @@ class Introduction(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_accident_risk_config(player.session.config)
+        config = accident_config_for_player(player)
         schedule = departure_schedule_for_player(player)
         return {
             'capacity_states': capacity_state_rows(config),
@@ -3064,7 +3302,7 @@ class ComprehensionCheck(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_accident_risk_config(player.session.config)
+        config = accident_config_for_player(player)
         queue_example = comprehension_queue_example(config)
         example_people = queue_example['people']
         example_capacity = queue_example['capacity']
@@ -3123,7 +3361,7 @@ class WarmupStart(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = parse_accident_risk_config(player.session.config)
+        config = accident_config_for_player(player)
         return {
             'warmup_rounds': C.WARMUP_ROUNDS,
             'warmup_capacity': parse_warmup_capacity(player.session.config, config),

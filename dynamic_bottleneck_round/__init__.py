@@ -13,6 +13,7 @@ import time
 
 from otree.api import *
 from .stochastic_capacity import (
+    CAPACITY_DISTRIBUTION,
     CAPACITY_MAX,
     CAPACITY_MIN,
     INFO_I0,
@@ -357,26 +358,34 @@ EXPORT_HEADERS = [
     'participant_code',
     'group_id',
     'round_number',
+    'formal_round_number',
     'treatment_condition',
     'actor_composition',
     'information_condition',
-    'incident_occurred',
-    'capacity_loss_ratio',
-    'remaining_capacity_ratio',
     'dynamic_capacity',
-    'dynamic_capacity_state',
-    'accident_sequence_id',
-    'accident_sequence_seed',
+    'actual_capacity',
+    'capacity_level',
+    'capacity_distribution',
+    'capacity_min',
+    'capacity_max',
+    'capacity_sequence_id',
+    'capacity_sequence_seed',
+    'capacity_revealed_before_decision',
     'departure_schedule_source',
     'departure_schedule_num_slots',
     'departure_schedule_first_time',
     'departure_schedule_last_time',
     'departure_slot',
     'departure_minute',
+    'departure_time',
     'queue_delay_minutes',
+    'queue_delay',
     'arrival_minute',
+    'arrival_time',
     'early_minutes',
+    'schedule_early',
     'late_minutes',
+    'schedule_late',
     'slot_load',
     'total_cost',
     'payoff',
@@ -405,6 +414,8 @@ EXPORT_HEADERS = [
     'agent_memory_output',
     'agent_persona_id',
     'agent_persona_label',
+    'agent_policy_version',
+    'agent_fallback_reason',
     'rl_policy_version',
     'rl_rounds_observed',
 ]
@@ -901,7 +912,7 @@ def public_capacity_context_for_group(group, *, after_decision=False):
         after_decision=after_decision,
         warmup=is_warmup_round(group.round_number),
     )
-    context['capacity_states'] = [{'capacity_min': config.capacity_min, 'capacity_max': config.capacity_max}]
+    context['capacity_states'] = capacity_state_rows(config)
     context['capacity_reveal_timing'] = config.information_condition
     return context
 
@@ -962,7 +973,7 @@ def static_departure_schedule():
     ) * C.DEPARTURE_CHOICE_STEP_MINUTES
     return {
         'enabled': True,
-        'source': 'fixed_accident_design',
+        'source': 'fixed_uniform_capacity_design',
         'players_count': 20,
         'capacity_basis': 4.0,
         'required_occupied_slots': C.NUM_DEPARTURE_SLOTS,
@@ -1166,7 +1177,14 @@ def capacity_sequence_for_session(session):
         raise ValueError(
             f'未知随机服务率序列 {sequence_id}；请选择 S01-S05 或 demo auto。'
         )
-    return deepcopy(bank[sequence_id]['rounds'])
+    bank_sequence = bank[sequence_id]
+    expected_seed = int(bank_sequence['generation_seed'])
+    if config.seed != expected_seed:
+        raise ValueError(
+            f'capacity_sequence_seed 必须与 {sequence_id} 的固定种子 '
+            f'{expected_seed} 一致。'
+        )
+    return deepcopy(bank_sequence['rounds'])
 
 
 def initialize_capacity_sequence(subsession, config=None):
@@ -1806,18 +1824,31 @@ def access_allowed(player):
 def capacity_state_rows(config):
     return [
         {
-            'capacity': config.normal_capacity,
-            'probability': 1 - config.incident_probability,
-            'probability_label': probability_display(1 - config.incident_probability),
-            'state': 'normal',
+            'state': 'low',
+            'label': '低',
+            'range_label': '1.33–2.21',
+            'capacity': (1.33 + 2.22) / 2,
+            'probability': 1 / 3,
         },
         {
-            'capacity': config.expected_incident_capacity,
-            'probability': config.incident_probability,
-            'probability_label': probability_display(config.incident_probability),
-            'state': 'incident',
+            'state': 'medium',
+            'label': '中',
+            'range_label': '2.22–3.10',
+            'capacity': (2.22 + 3.11) / 2,
+            'probability': 1 / 3,
+        },
+        {
+            'state': 'high',
+            'label': '高',
+            'range_label': '3.11–4.00',
+            'capacity': (3.11 + 4.00) / 2,
+            'probability': 1 / 3,
         },
     ]
+
+
+def capacity_level_label(level):
+    return {'low': '低', 'medium': '中', 'high': '高'}[str(level)]
 
 
 def choice_preview(player):
@@ -2032,7 +2063,7 @@ def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
     schedule = departure_schedule_for_player(reference_player)
     preview = choice_preview(reference_player)
     phase = round_phase_context(group.round_number)
-    capacity_context = public_accident_context_for_group(group)
+    capacity_context = public_capacity_context_for_group(group)
     capacity_context['experiment_phase'] = phase['phase_name']
     capacity_context['round_label'] = phase['round_label']
     return AgentChoiceSet(
@@ -2175,8 +2206,8 @@ def prepare_independent_rl_decisions_for_group(group):
                 'warmup': warmup,
             }
             if information_condition == INFO_I1 and not warmup:
-                policy_kwargs['current_incident_occurred'] = (
-                    choice_set.capacity_context['incident_occurred']
+                policy_kwargs['current_actual_capacity'] = (
+                    choice_set.capacity_context['actual_capacity']
                 )
             choice = choose_independent_rl_departure(
                 **policy_kwargs,
@@ -2200,10 +2231,11 @@ def prepare_independent_rl_decisions_for_group(group):
                 'effective_observation_count': 0.0,
                 'rel_lambda': rel_parameters['rel_lambda'],
                 'rel_eta': rel_parameters['rel_eta'],
+                'capacity_kernel_bandwidth': None,
                 'random_seed_fingerprint': '',
             }
         departure_minute = departure_minute_for_slot(slot, schedule)
-        accident = accident_record_for_group(group)
+        capacity_record = capacity_record_for_group(group)
         choice_audit = {
             'agent_id': agent_id,
             'round_number': phase['display_round_number'],
@@ -2221,6 +2253,9 @@ def prepare_independent_rl_decisions_for_group(group):
             ),
             'rel_lambda': choice.get('rel_lambda'),
             'rel_eta': choice.get('rel_eta'),
+            'capacity_kernel_bandwidth': choice.get(
+                'capacity_kernel_bandwidth'
+            ),
             'random_seed_fingerprint': choice.get(
                 'random_seed_fingerprint',
                 '',
@@ -2228,8 +2263,8 @@ def prepare_independent_rl_decisions_for_group(group):
             'rounds_observed': int(choice.get('rounds_observed', 0)),
         }
         if information_condition == INFO_I1 and not warmup:
-            choice_audit['current_incident_occurred'] = bool(
-                choice_set.capacity_context['incident_occurred']
+            choice_audit['current_actual_capacity'] = float(
+                choice_set.capacity_context['actual_capacity']
             )
         records.append(
             {
@@ -2243,15 +2278,17 @@ def prepare_independent_rl_decisions_for_group(group):
                 'group_id': int(group.id_in_subsession),
                 'round_number': phase['display_round_number'],
                 'dynamic_capacity': float(group.dynamic_capacity),
-                'dynamic_capacity_state': str(group.dynamic_capacity_state),
-                'capacity_probability': float(group.capacity_probability),
+                'capacity_level': capacity_record['capacity_level'],
+                'capacity_distribution': capacity_record['distribution'],
+                'capacity_min': capacity_record['capacity_min'],
+                'capacity_max': capacity_record['capacity_max'],
                 'capacity_reveal_timing': information_condition,
-                'incident_occurred': accident['incident_occurred'],
-                'capacity_loss_ratio': accident['capacity_loss_ratio'],
-                'remaining_capacity_ratio': accident['remaining_capacity_ratio'],
+                'capacity_revealed_before_decision': bool(
+                    information_condition == INFO_I1 or warmup
+                ),
                 'information_condition': information_condition,
-                'accident_sequence_id': accident['sequence_id'],
-                'accident_sequence_seed': accident['sequence_seed'],
+                'capacity_sequence_id': capacity_record['sequence_id'],
+                'capacity_sequence_seed': capacity_record['sequence_seed'],
                 'departure_slot': slot,
                 'departure_minute': round(departure_minute, 2),
                 'departure_time_label': minute_to_clock(departure_minute),
@@ -2312,7 +2349,6 @@ def update_independent_rl_states(group, records):
             formal_round_number=formal_round_number(group.round_number),
             departure_slot=record['departure_slot'],
             total_cost=record['total_cost'],
-            incident_occurred=bool(feedback['incident_occurred']),
             actual_capacity=float(feedback['dynamic_capacity']),
             decision_source=record.get('decision_source', ''),
         )
@@ -2357,9 +2393,6 @@ def rl_candidate_for_choice_set(group, choice_set):
         rewards=choice_set.rewards,
         persona=choice_set.persona,
         known_current_capacity=visible_capacity,
-        known_incident_status=choice_set.capacity_context.get(
-            'incident_occurred'
-        ),
     )
     return {
         **choice,
@@ -2418,7 +2451,7 @@ def update_rl_shadow_states(group, agent_records):
     if feedback is None:
         return
     observation = public_feedback_observation(feedback)
-    config = accident_config_for_group(group)
+    config = capacity_config_for_group(group)
     capacity_states = capacity_state_rows(config)
     store, reference_player = rl_state_store_for_group(group)
     if reference_player is None:
@@ -2515,7 +2548,7 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
     schedule = departure_schedule_for_player(players[0])
     records = []
     phase = round_phase_context(group.round_number)
-    accident = accident_record_for_group(group)
+    capacity_record = capacity_record_for_group(group)
     information_condition = information_condition_for_group(
         group.session,
         group.id_in_subsession,
@@ -2541,15 +2574,17 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
                 'group_id': int(group.id_in_subsession),
                 'round_number': phase['display_round_number'],
                 'dynamic_capacity': float(group.dynamic_capacity),
-                'dynamic_capacity_state': str(group.dynamic_capacity_state),
-                'capacity_probability': float(group.capacity_probability),
+                'capacity_level': capacity_record['capacity_level'],
+                'capacity_distribution': capacity_record['distribution'],
+                'capacity_min': capacity_record['capacity_min'],
+                'capacity_max': capacity_record['capacity_max'],
                 'capacity_reveal_timing': information_condition,
-                'incident_occurred': accident['incident_occurred'],
-                'capacity_loss_ratio': accident['capacity_loss_ratio'],
-                'remaining_capacity_ratio': accident['remaining_capacity_ratio'],
+                'capacity_revealed_before_decision': bool(
+                    choice_set.capacity_context.get('current_capacity_revealed')
+                ),
                 'information_condition': information_condition,
-                'accident_sequence_id': accident['sequence_id'],
-                'accident_sequence_seed': accident['sequence_seed'],
+                'capacity_sequence_id': capacity_record['sequence_id'],
+                'capacity_sequence_seed': capacity_record['sequence_seed'],
                 'departure_slot': slot,
                 'departure_minute': round(departure_minute, 2),
                 'departure_time_label': minute_to_clock(departure_minute),
@@ -2749,7 +2784,7 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
             costs_by_slot[slot].append(float(record.get('total_cost', 0)))
 
     all_costs = [cost for values in costs_by_slot.values() for cost in values]
-    accident = accident_record_for_group(group)
+    capacity_record = capacity_record_for_group(group)
     information_condition = str(
         getattr(
             group,
@@ -2764,13 +2799,13 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
     )
     return {
         'round_number': round_phase_context(group.round_number)['display_round_number'],
-        'incident_occurred': accident['incident_occurred'],
-        'capacity_loss_ratio': accident['capacity_loss_ratio'],
-        'remaining_capacity_ratio': accident['remaining_capacity_ratio'],
-        'actual_capacity': accident['actual_capacity'],
-        'dynamic_capacity': accident['actual_capacity'],
+        'actual_capacity': capacity_record['actual_capacity'],
+        'dynamic_capacity': capacity_record['actual_capacity'],
+        'capacity_level': capacity_record['capacity_level'],
+        'capacity_distribution': capacity_record['distribution'],
+        'capacity_min': capacity_record['capacity_min'],
+        'capacity_max': capacity_record['capacity_max'],
         'information_condition': information_condition,
-        'accident_sequence_id': accident['sequence_id'],
         'departure_outcomes': [
             {
                 'slot': slot,
@@ -2869,7 +2904,7 @@ def result_current_round_cost_snapshot(player):
     }
 
 
-def accident_export_metadata(player):
+def capacity_export_metadata(player):
     actor_composition = str(
         getattr(player, 'actor_composition', '')
         or player.participant.vars.get('dynamic_bottleneck_treatment_group', '')
@@ -2882,17 +2917,16 @@ def accident_export_metadata(player):
         'treatment_condition': f'{actor_composition}-{information_condition}',
         'actor_composition': actor_composition,
         'information_condition': information_condition,
-        'incident_occurred': bool(getattr(player, 'incident_occurred', False)),
-        'capacity_loss_ratio': round(float(getattr(player, 'capacity_loss_ratio', 0)), 6),
-        'remaining_capacity_ratio': round(
-            float(getattr(player, 'remaining_capacity_ratio', 1)),
-            6,
-        ),
         'dynamic_capacity': round(float(getattr(player, 'dynamic_capacity', 0)), 6),
-        'dynamic_capacity_state': str(getattr(player, 'dynamic_capacity_state', '')),
-        'accident_sequence_id': str(getattr(player, 'accident_sequence_id', '')),
-        'accident_sequence_seed': int(
-            getattr(player, 'accident_sequence_seed', 0) or 0
+        'capacity_level': str(getattr(player, 'capacity_level', '')),
+        'capacity_distribution': str(
+            getattr(player, 'capacity_distribution', CAPACITY_DISTRIBUTION)
+        ),
+        'capacity_min': round(float(getattr(player, 'capacity_min', 1.33)), 2),
+        'capacity_max': round(float(getattr(player, 'capacity_max', 4.00)), 2),
+        'capacity_sequence_id': str(getattr(player, 'capacity_sequence_id', '')),
+        'capacity_sequence_seed': int(
+            getattr(player, 'capacity_sequence_seed', 0) or 0
         ),
     }
 
@@ -2905,23 +2939,33 @@ def export_row_for_player(player):
     schedule = departure_schedule_for_player(player)
     dropout_audit = dropout_audit_for_player_round(player)
     values = {
-        **accident_export_metadata(player),
+        **capacity_export_metadata(player),
         'session_code': player.session.code,
         'participant_code': getattr(player.participant, 'code', ''),
         'group_id': player.group.id_in_subsession,
         'round_number': formal_round_number(player.round_number),
+        'formal_round_number': formal_round_number(player.round_number),
+        'actual_capacity': round(float(player.dynamic_capacity), 6),
+        'capacity_revealed_before_decision': bool(
+            getattr(player, 'capacity_revealed_before_decision', False)
+        ),
         'departure_schedule_source': schedule.get('source', ''),
         'departure_schedule_num_slots': schedule.get('num_slots', ''),
         'departure_schedule_first_time': schedule.get('first_departure_time', ''),
         'departure_schedule_last_time': schedule.get('last_departure_time', ''),
         'departure_slot': player.field_maybe_none('departure_slot') or '',
         'departure_minute': player.field_maybe_none('departure_minute') or '',
+        'departure_time': getattr(player, 'departure_time_label', ''),
         'queue_delay_minutes': export_float(
             getattr(player, 'queue_delay_minutes', 0)
         ),
+        'queue_delay': export_float(getattr(player, 'queue_delay_minutes', 0)),
         'arrival_minute': export_float(getattr(player, 'arrival_minute', 0)),
+        'arrival_time': getattr(player, 'arrival_time_label', ''),
         'early_minutes': export_float(getattr(player, 'early_minutes', 0)),
+        'schedule_early': export_float(getattr(player, 'early_minutes', 0)),
         'late_minutes': export_float(getattr(player, 'late_minutes', 0)),
+        'schedule_late': export_float(getattr(player, 'late_minutes', 0)),
         'slot_load': getattr(player, 'slot_load', 0),
         'total_cost': export_float(getattr(player, 'total_cost', 0)),
         'payoff': export_float(
@@ -2950,6 +2994,8 @@ def export_row_for_player(player):
         ),
         'actor_type': 'human',
         'api_agent_mode': api_agent_mode(player.session),
+        'agent_policy_version': '',
+        'agent_fallback_reason': '',
     }
     return [values.get(header, '') for header in EXPORT_HEADERS]
 
@@ -2982,19 +3028,60 @@ def export_row_for_agent_record(record, reference_player):
         'participant_code': '',
         'group_id': record.get('group_id', reference_player.group.id_in_subsession),
         'round_number': formal_round_number(reference_player.round_number),
+        'formal_round_number': formal_round_number(reference_player.round_number),
         'dynamic_capacity': export_float(
             record.get('dynamic_capacity', reference_player.dynamic_capacity)
         ),
-        'dynamic_capacity_state': record.get(
-            'dynamic_capacity_state',
-            reference_player.dynamic_capacity_state,
+        'actual_capacity': export_float(
+            record.get('dynamic_capacity', reference_player.dynamic_capacity)
+        ),
+        'capacity_level': record.get(
+            'capacity_level',
+            getattr(
+                reference_player,
+                'capacity_level',
+                capacity_level(reference_player.dynamic_capacity),
+            ),
+        ),
+        'capacity_distribution': record.get(
+            'capacity_distribution',
+            getattr(reference_player, 'capacity_distribution', CAPACITY_DISTRIBUTION),
+        ),
+        'capacity_min': record.get(
+            'capacity_min', getattr(reference_player, 'capacity_min', 1.33)
+        ),
+        'capacity_max': record.get(
+            'capacity_max', getattr(reference_player, 'capacity_max', 4.00)
+        ),
+        'capacity_sequence_id': record.get(
+            'capacity_sequence_id',
+            getattr(reference_player, 'capacity_sequence_id', ''),
+        ),
+        'capacity_sequence_seed': record.get(
+            'capacity_sequence_seed',
+            getattr(reference_player, 'capacity_sequence_seed', 0),
+        ),
+        'capacity_revealed_before_decision': bool(
+            record.get(
+                'capacity_revealed_before_decision',
+                getattr(
+                    reference_player,
+                    'capacity_revealed_before_decision',
+                    False,
+                ),
+            )
         ),
         'departure_slot': record.get('departure_slot', ''),
         'departure_minute': record.get('departure_minute', ''),
+        'departure_time': record.get('departure_time_label', ''),
         'queue_delay_minutes': export_float(record.get('queue_delay_minutes', 0)),
+        'queue_delay': export_float(record.get('queue_delay_minutes', 0)),
         'arrival_minute': export_float(record.get('arrival_minute', 0)),
+        'arrival_time': record.get('arrival_time_label', ''),
         'early_minutes': export_float(record.get('early_minutes', 0)),
+        'schedule_early': export_float(record.get('early_minutes', 0)),
         'late_minutes': export_float(record.get('late_minutes', 0)),
+        'schedule_late': export_float(record.get('late_minutes', 0)),
         'slot_load': int(record.get('slot_load', 0) or 0),
         'total_cost': export_float(record.get('total_cost', 0)),
         'payoff': export_float(
@@ -3025,6 +3112,10 @@ def export_row_for_agent_record(record, reference_player):
         'agent_memory_output': record.get('memory_output', ''),
         'agent_persona_id': record.get('persona_id', ''),
         'agent_persona_label': record.get('persona_label', ''),
+        'agent_policy_version': record.get('policy_version', ''),
+        'agent_fallback_reason': (
+            record.get('reason', '') if record.get('fallback_used') else ''
+        ),
         'rl_policy_version': record.get('policy_version', ''),
         'rl_rounds_observed': record.get('rounds_observed', ''),
     }
@@ -3051,8 +3142,8 @@ def build_admin_report_rows(players):
     round_rows = []
     for (round_number, group_id), group_players in sorted(groups.items()):
         representative = group_players[0]
-        state_counts[representative.dynamic_capacity_state] = (
-            state_counts.get(representative.dynamic_capacity_state, 0) + 1
+        state_counts[representative.capacity_level] = (
+            state_counts.get(representative.capacity_level, 0) + 1
         )
         completed = [player for player in group_players if player_has_departure_choice(player)]
         virtual_records = active_virtual_decisions_for_group(representative.group)
@@ -3120,8 +3211,7 @@ def build_admin_report_rows(players):
                 'round_number': formal_round_number(round_number),
                 'group_id': group_id,
                 'dynamic_capacity': representative.dynamic_capacity,
-                'dynamic_capacity_state': representative.dynamic_capacity_state,
-                'capacity_probability': probability_display(representative.capacity_probability),
+                'capacity_level': representative.capacity_level,
                 'average_queue_delay': number_display(average_queue),
                 'average_cost': number_display(average_cost),
                 'coarse_toll_time_window_spec': representative.coarse_toll_time_window_spec or '无',
@@ -3190,7 +3280,7 @@ class Introduction(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = accident_config_for_player(player)
+        config = capacity_config_for_player(player)
         schedule = departure_schedule_for_player(player)
         return {
             'capacity_states': capacity_state_rows(config),
@@ -3217,7 +3307,7 @@ class ComprehensionCheck(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = accident_config_for_player(player)
+        config = capacity_config_for_player(player)
         queue_example = comprehension_queue_example(config)
         example_people = queue_example['people']
         example_capacity = queue_example['capacity']
@@ -3276,10 +3366,17 @@ class WarmupStart(Page):
 
     @staticmethod
     def vars_for_template(player):
-        config = accident_config_for_player(player)
+        config = capacity_config_for_player(player)
         return {
             'warmup_rounds': C.WARMUP_ROUNDS,
-            'warmup_capacity': parse_warmup_capacity(player.session.config, config),
+            'warmup_capacity': parse_warmup_capacity(
+                player.session.config,
+                config,
+                player.round_number,
+            ),
+            'warmup_capacity_sequence': '、'.join(
+                f'{value:.2f}' for value in WARMUP_CAPACITIES
+            ),
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
         }
 
@@ -3294,7 +3391,13 @@ class FormalStart(Page):
 
     @staticmethod
     def vars_for_template(player):
-        return {'formal_rounds': C.FORMAL_ROUNDS}
+        config = capacity_config_for_player(player)
+        return {
+            'formal_rounds': C.FORMAL_ROUNDS,
+            'capacity_min': f'{config.capacity_min:.2f}',
+            'capacity_max': f'{config.capacity_max:.2f}',
+            'capacity_reveal_description': capacity_reveal_description(config),
+        }
 
 
 class RoundStartSync(Page):
@@ -3363,26 +3466,17 @@ class Decision(Page):
 
     @staticmethod
     def vars_for_template(player):
-        context = public_accident_context_for_group(player.group)
-        incident_status_revealed = bool(
-            not is_warmup_round(player.round_number)
-            and context.get('information_condition') == INFO_I1
-            and 'incident_occurred' in context
-        )
-        incident_status_text = ''
-        if incident_status_revealed:
-            incident_status_text = (
-                '本轮发生事故'
-                if context['incident_occurred']
-                else '本轮未发生事故'
+        context = public_capacity_context_for_group(player.group)
+        if context.get('current_capacity_revealed'):
+            context['actual_capacity_display'] = f'{context["actual_capacity"]:.2f}'
+            context['capacity_level_label'] = capacity_level_label(
+                context['capacity_level']
             )
         schedule = departure_schedule_for_player(player)
         preview = choice_preview(player)
         return {
             **context,
             **round_phase_context(player.round_number),
-            'incident_status_revealed': incident_status_revealed,
-            'incident_status_text': incident_status_text,
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'departure_time_min': schedule['first_departure_time'],
             'departure_time_max': schedule['last_departure_time'],
@@ -3495,9 +3589,9 @@ class Results(Page):
         )
         return {
             **phase,
-            'dynamic_capacity': player.dynamic_capacity,
-            'dynamic_capacity_state': player.dynamic_capacity_state,
-            'capacity_probability': probability_display(player.capacity_probability),
+            'dynamic_capacity': f'{player.dynamic_capacity:.2f}',
+            'capacity_level': player.capacity_level,
+            'capacity_level_label': capacity_level_label(player.capacity_level),
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'previous_capacity_label': (
                 str(player.previous_round_capacity) if has_previous_capacity else '无'

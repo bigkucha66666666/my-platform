@@ -358,35 +358,12 @@
 </style>
 
 <div class="decision-shell">
-  {{ if capacity_revealed }}
+  {{ if current_capacity_revealed }}
   <section class="capacity-panel is-known">
     <div class="capacity-copy">
-      <p class="capacity-kicker">本轮真实瓶颈服务率</p>
-      <p class="capacity-value">{{ actual_capacity }} 人 / {{ capacity_window_minutes }} 分钟</p>
-      <p class="capacity-note">同组所有参与者本轮使用相同服务率。</p>
-    </div>
-    <div class="capacity-road-scene" aria-hidden="true">
-      <span class="road-dash"></span>
-      <svg class="commute-car capacity-car" viewBox="0 0 64 40">
-        <path class="car-body" d="M13 26h38l-4-12a6 6 0 0 0-6-4H23a6 6 0 0 0-6 4l-4 12Z"/>
-        <path class="car-base" d="M8 25h48v8H8z"/>
-        <path class="car-window" d="M22 14h19l2 7H19l3-7Z"/>
-        <circle class="car-wheel" cx="18" cy="33" r="5"/>
-        <circle class="car-wheel" cx="46" cy="33" r="5"/>
-      </svg>
-    </div>
-    <div class="round-tag">R{{ display_round_number }} / {{ display_total_rounds }}</div>
-  </section>
-  {{ elif incident_status_revealed }}
-  <section class="capacity-panel is-known">
-    <div class="capacity-copy">
-      <p class="capacity-kicker">本轮事故状态</p>
-      <p class="capacity-value">{{ if incident_occurred }}本轮发生事故{{ else }}本轮未发生事故{{ endif }}</p>
-      {{ if incident_occurred }}
-      <p class="capacity-note">事故影响程度与实际服务率将在提交后公布。</p>
-      {{ else }}
-      <p class="capacity-note">本轮无事故，具体结果将在提交后公布。</p>
-      {{ endif }}
+      <p class="capacity-kicker">本轮瓶颈服务率</p>
+      <p class="capacity-value">{{ actual_capacity_display }} 主体 / 分钟</p>
+      <p class="capacity-note">通行能力等级：{{ capacity_level_label }}。同组所有主体本轮使用相同服务率。</p>
     </div>
     <div class="capacity-road-scene" aria-hidden="true">
       <span class="road-dash"></span>
@@ -405,7 +382,7 @@
     <div class="capacity-copy">
       <p class="capacity-kicker">本轮服务率将在提交后公布</p>
       <p class="capacity-note">请根据已经公布的历史结果作出选择。</p>
-      <div class="state-strip">{{ for item in capacity_states }}<span class="state-chip">{{ item.capacity }} 人 / 1 分钟</span>{{ endfor }}</div>
+      <div class="state-strip"><span class="state-chip">均匀分布 U({{ capacity_min }}, {{ capacity_max }})</span></div>
     </div>
     <div class="capacity-road-scene" aria-hidden="true">
       <span class="road-dash"></span>

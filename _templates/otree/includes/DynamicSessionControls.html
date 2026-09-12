@@ -144,22 +144,22 @@
   <div class="session-presets" role="group" aria-label="动态瓶颈快捷实验方案">
     <button type="button" class="session-preset" data-preset="H-I0">
       <span class="session-preset__tag">H-I0</span>
-      <strong>Human · 事故未知</strong>
+      <strong>Human · 仅知均匀分布</strong>
       <small>30 Human · 总主体数 30</small>
     </button>
     <button type="button" class="session-preset" data-preset="H-I1">
       <span class="session-preset__tag">H-I1</span>
-      <strong>Human · 事故已知</strong>
+      <strong>Human · 本轮精确服务率已知</strong>
       <small>30 Human · 总主体数 30</small>
     </button>
     <button type="button" class="session-preset" data-preset="HA-I0">
       <span class="session-preset__tag">HA-I0</span>
-      <strong>Human-Agent · 事故未知</strong>
+      <strong>Human-Agent · 仅知均匀分布</strong>
       <small>10 Human + 10 LLM + 10 RL</small>
     </button>
     <button type="button" class="session-preset" data-preset="HA-I1">
       <span class="session-preset__tag">HA-I1</span>
-      <strong>Human-Agent · 事故已知</strong>
+      <strong>Human-Agent · 本轮精确服务率已知</strong>
       <small>10 Human + 10 LLM + 10 RL</small>
     </button>
     <button type="button" class="session-preset" data-preset="CUSTOM">
@@ -291,8 +291,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
     'rl_agent_enabled', 'rl_agent_count_per_group', 'cohort_size',
     'grouping_enabled', 'manual_grouping_spec', 'group_agent_spec',
-    'group_treatment_spec', 'accident_information_condition',
-    'dynamic_capacity_sequence_scope', 'dynamic_capacity_sequence_preset',
+    'group_treatment_spec', 'capacity_information_condition',
+    'capacity_sequence_id', 'capacity_sequence_seed',
   ];
   const replacedAgentFields = new Set([
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
@@ -309,7 +309,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   for (const configName of dynamicAgentConfigs) {
-    sourceFor(configName, 'dynamic_capacity_sequence_preset')
+    sourceFor(configName, 'capacity_sequence_id')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
+    sourceFor(configName, 'capacity_sequence_seed')
       ?.closest('tr')?.setAttribute('hidden', 'hidden');
     sourceFor(configName, 'group_treatment_spec')
       ?.closest('tr')?.setAttribute('hidden', 'hidden');
@@ -348,6 +350,13 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const formalScenarioConfig = 'dynamic_bottleneck_round_prod';
   const treatmentOptions = ['H-I0', 'H-I1', 'HA-I0', 'HA-I1'];
+  const capacitySequenceSeeds = {
+    S01: 2026091101,
+    S02: 2026091102,
+    S03: 2026091103,
+    S04: 2026091104,
+    S05: 2026091105,
+  };
 
   function setSource(fieldName, value) {
     const source = sourceFor(currentConfig, fieldName);
@@ -355,6 +364,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function readSource(fieldName, fallback = '') {
     return sourceFor(currentConfig, fieldName)?.value ?? fallback;
+  }
+  function storeSequenceSelection() {
+    const sequenceId = sequencePreset.value || 'auto';
+    setSource('capacity_sequence_id', sequenceId);
+    if (capacitySequenceSeeds[sequenceId]) {
+      setSource('capacity_sequence_seed', capacitySequenceSeeds[sequenceId]);
+    }
   }
   function updateSequenceHint() {
     sequenceHint.textContent = sequencePreset.value === 'auto'
@@ -391,14 +407,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setSource('api_agent_count_per_group', haGroups ? 10 : 0);
     setSource('rl_agent_enabled', haGroups ? 1 : 0);
     setSource('rl_agent_count_per_group', haGroups ? 10 : 0);
-    setSource('accident_information_condition', customSelections[0].endsWith('I1') ? 'I1' : 'I0');
+    setSource('capacity_information_condition', customSelections[0].endsWith('I1') ? 'I1' : 'I0');
     customGroupTotals.textContent = `共 ${count} 组：${humans} 个 Human 登录席位 + ${agents} 个虚拟 Agent；每组总主体数 30。`;
     summary.innerHTML = customSelections.map((treatment, index) => {
       const members = treatment.startsWith('HA-')
         ? '10 Human + 10 LLM + 10 RL'
         : '30 Human';
       return `<div class="session-preset-summary__group"><b>G${String(index + 1).padStart(2, '0')} · ${treatment}</b><span>${members} · 总主体数 30</span></div>`;
-    }).join('') + '<p class="session-preset-summary__note">各组独立排队与结算，同轮共享上方选定的事故容量序列。</p>';
+    }).join('') + '<p class="session-preset-summary__note">各组独立排队与结算，同轮共享上方选定的随机服务率序列。</p>';
     summary.hidden = false;
   }
   function renderCustomRows() {
@@ -428,12 +444,12 @@ document.addEventListener('DOMContentLoaded', () => {
     singleControl.hidden = !singleVisible;
     if (singleVisible) singleCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
     if (dynamicVisible) {
-      const storedSequence = readSource('dynamic_capacity_sequence_preset', 'auto') || 'auto';
+      const storedSequence = readSource('capacity_sequence_id', 'auto') || 'auto';
       sequencePreset.options[0].disabled = formalVisible;
       sequencePreset.value = [...sequencePreset.options].some(
         option => option.value === storedSequence
       ) && !(formalVisible && storedSequence === 'auto') ? storedSequence : (formalVisible ? 'S01' : 'auto');
-      setSource('dynamic_capacity_sequence_preset', sequencePreset.value);
+      storeSequenceSelection();
       updateSequenceHint();
       dynamicEnabled.checked = readSource('api_agent_mode', 'off') === 'active';
       dynamicCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
@@ -468,7 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setSource('api_agent_count_per_group', singleCountInput.value || 1);
     }
     if (!dynamicAgentConfigs.has(currentConfig)) return;
-    setSource('dynamic_capacity_sequence_preset', sequencePreset.value || 'auto');
+    storeSequenceSelection();
     if (formalDynamicConfigs.has(currentConfig)) {
       syncCustomSpec();
       return;
@@ -553,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
     storeVisibleControls();
   });
   sequencePreset.addEventListener('change', () => {
-    setSource('dynamic_capacity_sequence_preset', sequencePreset.value || 'auto');
+    storeSequenceSelection();
     updateSequenceHint();
   });
   customGroupingEnabled.addEventListener('change', () => {

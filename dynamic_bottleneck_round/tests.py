@@ -350,7 +350,7 @@ class DynamicCapacityQueueTests(unittest.TestCase):
 
 
 class DynamicCostExportTests(unittest.TestCase):
-    def test_accident_cost_uses_only_queue_early_and_late_components(self):
+    def test_uniform_capacity_cost_uses_only_queue_early_and_late_components(self):
         calculator = getattr(dynamic_app, 'calculate_cost_components', None)
         self.assertIsNotNone(calculator)
 
@@ -412,11 +412,9 @@ class PublicFeedbackSnapshotTests(unittest.TestCase):
         self.group = SimpleNamespace(
             round_number=2,
             dynamic_capacity=3,
-            incident_occurred=False,
-            capacity_loss_ratio=0,
-            remaining_capacity_ratio=1,
+            capacity_level='medium',
             information_condition='I0',
-            accident_sequence_id='warmup',
+            capacity_sequence_id='warmup',
             get_players=lambda: self.players,
         )
         self.virtual_records = [
@@ -875,25 +873,25 @@ class PersistentDropoutSuspensionTests(unittest.TestCase):
 
 class DynamicPresentationContextTests(unittest.TestCase):
     def test_reveal_description_matches_i1(self):
-        config = dynamic_app.parse_accident_risk_config(
-            {'accident_information_condition': 'I1'}
+        config = dynamic_app.parse_stochastic_capacity_config(
+            {'capacity_information_condition': 'I1'}
         )
 
-        self.assertIn('事故是否发生', capacity_reveal_description(config))
+        self.assertIn('精确服务率', capacity_reveal_description(config))
 
     def test_reveal_description_matches_i0(self):
-        config = dynamic_app.parse_accident_risk_config(
-            {'accident_information_condition': 'I0'}
+        config = dynamic_app.parse_stochastic_capacity_config(
+            {'capacity_information_condition': 'I0'}
         )
 
-        self.assertIn('长期分布', capacity_reveal_description(config))
+        self.assertIn('均匀分布', capacity_reveal_description(config))
 
-    def test_queue_example_uses_expected_incident_capacity(self):
-        config = dynamic_app.parse_accident_risk_config({})
+    def test_queue_example_uses_uniform_distribution_mean(self):
+        config = dynamic_app.parse_stochastic_capacity_config({})
 
         example = comprehension_queue_example(config)
 
-        self.assertEqual(example['capacity'], config.expected_incident_capacity)
+        self.assertEqual(example['capacity'], config.theoretical_mean)
         self.assertGreater(example['wait_minutes'], 0)
         self.assertEqual(
             len(
@@ -923,7 +921,7 @@ class TemplateContractTests(unittest.TestCase):
             '单瓶颈示意',
             '居住地',
             '工作地',
-            '候选瓶颈服务率',
+            '随机瓶颈服务率',
             '规则测试',
             '固定行驶成本',
             '排队成本',
@@ -934,7 +932,7 @@ class TemplateContractTests(unittest.TestCase):
             '瓶颈服务率',
         ):
             self.assertIn(text, html)
-        self.assertIn('具体变化规律不会提前公布', html)
+        self.assertIn('1.33–4.00 主体/分钟的均匀分布', html)
         self.assertIn('{{ for item in capacity_states }}', html)
         self.assertIn('{{ capacity_reveal_description }}', html)
         self.assertNotIn('目标比例', html)
@@ -960,16 +958,16 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn('{{ example_arrival_time }}', html)
         self.assertEqual(html.count('class="question-card"'), 4)
 
-    def test_decision_has_separate_reveal_messages(self):
+    def test_decision_has_i0_and_i1_capacity_messages(self):
         html = self.template_text('Decision.html')
 
-        self.assertIn('{{ if capacity_revealed }}', html)
-        self.assertIn('{{ elif incident_status_revealed }}', html)
-        self.assertIn('本轮真实瓶颈服务率', html)
-        self.assertIn('本轮事故状态', html)
-        self.assertIn('本轮发生事故', html)
-        self.assertIn('本轮未发生事故', html)
+        self.assertIn('{{ if current_capacity_revealed }}', html)
+        self.assertIn('本轮瓶颈服务率', html)
+        self.assertIn('{{ actual_capacity_display }} 主体 / 分钟', html)
+        self.assertIn('通行能力等级：{{ capacity_level_label }}', html)
         self.assertIn('本轮服务率将在提交后公布', html)
+        self.assertNotIn('事故', html)
+        self.assertNotIn('incident', html)
         self.assertIn('请根据已经公布的历史结果作出选择', html)
         self.assertNotIn('{{ item.probability_percent }}%', html)
         self.assertIn('class="time-wheel"', html)
@@ -1085,9 +1083,13 @@ class SettingsContractTests(unittest.TestCase):
         required = {
             'session_code', 'participant_code', 'group_id', 'round_number',
             'treatment_condition', 'actor_composition', 'information_condition',
-            'incident_occurred', 'capacity_loss_ratio', 'remaining_capacity_ratio',
-            'dynamic_capacity', 'dynamic_capacity_state', 'accident_sequence_id',
-            'accident_sequence_seed', 'departure_slot', 'departure_minute',
+            'dynamic_capacity', 'capacity_level', 'capacity_distribution',
+            'capacity_min', 'capacity_max', 'capacity_sequence_id',
+            'capacity_sequence_seed', 'departure_slot', 'departure_minute',
+            'formal_round_number', 'actual_capacity',
+            'capacity_revealed_before_decision', 'departure_time',
+            'queue_delay', 'arrival_time', 'schedule_early', 'schedule_late',
+            'agent_policy_version', 'agent_fallback_reason',
             'queue_delay_minutes', 'arrival_minute', 'early_minutes', 'late_minutes',
             'total_cost', 'payoff', 'decision_source', 'timeout_happened',
             'departure_schedule_num_slots', 'departure_schedule_first_time',
@@ -1096,36 +1098,39 @@ class SettingsContractTests(unittest.TestCase):
         self.assertTrue(required.issubset(set(EXPORT_HEADERS)))
 
 
-class AccidentExperimentContractTests(unittest.TestCase):
-    def test_dynamic_settings_use_accident_risk_contract(self):
+class UniformCapacityExperimentContractTests(unittest.TestCase):
+    def test_dynamic_settings_use_uniform_capacity_contract(self):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         formal_names = ('dynamic_bottleneck_round_prod',)
         demo = configs['dynamic_bottleneck_round_demo']
         for config in [configs[name] for name in formal_names] + [demo]:
-            self.assertEqual(config['accident_normal_capacity'], 4.0)
-            self.assertEqual(config['accident_probability'], 0.20)
-            self.assertEqual(config['accident_loss_alpha'], 6.83057)
-            self.assertEqual(config['accident_loss_beta'], 4.05907)
+            self.assertEqual(config['capacity_distribution'], 'uniform')
+            self.assertEqual(config['capacity_min'], 1.33)
+            self.assertEqual(config['capacity_max'], 4.00)
+            self.assertEqual(config['capacity_sequence_seed'], 2026091101)
+            self.assertNotIn('accident_probability', config)
+            self.assertNotIn('accident_loss_alpha', config)
+            self.assertNotIn('accident_loss_beta', config)
             self.assertNotIn('dynamic_capacity_draw_mode', config)
             self.assertNotIn('dynamic_capacity_transition_matrix', config)
             self.assertNotIn('dynamic_capacity_values', config)
         for name in formal_names:
-            self.assertEqual(configs[name]['dynamic_capacity_sequence_preset'], 'S01')
-        self.assertEqual(demo['dynamic_capacity_sequence_preset'], 'auto')
+            self.assertEqual(configs[name]['capacity_sequence_id'], 'S01')
+        self.assertEqual(demo['capacity_sequence_id'], 'auto')
 
     def test_one_formal_scenario_contains_session_level_treatment_defaults(self):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         formal = configs['dynamic_bottleneck_round_prod']
-        self.assertEqual(formal['display_name'], '正式实验 · 事故风险动态瓶颈')
+        self.assertEqual(formal['display_name'], '正式实验 · 随机服务率动态瓶颈')
         self.assertEqual(formal['group_treatment_spec'], 'G01:H-I0')
         self.assertEqual(formal['num_demo_participants'], 30)
         self.assertEqual(formal['api_agent_count_per_group'], 0)
         self.assertEqual(formal['rl_agent_count_per_group'], 0)
-        self.assertEqual(formal['accident_information_condition'], 'I0')
+        self.assertEqual(formal['capacity_information_condition'], 'I0')
         self.assertEqual(formal['payoff_rounds'], 30)
         for retired in (
             'dynamic_bottleneck_round_prod_h_i0',
@@ -1164,9 +1169,13 @@ class AccidentExperimentContractTests(unittest.TestCase):
         return SimpleNamespace(
             config={
                 'name': name,
-                'accident_information_condition': (
+                'capacity_information_condition': (
                     'I1' if treatment.endswith('I1') else 'I0'
                 ),
+                'capacity_distribution': 'uniform',
+                'capacity_min': 1.33,
+                'capacity_max': 4.00,
+                'capacity_sequence_seed': 2026091101,
                 'api_agent_mode': api_mode,
                 'api_agent_count_per_group': api_count,
                 'rl_agent_enabled': rl_enabled,
@@ -1277,11 +1286,11 @@ class AccidentExperimentContractTests(unittest.TestCase):
             rl_enabled='1',
             rl_count=10,
         )
-        session.config['accident_information_condition'] = 'I0'
+        session.config['capacity_information_condition'] = 'I0'
 
         dynamic_app.configure_formal_treatments(session)
 
-        self.assertEqual(session.config['accident_information_condition'], 'I1')
+        self.assertEqual(session.config['capacity_information_condition'], 'I1')
         self.assertEqual(dynamic_app.information_condition_for_group(session, 1), 'I1')
 
     def test_demo_allows_smaller_actor_count(self):
@@ -1329,6 +1338,12 @@ class DynamicCapacityLifecycleTests(unittest.TestCase):
         self.assertEqual(len(records), 30)
         self.assertEqual(records[0]['sequence_id'], 'S01')
         self.assertEqual(records[-1]['formal_round_number'], 30)
+
+    def test_named_sequence_rejects_mismatched_config_seed(self):
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S02')
+
+        with self.assertRaisesRegex(ValueError, 'capacity_sequence_seed.*S02'):
+            dynamic_app.capacity_sequence_for_session(session)
 
     def test_initialization_stores_one_session_sequence_for_all_groups(self):
         session = self.make_session()
@@ -1642,7 +1657,7 @@ class DynamicContinuousQueueTests(unittest.TestCase):
         self.assertNotEqual(components['total_cost'], 0.67)
 
 
-class DynamicAccidentCostTests(unittest.TestCase):
+class DynamicUniformCapacityCostTests(unittest.TestCase):
     def test_cost_uses_only_queue_early_and_late_components(self):
         components = dynamic_app.calculate_cost_components(
             queue_delay=2,
@@ -1662,7 +1677,7 @@ class DynamicAccidentCostTests(unittest.TestCase):
             },
         )
 
-    def test_legacy_toll_argument_cannot_change_accident_cost(self):
+    def test_legacy_toll_argument_cannot_change_capacity_cost(self):
         without_toll = dynamic_app.calculate_cost_components(
             queue_delay=1,
             early_minutes=0,
@@ -1690,12 +1705,12 @@ class DynamicAccidentCostTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            dynamic_app.accident_incentives_for_slot(session, 8),
+            dynamic_app.capacity_incentives_for_slot(session, 8),
             {'reward_bonus': 0.0, 'coarse_toll_charge': 0.0},
         )
 
 
-class DynamicAccidentExportTests(unittest.TestCase):
+class DynamicUniformCapacityExportTests(unittest.TestCase):
     @staticmethod
     def make_player_and_group():
         session = SimpleNamespace(code='SESSION01', config={}, vars={})
@@ -1705,13 +1720,13 @@ class DynamicAccidentExportTests(unittest.TestCase):
             participant=participant,
             round_number=C.WARMUP_ROUNDS + 1,
             dynamic_capacity=1.50123456789,
-            dynamic_capacity_state='incident',
-            incident_occurred=True,
-            capacity_loss_ratio=0.6246913580275,
-            remaining_capacity_ratio=0.3753086419725,
+            capacity_level='low',
+            capacity_distribution='uniform',
+            capacity_min=1.33,
+            capacity_max=4.00,
             information_condition='I1',
-            accident_sequence_id='S01',
-            accident_sequence_seed=2026090801,
+            capacity_sequence_id='S01',
+            capacity_sequence_seed=2026091101,
             actor_composition='H',
             departure_slot=1,
             departure_minute=466,
@@ -1733,18 +1748,16 @@ class DynamicAccidentExportTests(unittest.TestCase):
             round_number=player.round_number,
             id_in_subsession=1,
             dynamic_capacity=player.dynamic_capacity,
-            incident_occurred=True,
-            capacity_loss_ratio=player.capacity_loss_ratio,
-            remaining_capacity_ratio=player.remaining_capacity_ratio,
+            capacity_level='low',
             information_condition='I1',
-            accident_sequence_id='S01',
-            accident_sequence_seed=2026090801,
+            capacity_sequence_id='S01',
+            capacity_sequence_seed=2026091101,
             get_players=lambda: [player],
         )
         player.group = group
         return player, group
 
-    def test_public_snapshot_contains_realized_accident_without_identity(self):
+    def test_public_snapshot_contains_realized_capacity_without_identity(self):
         player, group = self.make_player_and_group()
 
         snapshot = dynamic_app.public_feedback_snapshot_for_group(
@@ -1752,31 +1765,29 @@ class DynamicAccidentExportTests(unittest.TestCase):
             virtual_records=[],
         )
 
-        self.assertTrue(snapshot['incident_occurred'])
-        self.assertEqual(snapshot['capacity_loss_ratio'], player.capacity_loss_ratio)
-        self.assertEqual(
-            snapshot['remaining_capacity_ratio'],
-            player.remaining_capacity_ratio,
-        )
         self.assertEqual(snapshot['actual_capacity'], player.dynamic_capacity)
+        self.assertEqual(snapshot['capacity_level'], 'low')
+        self.assertEqual(snapshot['capacity_distribution'], 'uniform')
         self.assertEqual(snapshot['information_condition'], 'I1')
-        self.assertEqual(snapshot['accident_sequence_id'], 'S01')
+        self.assertNotIn('capacity_sequence_id', snapshot)
+        self.assertNotIn('capacity_sequence_seed', snapshot)
         serialized = json.dumps(snapshot, ensure_ascii=False)
         self.assertNotIn('participant_code', serialized)
         self.assertNotIn('actor_type', serialized)
         self.assertNotIn('agent_id', serialized)
 
-    def test_export_schema_uses_accident_treatment_fields_not_markov_fields(self):
+    def test_export_schema_uses_uniform_capacity_fields_not_legacy_fields(self):
         required = {
             'treatment_condition',
             'actor_composition',
             'information_condition',
-            'incident_occurred',
-            'capacity_loss_ratio',
-            'remaining_capacity_ratio',
             'dynamic_capacity',
-            'accident_sequence_id',
-            'accident_sequence_seed',
+            'capacity_level',
+            'capacity_distribution',
+            'capacity_min',
+            'capacity_max',
+            'capacity_sequence_id',
+            'capacity_sequence_seed',
         }
         removed = {
             'previous_round_capacity',
@@ -1787,20 +1798,24 @@ class DynamicAccidentExportTests(unittest.TestCase):
             'coarse_toll_calibration_capacity',
             'coarse_toll_points',
             'coarse_toll_charge',
+            'incident_occurred',
+            'capacity_loss_ratio',
+            'remaining_capacity_ratio',
+            'accident_sequence_id',
+            'accident_sequence_seed',
         }
 
         self.assertTrue(required.issubset(EXPORT_HEADERS))
         self.assertTrue(removed.isdisjoint(EXPORT_HEADERS))
 
-    def test_export_metadata_rounds_only_serialized_accident_values(self):
+    def test_export_metadata_rounds_only_serialized_capacity_values(self):
         player, _group = self.make_player_and_group()
 
-        metadata = dynamic_app.accident_export_metadata(player)
+        metadata = dynamic_app.capacity_export_metadata(player)
 
         self.assertEqual(metadata['treatment_condition'], 'H-I1')
-        self.assertEqual(metadata['capacity_loss_ratio'], 0.624691)
-        self.assertEqual(metadata['remaining_capacity_ratio'], 0.375309)
         self.assertEqual(metadata['dynamic_capacity'], 1.501235)
+        self.assertEqual(metadata['capacity_level'], 'low')
         self.assertEqual(player.dynamic_capacity, 1.50123456789)
 
     def test_human_export_rounds_continuous_results_to_six_decimals(self):
@@ -1812,6 +1827,7 @@ class DynamicAccidentExportTests(unittest.TestCase):
         ))
 
         self.assertEqual(exported['queue_delay_minutes'], 1.234568)
+        self.assertEqual(exported['queue_delay'], 1.234568)
         self.assertEqual(exported['arrival_minute'], 475.234568)
         self.assertEqual(exported['late_minutes'], 1.234568)
         self.assertEqual(exported['total_cost'], 8.641975)
@@ -1822,7 +1838,7 @@ class DynamicAccidentExportTests(unittest.TestCase):
         record = {
             'group_id': 1,
             'dynamic_capacity': 1.50123456789,
-            'dynamic_capacity_state': 'incident',
+            'capacity_level': 'low',
             'departure_slot': 3,
             'departure_minute': 468,
             'queue_delay_minutes': 2.34567891,
@@ -1844,25 +1860,26 @@ class DynamicAccidentExportTests(unittest.TestCase):
         self.assertEqual(exported['slot_load'], 3)
         self.assertEqual(exported['dynamic_capacity'], 1.501235)
         self.assertEqual(exported['queue_delay_minutes'], 2.345679)
+        self.assertEqual(exported['queue_delay'], 2.345679)
         self.assertEqual(exported['total_cost'], 21.419752)
 
 
-class DynamicAccidentPresentationBackendTests(unittest.TestCase):
+class DynamicCapacityPresentationBackendTests(unittest.TestCase):
     @staticmethod
-    def decision_context(information_condition, incident_occurred):
+    def decision_context(information_condition, actual_capacity=2.37):
         group = SimpleNamespace(
             round_number=C.WARMUP_ROUNDS + 1,
             id_in_subsession=1,
-            incident_occurred=incident_occurred,
-            dynamic_capacity=1.5 if incident_occurred else 4.0,
-            capacity_loss_ratio=0.625 if incident_occurred else 0.0,
-            remaining_capacity_ratio=0.375 if incident_occurred else 1.0,
-            accident_sequence_id='S01',
-            accident_sequence_seed=20260901,
+            dynamic_capacity=actual_capacity,
+            capacity_level=dynamic_app.capacity_level(actual_capacity),
+            capacity_sequence_id='S01',
+            capacity_sequence_seed=2026091101,
             session=SimpleNamespace(
                 config={
-                    'accident_information_condition': information_condition,
-                    'accident_normal_capacity': 4.0,
+                    'capacity_distribution': 'uniform',
+                    'capacity_min': 1.33,
+                    'capacity_max': 4.0,
+                    'capacity_information_condition': information_condition,
                 },
                 vars={},
             ),
@@ -1886,66 +1903,58 @@ class DynamicAccidentPresentationBackendTests(unittest.TestCase):
         ):
             return dynamic_app.Decision.vars_for_template(player)
 
-    def test_i1_decision_context_discloses_only_incident_boolean(self):
-        incident = self.decision_context('I1', True)
-        normal = self.decision_context('I1', False)
+    def test_i1_decision_context_discloses_exact_capacity_and_level(self):
+        context = self.decision_context('I1', 2.37)
 
-        self.assertTrue(incident['incident_status_revealed'])
-        self.assertEqual(incident['incident_status_text'], '本轮发生事故')
-        self.assertTrue(incident['incident_occurred'])
-        self.assertFalse(incident['capacity_revealed'])
-        self.assertNotIn('actual_capacity', incident)
-        self.assertNotIn('capacity_loss_ratio', incident)
-        self.assertEqual(normal['incident_status_text'], '本轮未发生事故')
-        self.assertFalse(normal['incident_occurred'])
-
-    def test_i0_decision_context_does_not_disclose_incident_status(self):
-        context = self.decision_context('I0', True)
-
-        self.assertFalse(context['incident_status_revealed'])
-        self.assertEqual(context['incident_status_text'], '')
+        self.assertTrue(context['current_capacity_revealed'])
+        self.assertEqual(context['actual_capacity'], 2.37)
+        self.assertEqual(context['actual_capacity_display'], '2.37')
+        self.assertEqual(context['capacity_level'], 'medium')
+        self.assertEqual(context['capacity_level_label'], '中')
         self.assertNotIn('incident_occurred', context)
-        self.assertNotIn('actual_capacity', context)
         self.assertNotIn('capacity_loss_ratio', context)
 
-    def test_capacity_rows_describe_iid_normal_and_incident_distribution(self):
-        config = dynamic_app.parse_accident_risk_config(
-            {
-                'normal_capacity': 4,
-                'incident_probability': 0.2,
-                'capacity_loss_alpha': 6.83057,
-                'capacity_loss_beta': 4.05907,
-                'information_condition': 'I1',
-            }
-        )
+    def test_i0_decision_context_does_not_disclose_capacity_or_level(self):
+        context = self.decision_context('I0', 2.37)
+
+        self.assertFalse(context['current_capacity_revealed'])
+        self.assertNotIn('actual_capacity', context)
+        self.assertNotIn('actual_capacity_display', context)
+        self.assertNotIn('capacity_level', context)
+        self.assertNotIn('capacity_level_label', context)
+
+    def test_capacity_rows_describe_three_equal_probability_ranges(self):
+        config = dynamic_app.parse_stochastic_capacity_config({})
 
         rows = dynamic_app.capacity_state_rows(config)
 
-        self.assertEqual([row['state'] for row in rows], ['normal', 'incident'])
-        self.assertEqual([row['probability'] for row in rows], [0.8, 0.2])
-        self.assertEqual(rows[0]['capacity'], 4.0)
-        self.assertAlmostEqual(
-            rows[1]['capacity'],
-            config.expected_incident_capacity,
-        )
+        self.assertEqual([row['state'] for row in rows], ['low', 'medium', 'high'])
+        self.assertEqual([row['label'] for row in rows], ['低', '中', '高'])
+        self.assertTrue(all(row['probability'] == 1 / 3 for row in rows))
+        self.assertEqual(rows[0]['range_label'], '1.33–2.21')
+        self.assertEqual(rows[-1]['range_label'], '3.11–4.00')
 
     def test_information_descriptions_match_i0_i1(self):
         descriptions = {
             condition: dynamic_app.capacity_reveal_description(
-                dynamic_app.parse_accident_risk_config(
-                    {'accident_information_condition': condition}
+                dynamic_app.parse_stochastic_capacity_config(
+                    {'capacity_information_condition': condition}
                 )
             )
             for condition in ('I0', 'I1')
         }
 
-        self.assertIn('长期分布', descriptions['I0'])
-        self.assertIn('事故是否发生', descriptions['I1'])
+        self.assertIn('均匀分布', descriptions['I0'])
+        self.assertIn('精确服务率', descriptions['I1'])
 
-    def test_warmup_capacity_is_normal_capacity(self):
-        config = dynamic_app.parse_accident_risk_config({'normal_capacity': 4.0})
+    def test_warmup_capacity_sequence_is_predeclared(self):
+        config = dynamic_app.parse_stochastic_capacity_config({})
 
-        self.assertEqual(dynamic_app.parse_warmup_capacity({}, config), 4.0)
+        self.assertEqual(
+            [dynamic_app.parse_warmup_capacity({}, config, round_number)
+             for round_number in range(1, 6)],
+            [1.33, 2.00, 2.67, 3.33, 4.00],
+        )
 
 
 class DynamicLegacyBackendRemovalTests(unittest.TestCase):
@@ -1965,13 +1974,15 @@ class DynamicLegacyBackendRemovalTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
 
-    def test_accident_bank_contains_no_legacy_sequence_schema(self):
+    def test_uniform_bank_contains_no_legacy_sequence_schema(self):
         bank_text = Path(
             dynamic_app.__file__
-        ).with_name('capacity_sequence_bank.json').read_text(encoding='utf-8')
+        ).with_name('uniform_capacity_sequence_bank.json').read_text(encoding='utf-8')
 
         self.assertNotIn('manual_sequence_spec', bank_text)
         self.assertNotIn('phased_markov', bank_text)
+        self.assertNotIn('incident_occurred', bank_text)
+        self.assertNotIn('capacity_loss_ratio', bank_text)
 
 
 class PlayerBot(Bot):
@@ -1982,7 +1993,7 @@ class PlayerBot(Bot):
             expect('开始前最后提醒', 'in', self.html)
             expect('同一轮内保持不变', 'in', self.html)
             expect('固定行驶成本', 'in', self.html)
-            expect('具体变化规律不会提前公布', 'in', self.html)
+            expect('均匀分布', 'in', self.html)
             yield Submission(Introduction, check_html=False)
             expect('同一小组、同一轮', 'in', self.html)
             yield Submission(ComprehensionCheck, check_html=False)
@@ -2002,17 +2013,16 @@ class PlayerBot(Bot):
         expect('data-poll="1500"', 'in', self.html)
         yield Submission(RoundStartSync, check_html=False)
 
-        accident_config = dynamic_app.parse_accident_risk_config(self.session.config)
+        capacity_config = dynamic_app.parse_stochastic_capacity_config(self.session.config)
         group_capacities = {player.dynamic_capacity for player in self.group.get_players()}
         expect(len(group_capacities), '==', 1)
         expect(self.player.dynamic_capacity, '>', 0)
-        expect(self.player.dynamic_capacity, '<=', accident_config.normal_capacity)
+        expect(self.player.dynamic_capacity, '<=', capacity_config.capacity_max)
         if phase['is_warmup']:
-            expect('本轮真实瓶颈服务率', 'in', self.html)
-            expect(self.player.dynamic_capacity, '==', accident_config.normal_capacity)
-        elif accident_config.information_condition == 'I1':
-            status = '本轮发生事故' if self.player.incident_occurred else '本轮未发生事故'
-            expect(status, 'in', self.html)
+            expect('本轮瓶颈服务率', 'in', self.html)
+        elif capacity_config.information_condition == 'I1':
+            expect('本轮精确服务率', 'in', self.html)
+            expect(f'{self.player.dynamic_capacity:.2f}', 'in', self.html)
 
         if self.case == 'same_time':
             chosen_minute = 474
@@ -2058,7 +2068,7 @@ class PlayerBot(Bot):
         )
         expect('上一轮服务率', 'in', self.html)
         expect('本轮真实瓶颈服务率', 'in', self.html)
-        expect(f'{self.player.dynamic_capacity} 人 / 1 分钟', 'in', self.html)
+        expect(f'{self.player.dynamic_capacity:.2f} 主体 / 分钟', 'in', self.html)
         expect('本轮成本与用时', 'in', self.html)
         expect('所有参与者的成本分布', 'in', self.html)
         expect('粗收费', 'in', self.html)

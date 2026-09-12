@@ -356,6 +356,18 @@ def _validated_bank_sequence(
             raise StochasticCapacityConfigError(
                 f'{sequence_id} stratum_index 必须从1到{FORMAL_ROUNDS}各出现一次。'
             )
+        stratum_width = (capacity_max - capacity_min) / FORMAL_ROUNDS
+        stratum_lower = capacity_min + (stratum_index - 1) * stratum_width
+        stratum_upper = capacity_min + stratum_index * stratum_width
+        rounding_half_unit = 0.005
+        if (
+            actual_capacity + rounding_half_unit < stratum_lower
+            or actual_capacity - rounding_half_unit > stratum_upper
+        ):
+            raise StochasticCapacityConfigError(
+                f'{sequence_id} 第{expected_round}轮 actual_capacity '
+                '不属于其 stratum_index 对应的等概率层。'
+            )
         strata.add(stratum_index)
         rounds.append(dict(raw_record))
     if strata != set(range(1, FORMAL_ROUNDS + 1)):

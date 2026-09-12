@@ -169,7 +169,6 @@ def choose_rl_departure(
     rewards,
     persona,
     known_current_capacity=None,
-    known_incident_status=None,
     policy_version=RL_POLICY_VERSION,
     decision_source='deepseek_fallback_rl',
 ) -> dict:
@@ -183,18 +182,6 @@ def choose_rl_departure(
         known = float(known_current_capacity)
         if known > 0:
             belief = {known: 1.0}
-    elif known_incident_status is not None:
-        desired_label = 'incident_expected' if known_incident_status else 'normal'
-        matching = [
-            capacity
-            for label, capacity in zip(
-                current['capacity_labels'],
-                current['capacity_values'],
-            )
-            if label == desired_label
-        ]
-        if matching:
-            belief = {float(matching[0]): 1.0}
     legal_slots = [dict(item) for item in available_slots]
     if not legal_slots:
         raise ValueError('RL fallback has no legal departure slots.')

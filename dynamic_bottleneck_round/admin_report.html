@@ -16,10 +16,10 @@
     </div>
   </div>
   <div class="report-grid">
-    <section class="report-card"><h4>各轮小组结果</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>服务率</th><th>状态</th><th>目标比例/概率</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>DeepSeek Agent</th><th>独立 RL 参与者</th><th>API 回退</th><th>RL 备用接管</th><th>出发时间分布</th></tr></thead><tbody>
-      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.dynamic_capacity_state }}</td><td>{{ row.capacity_probability }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.api_agent_count }}</td><td>{{ row.independent_rl_agent_count }}</td><td>{{ row.agent_fallback_count }}</td><td>{{ row.rl_fallback_count }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
+    <section class="report-card"><h4>各轮小组结果</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>服务率</th><th>等级</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>DeepSeek Agent</th><th>独立 RL 参与者</th><th>API 回退</th><th>RL 备用接管</th><th>出发时间分布</th></tr></thead><tbody>
+      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.capacity_level }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.api_agent_count }}</td><td>{{ row.independent_rl_agent_count }}</td><td>{{ row.agent_fallback_count }}</td><td>{{ row.rl_fallback_count }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
     </tbody></table></section>
-    <section class="report-card"><h4>服务率状态出现次数</h4><table class="report-table"><thead><tr><th>状态</th><th>出现次数</th></tr></thead><tbody>
+    <section class="report-card"><h4>服务率等级出现次数</h4><table class="report-table"><thead><tr><th>等级</th><th>出现次数</th></tr></thead><tbody>
       {{ for row in state_rows }}<tr><td>{{ row.state }}</td><td>{{ row.count }}</td></tr>{{ endfor }}
     </tbody></table></section>
   </div>

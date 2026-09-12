@@ -1,4 +1,4 @@
-"""Pure incident-conditioned Liu-REL departure-choice mechanics."""
+"""Pure uniform-capacity-conditioned Liu-REL departure-choice mechanics."""
 
 from __future__ import annotations
 
@@ -9,9 +9,12 @@ import random
 from typing import Iterable, Mapping, Sequence
 
 
-LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_incident_v2'
+LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_uniform_capacity_v1'
 INFORMATION_CONDITIONS = {'I0', 'I1'}
 PHI_FLOOR = 1e-9
+CAPACITY_KERNEL_BANDWIDTH = (4.00 - 1.33) / math.sqrt(12)
+# Treat observations within two frozen bandwidths as effective kernel support.
+CAPACITY_KERNEL_MIN_EFFECTIVE_WEIGHT = math.exp(-2)
 
 
 class LiuRELAlgorithmError(ValueError):
@@ -74,8 +77,6 @@ def valid_or_initial_liu_rel_state(state) -> dict:
             _positive_int(item.get('departure_slot'), 'departure_slot')
             _finite_float(item.get('total_cost'), 'total_cost')
             _positive_float(item.get('actual_capacity'), 'actual_capacity')
-            if not isinstance(item.get('incident_occurred'), bool):
-                return initial_liu_rel_state()
     except LiuRELAlgorithmError:
         return initial_liu_rel_state()
     return deepcopy(state)
@@ -87,7 +88,6 @@ def append_liu_rel_experience(
     formal_round_number,
     departure_slot,
     total_cost,
-    incident_occurred,
     actual_capacity,
     decision_source='',
     warmup=False,
@@ -113,7 +113,6 @@ def append_liu_rel_experience(
             'formal_round_number': round_number,
             'departure_slot': slot,
             'total_cost': cost,
-            'incident_occurred': bool(incident_occurred),
             'actual_capacity': capacity,
             'decision_source': str(decision_source or ''),
         }
@@ -127,7 +126,8 @@ def select_information_conditioned_experiences(
     experiences: Sequence[Mapping[str, object]],
     *,
     information_condition,
-    current_incident_occurred=None,
+    current_actual_capacity=None,
+    capacity_kernel_bandwidth=CAPACITY_KERNEL_BANDWIDTH,
 ) -> dict:
     condition = str(information_condition or '').strip().upper()
     if condition not in INFORMATION_CONDITIONS:
@@ -136,20 +136,31 @@ def select_information_conditioned_experiences(
     if condition == 'I0':
         return _selection(_unit_weighted(history), 'i0_all')
 
-    if current_incident_occurred is None:
-        raise LiuRELAlgorithmError(f'{condition} requires current incident status.')
-    incident = bool(current_incident_occurred)
-    same_status = [
-        item
-        for item in history
-        if bool(item.get('incident_occurred')) == incident
-    ]
-
-    if _distinct_slots(same_status) >= 2:
-        return _selection(
-            _unit_weighted(same_status),
-            'i1_incident' if incident else 'i1_normal',
+    if current_actual_capacity is None:
+        raise LiuRELAlgorithmError(f'{condition} requires current actual capacity.')
+    current_capacity = _positive_float(
+        current_actual_capacity,
+        'current actual capacity',
+    )
+    bandwidth = _positive_float(
+        capacity_kernel_bandwidth,
+        'capacity_kernel_bandwidth',
+    )
+    weighted = []
+    for item in history:
+        historical_capacity = _positive_float(
+            item.get('actual_capacity'),
+            'historical actual_capacity',
         )
+        weight = math.exp(
+            -((current_capacity - historical_capacity) ** 2)
+            / (2 * bandwidth**2)
+        )
+        if weight >= CAPACITY_KERNEL_MIN_EFFECTIVE_WEIGHT:
+            weighted.append({**item, 'weight': weight})
+
+    if _distinct_slots(weighted) >= 2:
+        return _selection(weighted, 'i1_capacity_kernel')
     if _distinct_slots(history) >= 2:
         return _selection(_unit_weighted(history), 'i1_backoff_i0')
     return _selection([], 'sparse')
@@ -287,7 +298,8 @@ def choose_liu_rel_departure(
     rel_random_seed,
     rel_initial_uniform_rounds=2,
     warmup=False,
-    current_incident_occurred=None,
+    current_actual_capacity=None,
+    capacity_kernel_bandwidth=CAPACITY_KERNEL_BANDWIDTH,
 ) -> dict:
     current = valid_or_initial_liu_rel_state(state)
     legal_slots = sorted(
@@ -335,7 +347,8 @@ def choose_liu_rel_departure(
         selection = select_information_conditioned_experiences(
             current['experiences'],
             information_condition=information_condition,
-            current_incident_occurred=current_incident_occurred,
+            current_actual_capacity=current_actual_capacity,
+            capacity_kernel_bandwidth=capacity_kernel_bandwidth,
         )
         context_level = selection['context_level']
         weighted = selection['experiences']
@@ -367,7 +380,7 @@ def choose_liu_rel_departure(
     return {
         'departure_slot': departure_slot,
         'decision_source': decision_source,
-        'reason': 'Incident-conditioned Liu-REL probability sample.',
+        'reason': 'Uniform-capacity-conditioned Liu-REL probability sample.',
         'policy_version': LIU_REL_POLICY_VERSION,
         'rounds_observed': int(current['rounds_observed']),
         'information_condition': str(information_condition).upper(),
@@ -379,6 +392,7 @@ def choose_liu_rel_departure(
         'effective_observation_count': effective_count,
         'rel_lambda': lambda_value,
         'rel_eta': eta,
+        'capacity_kernel_bandwidth': float(capacity_kernel_bandwidth),
         'random_seed_fingerprint': digest[:12],
     }
 
@@ -386,8 +400,7 @@ def choose_liu_rel_departure(
 def _softmax_source(context_level):
     return {
         'i0_all': 'liu_rel_softmax_i0',
-        'i1_incident': 'liu_rel_softmax_i1',
-        'i1_normal': 'liu_rel_softmax_i1',
+        'i1_capacity_kernel': 'liu_rel_softmax_i1_capacity_kernel',
         'i1_backoff_i0': 'liu_rel_softmax_i1_backoff_i0',
     }[context_level]
 

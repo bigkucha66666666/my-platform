@@ -209,15 +209,12 @@ class DynamicRLFallbackPolicyTests(unittest.TestCase):
         self.assertEqual(updated['last_own_public_result'], own_result)
 
 
-class AccidentRLFallbackPolicyTests(unittest.TestCase):
+class UniformCapacityRLFallbackPolicyTests(unittest.TestCase):
     def setUp(self):
         self.capacity_states = (
-            {'state': 'normal', 'capacity': 4.0, 'probability': 0.8},
-            {
-                'state': 'incident_expected',
-                'capacity': 1.490853959841,
-                'probability': 0.2,
-            },
+            {'state': 'low', 'capacity': 1.775, 'probability': 1 / 3},
+            {'state': 'medium', 'capacity': 2.665, 'probability': 1 / 3},
+            {'state': 'high', 'capacity': 3.555, 'probability': 1 / 3},
         )
         self.slots = (
             {'slot': 1, 'departure_minute': 473},
@@ -240,9 +237,9 @@ class AccidentRLFallbackPolicyTests(unittest.TestCase):
 
         self.assertEqual(
             state['capacity_values'],
-            [4.0, 1.490853959841],
+            [1.775, 2.665, 3.555],
         )
-        self.assertEqual(state['capacity_prior'], [0.8, 0.2])
+        self.assertEqual(state['capacity_prior'], [1 / 3, 1 / 3, 1 / 3])
         self.assertNotIn('transition_counts', state)
 
     def test_observation_accepts_any_realized_float_capacity(self):
@@ -261,7 +258,7 @@ class AccidentRLFallbackPolicyTests(unittest.TestCase):
         self.assertEqual(updated['rounds_observed'], 1)
         self.assertNotIn('transition_counts', updated)
 
-    def test_exact_i2_capacity_overrides_discrete_prior(self):
+    def test_exact_i1_capacity_overrides_discrete_prior(self):
         choice = choose_rl_departure(
             state=initial_rl_state(self.capacity_states),
             available_slots=self.slots,
@@ -275,22 +272,10 @@ class AccidentRLFallbackPolicyTests(unittest.TestCase):
 
         self.assertEqual(choice['belief'], {'1.375': 1.0})
 
-    def test_i1_incident_status_collapses_to_conditional_mean_capacity(self):
-        choice = choose_rl_departure(
-            state=initial_rl_state(self.capacity_states),
-            available_slots=self.slots,
-            cost_parameters=self.costs,
-            capacity_states=self.capacity_states,
-            tolls=(),
-            rewards=(),
-            persona=self.persona,
-            known_incident_status=True,
-        )
+    def test_incident_status_parameter_is_removed(self):
+        from inspect import signature
 
-        self.assertEqual(
-            choice['belief'],
-            {'1.490853959841': 1.0},
-        )
+        self.assertNotIn('known_incident_status', signature(choose_rl_departure).parameters)
 
 
 if __name__ == '__main__':

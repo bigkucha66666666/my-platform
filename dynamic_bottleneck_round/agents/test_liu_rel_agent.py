@@ -2,6 +2,7 @@ import math
 import unittest
 
 from dynamic_bottleneck_round.agents.liu_rel_agent import (
+    CAPACITY_KERNEL_BANDWIDTH,
     LIU_REL_POLICY_VERSION,
     append_liu_rel_experience,
     choose_liu_rel_departure,
@@ -14,12 +15,11 @@ from dynamic_bottleneck_round.agents.liu_rel_agent import (
 )
 
 
-def experience(round_number, slot, cost, incident, capacity):
+def experience(round_number, slot, cost, capacity):
     return {
         'formal_round_number': round_number,
         'departure_slot': slot,
         'total_cost': cost,
-        'incident_occurred': incident,
         'actual_capacity': capacity,
         'decision_source': 'liu_rel_softmax_i0',
     }
@@ -46,7 +46,7 @@ class LiuRELStateTests(unittest.TestCase):
     def test_version_mismatch_reinitializes_state(self):
         stale = initial_liu_rel_state()
         stale['policy_version'] = 'old'
-        stale['experiences'] = [experience(1, 4, 10, False, 4)]
+        stale['experiences'] = [experience(1, 4, 10, 4)]
 
         self.assertEqual(valid_or_initial_liu_rel_state(stale), initial_liu_rel_state())
 
@@ -58,7 +58,6 @@ class LiuRELStateTests(unittest.TestCase):
                 'formal_round_number': 1,
                 'departure_slot': 4,
                 'total_cost': 'not-a-number',
-                'incident_occurred': False,
                 'actual_capacity': 4,
             }
         ]
@@ -74,7 +73,6 @@ class LiuRELStateTests(unittest.TestCase):
             formal_round_number=1,
             departure_slot=4,
             total_cost=10,
-            incident_occurred=False,
             actual_capacity=4,
             decision_source='liu_rel_uniform_initial',
         )
@@ -84,7 +82,6 @@ class LiuRELStateTests(unittest.TestCase):
             formal_round_number=1,
             departure_slot=9,
             total_cost=99,
-            incident_occurred=True,
             actual_capacity=1.5,
             decision_source='rl_fallback_lowest_schedule_cost',
         )
@@ -100,7 +97,6 @@ class LiuRELStateTests(unittest.TestCase):
             formal_round_number=0,
             departure_slot=3,
             total_cost=8,
-            incident_occurred=False,
             actual_capacity=4,
             decision_source='liu_rel_uniform_warmup',
             warmup=True,
@@ -111,7 +107,7 @@ class LiuRELStateTests(unittest.TestCase):
 
 class LiuRELStatisticsTests(unittest.TestCase):
     def test_single_experience_has_zero_population_standard_deviation(self):
-        weighted = [{**experience(1, 3, 12, False, 4), 'weight': 0.4}]
+        weighted = [{**experience(1, 3, 12, 4), 'weight': 0.4}]
 
         statistics = weighted_cost_statistics_by_slot(weighted, rel_lambda=0.25)
 
@@ -121,8 +117,8 @@ class LiuRELStatisticsTests(unittest.TestCase):
 
     def test_weighted_mean_population_deviation_and_minus_lambda_propensity(self):
         weighted = [
-            {**experience(1, 3, 10, False, 4), 'weight': 1},
-            {**experience(2, 3, 14, True, 2), 'weight': 3},
+            {**experience(1, 3, 10, 4), 'weight': 1},
+            {**experience(2, 3, 14, 2), 'weight': 3},
         ]
 
         statistics = weighted_cost_statistics_by_slot(weighted, rel_lambda=0.25)
@@ -139,60 +135,75 @@ class LiuRELStatisticsTests(unittest.TestCase):
 class LiuRELConditioningTests(unittest.TestCase):
     def setUp(self):
         self.history = [
-            experience(1, 2, 11, False, 4.0),
-            experience(2, 5, 15, False, 4.0),
-            experience(3, 3, 20, True, 1.4),
-            experience(4, 6, 16, True, 2.0),
+            experience(1, 2, 11, 1.40),
+            experience(2, 5, 15, 2.20),
+            experience(3, 3, 20, 3.10),
+            experience(4, 6, 16, 4.00),
         ]
 
     def test_i0_uses_all_history_and_ignores_current_realization(self):
         first = select_information_conditioned_experiences(
             self.history,
             information_condition='I0',
-            current_incident_occurred=True,
+            current_actual_capacity=1.50,
         )
         second = select_information_conditioned_experiences(
             self.history,
             information_condition='I0',
-            current_incident_occurred=False,
+            current_actual_capacity=3.90,
         )
 
         self.assertEqual(first, second)
         self.assertEqual(first['context_level'], 'i0_all')
         self.assertTrue(all(item['weight'] == 1 for item in first['experiences']))
 
-    def test_i1_filters_only_by_current_incident_status(self):
+    def test_i1_weights_all_history_by_gaussian_capacity_distance(self):
+        current_capacity = 2.50
         selected = select_information_conditioned_experiences(
             self.history,
             information_condition='I1',
-            current_incident_occurred=True,
+            current_actual_capacity=current_capacity,
         )
 
-        self.assertEqual(selected['context_level'], 'i1_incident')
+        self.assertEqual(selected['context_level'], 'i1_capacity_kernel')
         self.assertEqual(
             [item['formal_round_number'] for item in selected['experiences']],
-            [3, 4],
+            [1, 2, 3, 4],
         )
-        self.assertTrue(all(item['weight'] == 1 for item in selected['experiences']))
+        for source, weighted in zip(self.history, selected['experiences']):
+            expected = math.exp(
+                -((current_capacity - source['actual_capacity']) ** 2)
+                / (2 * CAPACITY_KERNEL_BANDWIDTH**2)
+            )
+            self.assertAlmostEqual(weighted['weight'], expected)
 
-    def test_i1_falls_back_to_i0_when_same_status_has_fewer_than_two_slots(self):
-        history = self.history[:3]
+    def test_i1_requires_current_actual_capacity(self):
+        with self.assertRaisesRegex(ValueError, 'current actual capacity'):
+            select_information_conditioned_experiences(
+                self.history,
+                information_condition='I1',
+            )
 
+    def test_i1_falls_back_to_i0_when_kernel_has_fewer_than_two_weighted_slots(self):
+        history = [
+            experience(1, 2, 11, 3.00),
+            experience(2, 5, 15, 4.00),
+        ]
         selected = select_information_conditioned_experiences(
             history,
             information_condition='I1',
-            current_incident_occurred=True,
+            current_actual_capacity=1.33,
         )
 
         self.assertEqual(selected['context_level'], 'i1_backoff_i0')
-        self.assertEqual(len(selected['experiences']), 3)
+        self.assertEqual(len(selected['experiences']), 2)
 
     def test_i2_is_rejected_by_the_two_condition_policy(self):
         with self.assertRaisesRegex(ValueError, 'I0 or I1'):
             select_information_conditioned_experiences(
                 self.history,
                 information_condition='I2',
-                current_incident_occurred=True,
+                current_actual_capacity=2.50,
             )
 
 
@@ -288,7 +299,7 @@ class LiuRELChoiceTests(unittest.TestCase):
 
     def test_sparse_formal_history_uses_normal_uniform_policy(self):
         state = initial_liu_rel_state()
-        state['experiences'] = [experience(1, 4, 10, False, 4)]
+        state['experiences'] = [experience(1, 4, 10, 4)]
         state['rounds_observed'] = 1
 
         choice = choose_liu_rel_departure(
@@ -322,8 +333,8 @@ class LiuRELChoiceTests(unittest.TestCase):
     def test_softmax_choice_returns_complete_audit_without_full_seed(self):
         state = initial_liu_rel_state()
         state['experiences'] = [
-            experience(1, 4, 10, False, 4),
-            experience(2, 12, 20, True, 1.5),
+            experience(1, 4, 10, 4),
+            experience(2, 12, 20, 1.5),
         ]
         state['rounds_observed'] = 2
 
@@ -335,13 +346,34 @@ class LiuRELChoiceTests(unittest.TestCase):
 
         self.assertEqual(choice['decision_source'], 'liu_rel_softmax_i0')
         self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
-        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_incident_v2')
+        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_uniform_capacity_v1')
         self.assertEqual(choice['context_level'], 'i0_all')
         self.assertEqual(len(choice['propensities']), 16)
         self.assertEqual(len(choice['choice_probabilities']), 16)
         self.assertIn(str(choice['departure_slot']), choice['choice_probabilities'])
         self.assertNotIn(str(self.base['rel_random_seed']), str(choice))
-        self.assertNotIn('rel_capacity_bandwidth', choice)
+        self.assertAlmostEqual(
+            choice['capacity_kernel_bandwidth'],
+            CAPACITY_KERNEL_BANDWIDTH,
+        )
+
+    def test_i1_softmax_uses_current_capacity_kernel(self):
+        state = initial_liu_rel_state()
+        state['experiences'] = [
+            experience(1, 4, 10, 1.50),
+            experience(2, 12, 20, 3.50),
+        ]
+        state['rounds_observed'] = 2
+
+        choice = choose_liu_rel_departure(
+            state=state,
+            formal_round_number=3,
+            current_actual_capacity=2.50,
+            **{**self.base, 'information_condition': 'I1'},
+        )
+
+        self.assertEqual(choice['context_level'], 'i1_capacity_kernel')
+        self.assertEqual(choice['decision_source'], 'liu_rel_softmax_i1_capacity_kernel')
 
 
 if __name__ == '__main__':

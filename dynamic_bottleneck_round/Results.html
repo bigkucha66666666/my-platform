@@ -445,7 +445,7 @@
   <section class="result-overview" aria-label="本轮成本与用时">
     <div class="overview-head">
       <div class="personal-cost"><p class="result-kicker">本轮成本与用时</p><p class="result-total">{{ total_cost }} <small>最终选择成本</small></p></div>
-      <div class="capacity-result"><p class="result-kicker">本轮真实瓶颈服务率</p><p class="capacity-value">{{ dynamic_capacity }} 人 / {{ capacity_window_minutes }} 分钟</p><p class="capacity-previous">上一轮服务率：{{ previous_capacity_label }}</p></div>
+      <div class="capacity-result"><p class="result-kicker">本轮真实瓶颈服务率</p><p class="capacity-value">{{ dynamic_capacity }} 主体 / 分钟</p><p class="capacity-previous">通行能力等级：{{ capacity_level_label }} · 上一轮服务率：{{ previous_capacity_label }}</p></div>
     </div>
     <div class="time-summary">
       <div class="time-head"><span>{{ departure_time }} 出发</span><span>{{ arrival_time }} 到达</span></div>

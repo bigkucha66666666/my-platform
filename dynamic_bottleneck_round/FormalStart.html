@@ -10,8 +10,8 @@
 <section class="formal-notice">
   <p class="formal-kicker">FORMAL EXPERIMENT</p>
   <h2 class="formal-title">热身已结束</h2>
-  <p class="formal-copy">下一页开始进入正式实验。正式实验共 30 轮，后续选择和结果将进入正式数据。</p>
-  <p class="formal-reminder">请根据每轮可见信息独立作决策，并留意历史结果中的变化。</p>
+  <p class="formal-copy">下一页开始进入正式实验。正式实验共 30 轮，每轮服务率从 {{ capacity_min }}–{{ capacity_max }} 主体/分钟的均匀分布中确定，后续选择和结果将进入正式数据。</p>
+  <p class="formal-reminder">{{ capacity_reveal_description }} 请根据每轮可见信息独立作决策，并留意历史结果中的变化。</p>
   <button class="otree-btn-next btn btn-primary">进入正式实验</button>
 </section>
 {{ endblock }}

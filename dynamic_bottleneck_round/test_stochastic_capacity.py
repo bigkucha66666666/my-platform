@@ -228,6 +228,29 @@ class UniformSequenceBankTests(unittest.TestCase):
                     with self.assertRaises(StochasticCapacityConfigError):
                         load_uniform_capacity_sequence_bank(path)
 
+    def test_loader_rejects_capacity_outside_declared_equal_probability_stratum(self):
+        bank_path = Path(__file__).with_name('uniform_capacity_sequence_bank.json')
+        payload = json.loads(bank_path.read_text(encoding='utf-8'))
+        sequence = payload['sequences'][0]
+        record = next(
+            item for item in sequence['rounds']
+            if item['stratum_index'] == 1
+        )
+        record['actual_capacity'] = 4.00
+        record['capacity_level'] = 'high'
+        sequence['mean_actual_capacity'] = sum(
+            item['actual_capacity'] for item in sequence['rounds']
+        ) / FORMAL_ROUNDS
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'bank.json'
+            path.write_text(json.dumps(payload), encoding='utf-8')
+
+            with self.assertRaisesRegex(
+                StochasticCapacityConfigError,
+                'stratum',
+            ):
+                load_uniform_capacity_sequence_bank(path)
+
 
 if __name__ == '__main__':
     unittest.main()

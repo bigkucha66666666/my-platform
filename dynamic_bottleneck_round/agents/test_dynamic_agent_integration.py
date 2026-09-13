@@ -1639,8 +1639,8 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             encoding='utf-8'
         )
 
-        self.assertIn('{% extends "otree/BaseAdminRegular.html" %}', html)
-        self.assertNotIn('{% extends "otree/BaseAdmin.html" %}', html)
+        self.assertIn('{% extends "otree/BaseAdmin.html" %}', html)
+        self.assertNotIn('{% extends "otree/BaseAdminRegular.html" %}', html)
 
     def test_dynamic_controls_define_fixed_treatments_and_custom_builder(self):
         html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(

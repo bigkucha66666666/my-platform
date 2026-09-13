@@ -13,8 +13,6 @@ LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_uniform_capacity_v1'
 INFORMATION_CONDITIONS = {'I0', 'I1'}
 PHI_FLOOR = 1e-9
 CAPACITY_KERNEL_BANDWIDTH = (4.00 - 1.33) / math.sqrt(12)
-# Treat observations within two frozen bandwidths as effective kernel support.
-CAPACITY_KERNEL_MIN_EFFECTIVE_WEIGHT = math.exp(-2)
 
 
 class LiuRELAlgorithmError(ValueError):
@@ -156,8 +154,7 @@ def select_information_conditioned_experiences(
             -((current_capacity - historical_capacity) ** 2)
             / (2 * bandwidth**2)
         )
-        if weight >= CAPACITY_KERNEL_MIN_EFFECTIVE_WEIGHT:
-            weighted.append({**item, 'weight': weight})
+        weighted.append({**item, 'weight': weight})
 
     if _distinct_slots(weighted) >= 2:
         return _selection(weighted, 'i1_capacity_kernel')

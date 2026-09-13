@@ -184,9 +184,9 @@ class LiuRELConditioningTests(unittest.TestCase):
                 information_condition='I1',
             )
 
-    def test_i1_falls_back_to_i0_when_kernel_has_fewer_than_two_weighted_slots(self):
+    def test_i1_keeps_positive_kernel_weights_at_capacity_extremes(self):
         history = [
-            experience(1, 2, 11, 3.00),
+            experience(1, 2, 11, 1.33),
             experience(2, 5, 15, 4.00),
         ]
         selected = select_information_conditioned_experiences(
@@ -195,8 +195,16 @@ class LiuRELConditioningTests(unittest.TestCase):
             current_actual_capacity=1.33,
         )
 
-        self.assertEqual(selected['context_level'], 'i1_backoff_i0')
+        self.assertEqual(selected['context_level'], 'i1_capacity_kernel')
         self.assertEqual(len(selected['experiences']), 2)
+        self.assertEqual(selected['experiences'][0]['weight'], 1)
+        self.assertAlmostEqual(
+            selected['experiences'][1]['weight'],
+            math.exp(
+                -((1.33 - 4.00) ** 2)
+                / (2 * CAPACITY_KERNEL_BANDWIDTH**2)
+            ),
+        )
 
     def test_i2_is_rejected_by_the_two_condition_policy(self):
         with self.assertRaisesRegex(ValueError, 'I0 or I1'):

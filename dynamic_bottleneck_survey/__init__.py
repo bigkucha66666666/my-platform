@@ -81,6 +81,8 @@ EXPORT_HEADERS = [
     'dynamic_group_id',
     'dynamic_group_label',
     'treatment_group',
+    'information_condition',
+    'treatment_condition',
     'api_agent_count',
     'rl_agent_count',
     'pattern_recognition',
@@ -114,6 +116,8 @@ class Player(BasePlayer):
     dynamic_group_id = models.IntegerField(initial=0)
     dynamic_group_label = models.StringField(blank=True)
     treatment_group = models.StringField(blank=True)
+    information_condition = models.StringField(blank=True)
+    treatment_condition = models.StringField(blank=True)
     api_agent_count = models.IntegerField(initial=0)
     rl_agent_count = models.IntegerField(initial=0)
 
@@ -178,6 +182,27 @@ def treatment_group_for_player(player):
     return 'HA' if api_count + rl_count > 0 else 'H'
 
 
+def information_condition_for_player(player):
+    condition = str(
+        player.participant.vars.get(
+            'dynamic_bottleneck_information_condition',
+            '',
+        )
+        or ''
+    ).strip().upper()
+    if condition in {'I0', 'I1'}:
+        return condition
+    session_config = getattr(getattr(player, 'session', None), 'config', {})
+    for field_name in (
+        'capacity_information_condition',
+        'accident_information_condition',
+    ):
+        condition = str(session_config.get(field_name, '') or '').strip().upper()
+        if condition in {'I0', 'I1'}:
+            return condition
+    return ''
+
+
 def copy_experiment_metadata(player):
     player.dynamic_group_id = int(
         player.participant.vars.get('assigned_group_id', 0) or 0
@@ -186,6 +211,12 @@ def copy_experiment_metadata(player):
         player.participant.vars.get('assigned_group_label', '') or ''
     )
     player.treatment_group = treatment_group_for_player(player)
+    player.information_condition = information_condition_for_player(player)
+    player.treatment_condition = (
+        f'{player.treatment_group}-{player.information_condition}'
+        if player.information_condition
+        else player.treatment_group
+    )
     player.api_agent_count = int(
         player.participant.vars.get('dynamic_bottleneck_api_agent_count', 0) or 0
     )
@@ -283,6 +314,8 @@ def custom_export(players):
             player.dynamic_group_id,
             player.dynamic_group_label,
             player.treatment_group,
+            player.information_condition,
+            player.treatment_condition,
             player.api_agent_count,
             player.rl_agent_count,
             player.field_maybe_none('pattern_recognition') or '',

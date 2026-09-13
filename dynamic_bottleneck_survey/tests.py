@@ -28,9 +28,30 @@ class SurveyModelTests(unittest.TestCase):
             'agent_choice_influence',
             'agent_predictability_effect',
             'treatment_group',
+            'information_condition',
+            'treatment_condition',
             'dynamic_group_label',
         ):
             self.assertTrue(hasattr(player_class, field_name), field_name)
+
+    def test_experiment_metadata_preserves_full_two_by_two_treatment(self):
+        player = SimpleNamespace(
+            participant=SimpleNamespace(
+                vars={
+                    'assigned_group_id': 3,
+                    'assigned_group_label': 'G03',
+                    'dynamic_bottleneck_treatment_group': 'HA',
+                    'dynamic_bottleneck_information_condition': 'I1',
+                    'dynamic_bottleneck_api_agent_count': 10,
+                    'dynamic_bottleneck_rl_agent_count': 10,
+                }
+            )
+        )
+
+        survey_app.copy_experiment_metadata(player)
+
+        self.assertEqual(player.information_condition, 'I1')
+        self.assertEqual(player.treatment_condition, 'HA-I1')
 
     def test_notice_round_is_selection_from_none_or_formal_rounds(self):
         choices = getattr(survey_app, 'NOTICE_ROUND_CHOICES', None)
@@ -153,6 +174,8 @@ class SurveyFlowContractTests(unittest.TestCase):
             'participant_code',
             'dynamic_group_label',
             'treatment_group',
+            'information_condition',
+            'treatment_condition',
             'api_agent_count',
             'rl_agent_count',
             'pattern_recognition',

@@ -17,7 +17,11 @@
 
 不采用实验开始后重新执行 `set_group_matrix()`。oTree 的 `set_group_matrix()` 会删除并重建 Group，而当前动态瓶颈在 `creating_session` 中已经写入各轮容量、同步状态和处理元数据，后置重分组容易破坏这些数据。
 
-不修改 oTree 安装包的 Room 路由和标签解析逻辑。
+不修改 oTree 安装包文件。项目在 `access_gate` 加载时为启用
+`participant_label_assignment=sequential` 的 Session 安装严格标签查找保护：
+只允许匹配已预绑定 Participant 的精确标签，不允许 oTree 在未知标签上
+回退到第一个未访问 Participant。其他未启用该配置的旧 Session 仍保持
+oTree 默认行为。
 
 ## 3. 标签权威来源
 
@@ -84,6 +88,8 @@ G02 · HA-I0 · P031–P040
 
 - 不修改 `prod_room` 的名称、监控页面、标签文件或已有链接形式。
 - 正确的预绑定标签会被 oTree Room 解析到指定 Participant，与进入顺序无关。
+- 对本场未分配的标签（例如 40 人 Session 中的 P041），严格查找保护会在
+  Room 分配阶段直接拒绝，不覆盖 P001 或其他已预绑定标签。
 - `access_gate` 校验实际 Participant 标签与 `expected_room_label` 一致；不一致时不得进入动态瓶颈实验，并显示需要使用的正确标签。
 - 管理员只应向本场参与者分发界面显示的标签范围。标签文件中超出本场范围的标签保留给其他 Session，但不属于当前 Session。
 - 非 Room 启动仍可使用参与者专属链接，预绑定标签不会改变实验分组。
@@ -97,6 +103,7 @@ G02 · HA-I0 · P031–P040
 - Session Human 数量与处理配置不一致；
 - `participant_label_assignment` 不是 `sequential`；
 - 预绑定标签与 Participant 数量不一致。
+- Room 请求中的标签未预绑定给当前 Session 的任一 Participant。
 
 入口阶段检测到标签不一致时，不进行静默换组。
 
@@ -108,11 +115,12 @@ G02 · HA-I0 · P031–P040
 2. I0 标签范围为 P001–P030 和 P031–P040；I1 相同。
 3. P040 先于 P001 进入时，两者仍属于预定组。
 4. 标签文件不足、重复或配置人数不一致时立即报错。
-5. H 组有 30 个 Human；HA 组有 10 Human、10 LLM、10 RL。
-6. 同一 Session 两组同轮共享服务率，但排队与成本独立。
-7. Room 管理页面继续显示标签在线状态和 Session 监控链接。
-8. 原有 258 项回归测试通过。
-9. 在 `otree_env` 中完成一次 40 人、两组、35 轮正式 Session 创建和 Bot 流程。
+5. P041 进入 40 人 Session 时被拒绝，且 P001 的预绑定保持不变。
+6. H 组有 30 个 Human；HA 组有 10 Human、10 LLM、10 RL。
+7. 同一 Session 两组同轮共享服务率，但排队与成本独立。
+8. Room 管理页面继续显示标签在线状态和 Session 监控链接。
+9. 原有回归测试与新增严格查找测试通过。
+10. 在 `otree_env` 中完成一次 40 人、两组、35 轮正式 Session 创建和 Bot 流程。
 
 ## 10. 非目标
 

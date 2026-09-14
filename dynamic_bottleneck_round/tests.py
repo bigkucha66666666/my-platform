@@ -1126,8 +1126,13 @@ class UniformCapacityExperimentContractTests(unittest.TestCase):
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         formal = configs['dynamic_bottleneck_round_prod']
         self.assertEqual(formal['display_name'], '正式实验 · 随机服务率动态瓶颈')
-        self.assertEqual(formal['group_treatment_spec'], 'G01:H-I0')
-        self.assertEqual(formal['num_demo_participants'], 30)
+        self.assertEqual(
+            formal['group_treatment_spec'],
+            'G01:H-I0;G02:HA-I0',
+        )
+        self.assertEqual(formal['num_demo_participants'], 40)
+        self.assertEqual(formal['participant_label_file'], '_rooms/econ101.txt')
+        self.assertEqual(formal['participant_label_assignment'], 'sequential')
         self.assertEqual(formal['api_agent_count_per_group'], 0)
         self.assertEqual(formal['rl_agent_count_per_group'], 0)
         self.assertEqual(formal['capacity_information_condition'], 'I0')

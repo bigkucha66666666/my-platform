@@ -26,6 +26,11 @@ from .stochastic_capacity import (
     parse_stochastic_capacity_config,
     stochastic_capacity_public_context,
 )
+from .room_label_assignment import (
+    build_sequential_label_plan,
+    flatten_label_plan,
+    load_room_labels,
+)
 from .agents.deepseek_agent import (
     AgentChoice,
     AgentChoiceSet,
@@ -90,6 +95,7 @@ INDEPENDENT_RL_DECISIONS_PARTICIPANT_VAR = (
 API_AGENT_MEMORY_PARTICIPANT_VAR = 'dynamic_bottleneck_round_api_agent_memory_v1'
 GROUP_AGENT_COUNTS_SESSION_VAR = 'dynamic_bottleneck_round_group_agent_counts_v1'
 GROUP_TREATMENTS_SESSION_VAR = 'dynamic_bottleneck_round_group_treatments_v1'
+ROOM_LABEL_PLAN_SESSION_VAR = 'dynamic_bottleneck_round_room_label_plan_v1'
 FORMAL_SESSION_CONFIG_NAMES = {
     'dynamic_bottleneck_round_prod',
 }
@@ -1088,6 +1094,43 @@ def build_treatment_group_matrix(players, treatments):
     return matrix
 
 
+def assign_formal_room_labels(players, treatments, session_config):
+    """Pre-bind ordered Room labels before creating the treatment matrix."""
+
+    assignment_mode = str(
+        session_config.get('participant_label_assignment', '') or ''
+    ).strip().lower()
+    if assignment_mode != 'sequential':
+        raise ValueError(
+            'participant_label_assignment 必须为 sequential，'
+            '才能按实验标签顺序固定分组。'
+        )
+
+    configured_path = str(
+        session_config.get('participant_label_file', '') or ''
+    ).strip()
+    if not configured_path:
+        raise ValueError('participant_label_file 不能为空。')
+    label_path = Path(configured_path)
+    if not label_path.is_absolute():
+        label_path = Path(__file__).resolve().parent.parent / label_path
+
+    plan = build_sequential_label_plan(
+        load_room_labels(label_path),
+        treatments,
+    )
+    ordered_labels = flatten_label_plan(plan)
+    if len(players) != len(ordered_labels):
+        raise ValueError(
+            f'Room 标签分组计划需要 {len(ordered_labels)} 名 Human，'
+            f'当前 Session 有 {len(players)} 名。'
+        )
+    for player, label in zip(players, ordered_labels):
+        player.participant.set_label(label)
+        player.participant.vars['expected_room_label'] = label
+    return plan
+
+
 def parse_manual_grouping_spec(spec):
     groups = []
     for raw_group in str(spec or '').replace('\n', ';').split(';'):
@@ -1309,6 +1352,14 @@ def creating_session(subsession):
         players = subsession.get_players()
         if is_formal_session(subsession.session):
             treatments = configure_formal_treatments(subsession.session)
+            label_plan = assign_formal_room_labels(
+                players,
+                treatments,
+                subsession.session.config,
+            )
+            subsession.session.vars[ROOM_LABEL_PLAN_SESSION_VAR] = deepcopy(
+                label_plan
+            )
             matrix = build_treatment_group_matrix(players, treatments)
             grouping_enabled = len(matrix) > 1
         else:

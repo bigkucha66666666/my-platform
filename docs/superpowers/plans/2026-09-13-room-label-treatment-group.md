@@ -4,7 +4,7 @@
 
 **Goal:** Make Room participant labels deterministically select H/HA treatment groups regardless of entry order, and add paired I0/I1 Session presets with explicit label ranges.
 
-**Architecture:** Add a pure label-assignment module that loads the configured Room label file, validates it, and binds labels to the already ordered oTree Participant records before the round-1 group matrix is created. Keep oTree Room unchanged: its existing exact-label lookup will resolve each arriving label to the pre-bound Participant. Expose the derived contiguous ranges in the formal Session controls and audit the expected label at the access gate.
+**Architecture:** Add a pure label-assignment module that loads the configured Room label file, validates it, and binds labels to the already ordered oTree Participant records before the round-1 group matrix is created. Leave the installed oTree package unchanged, but install a project-level strict lookup wrapper for sequential sessions so unknown labels cannot trigger oTree's unvisited-participant fallback. Expose the derived contiguous ranges in the formal Session controls and audit the expected label at the access gate.
 
 **Tech Stack:** Python 3.10, oTree, unittest, oTree templates with vanilla JavaScript, conda environment `otree_env`.
 
@@ -127,6 +127,7 @@ Expected: all tests pass.
 
 **Files:**
 - Modify: `access_gate/__init__.py`
+- Create: `access_gate/strict_room_labels.py`
 - Create: `access_gate/test_label_validation.py`
 
 - [ ] **Step 1: Write failing validation tests**
@@ -150,6 +151,9 @@ expected_label = player.participant.vars.get('expected_room_label')
 if expected_label and player.participant.label != expected_label:
     return f'当前入口标签不正确，请使用 {expected_label} 进入实验房间。'
 ```
+
+同时对 `participant_label_assignment=sequential` 的 Session 安装精确标签查找保护，
+使未分配标签在 Room 路由阶段直接返回空，不回退并覆盖第一个未访问 Participant。
 
 - [ ] **Step 4: Verify access-gate tests GREEN**
 

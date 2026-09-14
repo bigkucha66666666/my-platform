@@ -1,4 +1,8 @@
 from otree.api import *
+from .strict_room_labels import install_strict_room_label_lookup
+
+
+install_strict_room_label_lookup()
 
 
 doc = """
@@ -35,6 +39,13 @@ class AccessGate(Page):
             return '系统未配置实验口令，请联系管理员。'
         if values['access_password'] != expected:
             return '口令错误，请重试。'
+        expected_label = player.participant.vars.get('expected_room_label')
+        actual_label = player.participant.label
+        if expected_label and actual_label != expected_label:
+            return (
+                f'当前入口标签不正确，请使用 {expected_label} '
+                '进入实验房间。'
+            )
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):

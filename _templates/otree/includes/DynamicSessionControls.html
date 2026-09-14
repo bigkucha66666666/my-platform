@@ -18,7 +18,7 @@
   .session-shortcuts__heading p { margin: 0; color: #66756f; font-size: 12px; }
   .session-presets {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 9px;
   }
   .session-preset {
@@ -142,6 +142,16 @@
     <p>点击后自动填写；完整参数仍可在下方继续修改</p>
   </div>
   <div class="session-presets" role="group" aria-label="动态瓶颈快捷实验方案">
+    <button type="button" class="session-preset" data-preset="PAIR-I0">
+      <span class="session-preset__tag">同场对比 · I0</span>
+      <strong>H-I0 + HA-I0</strong>
+      <small>40 个 Human 登录席位 · P001–P040</small>
+    </button>
+    <button type="button" class="session-preset" data-preset="PAIR-I1">
+      <span class="session-preset__tag">同场对比 · I1</span>
+      <strong>H-I1 + HA-I1</strong>
+      <small>40 个 Human 登录席位 · P001–P040</small>
+    </button>
     <button type="button" class="session-preset" data-preset="H-I0">
       <span class="session-preset__tag">H-I0</span>
       <strong>Human · 仅知均匀分布</strong>
@@ -293,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'grouping_enabled', 'manual_grouping_spec', 'group_agent_spec',
     'group_treatment_spec', 'capacity_information_condition',
     'capacity_sequence_id', 'capacity_sequence_seed',
+    'participant_label_file', 'participant_label_assignment',
   ];
   const replacedAgentFields = new Set([
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
@@ -315,6 +326,10 @@ document.addEventListener('DOMContentLoaded', () => {
       ?.closest('tr')?.setAttribute('hidden', 'hidden');
     sourceFor(configName, 'group_treatment_spec')
       ?.closest('tr')?.setAttribute('hidden', 'hidden');
+    sourceFor(configName, 'participant_label_file')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
+    sourceFor(configName, 'participant_label_assignment')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
   }
   if ([...activeAgentConfigs, ...dynamicAgentConfigs].some(
     configName => !sourceFor(configName, 'api_agent_count_per_group')
@@ -328,24 +343,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentConfig = '';
   let applyingPreset = false;
-  let selectedPreset = 'H-I0';
-  let customSelections = ['H-I0'];
+  let selectedPreset = 'PAIR-I0';
+  let customSelections = ['H-I0', 'HA-I0'];
   const presets = {
+    'PAIR-I0': {
+      humans: 40,
+      treatments: ['H-I0', 'HA-I0'],
+      groups: [
+        ['G01 · H-I0 · P001–P030', '30 Human · 总主体数 30'],
+        ['G02 · HA-I0 · P031–P040', '10 Human + 10 LLM + 10 RL · 总主体数 30'],
+      ],
+    },
+    'PAIR-I1': {
+      humans: 40,
+      treatments: ['H-I1', 'HA-I1'],
+      groups: [
+        ['G01 · H-I1 · P001–P030', '30 Human · 总主体数 30'],
+        ['G02 · HA-I1 · P031–P040', '10 Human + 10 LLM + 10 RL · 总主体数 30'],
+      ],
+    },
     'H-I0': {
       humans: 30,
-      groups: [['G01 · H-I0', '30 Human · 总主体数 30']],
+      treatments: ['H-I0'],
+      groups: [['G01 · H-I0 · P001–P030', '30 Human · 总主体数 30']],
     },
     'H-I1': {
       humans: 30,
-      groups: [['G01 · H-I1', '30 Human · 总主体数 30']],
+      treatments: ['H-I1'],
+      groups: [['G01 · H-I1 · P001–P030', '30 Human · 总主体数 30']],
     },
     'HA-I0': {
       humans: 10,
-      groups: [['G01 · HA-I0', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
+      treatments: ['HA-I0'],
+      groups: [['G01 · HA-I0 · P001–P010', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
     },
     'HA-I1': {
       humans: 10,
-      groups: [['G01 · HA-I1', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
+      treatments: ['HA-I1'],
+      groups: [['G01 · HA-I1 · P001–P010', '10 Human + 10 LLM + 10 RL · 总主体数 30']],
     },
   };
   const formalScenarioConfig = 'dynamic_bottleneck_round_prod';
@@ -384,6 +419,26 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     return values.length ? values : ['H-I0'];
   }
+  function humanCountForTreatment(treatment) {
+    return treatment.startsWith('HA-') ? 10 : 30;
+  }
+  function formatRoomLabel(position) {
+    return `P${String(position).padStart(3, '0')}`;
+  }
+  function labelRangeForGroup(start, humanCount) {
+    const first = formatRoomLabel(start);
+    const last = formatRoomLabel(start + humanCount - 1);
+    return first === last ? first : `${first}–${last}`;
+  }
+  function presetCodeForTreatments(treatments) {
+    for (const [code, preset] of Object.entries(presets)) {
+      if (preset.treatments.length === treatments.length
+          && preset.treatments.every((value, index) => value === treatments[index])) {
+        return code;
+      }
+    }
+    return 'CUSTOM';
+  }
   function syncCustomSpec() {
     const count = customGroupingEnabled.checked
       ? Math.max(1, Number.parseInt(customGroupCount.value, 10) || 1)
@@ -409,11 +464,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setSource('rl_agent_count_per_group', haGroups ? 10 : 0);
     setSource('capacity_information_condition', customSelections[0].endsWith('I1') ? 'I1' : 'I0');
     customGroupTotals.textContent = `共 ${count} 组：${humans} 个 Human 登录席位 + ${agents} 个虚拟 Agent；每组总主体数 30。`;
+    let nextLabelNumber = 1;
     summary.innerHTML = customSelections.map((treatment, index) => {
+      const humanCount = humanCountForTreatment(treatment);
+      const labelRange = labelRangeForGroup(nextLabelNumber, humanCount);
+      nextLabelNumber += humanCount;
       const members = treatment.startsWith('HA-')
         ? '10 Human + 10 LLM + 10 RL'
         : '30 Human';
-      return `<div class="session-preset-summary__group"><b>G${String(index + 1).padStart(2, '0')} · ${treatment}</b><span>${members} · 总主体数 30</span></div>`;
+      return `<div class="session-preset-summary__group"><b>G${String(index + 1).padStart(2, '0')} · ${treatment} · ${labelRange}</b><span>${members} · 总主体数 30</span></div>`;
     }).join('') + '<p class="session-preset-summary__note">各组独立排队与结算，同轮共享上方选定的随机服务率序列。</p>';
     summary.hidden = false;
   }
@@ -460,10 +519,8 @@ document.addEventListener('DOMContentLoaded', () => {
       independentRlCountWrap.hidden = !independentRlEnabled.checked;
       if (formalVisible) {
         customSelections = parseStoredTreatments();
-        selectedPreset = customSelections.length === 1
-          ? customSelections[0]
-          : 'CUSTOM';
-        customGroupingEnabled.checked = selectedPreset === 'CUSTOM';
+        selectedPreset = presetCodeForTreatments(customSelections);
+        customGroupingEnabled.checked = customSelections.length > 1;
         customGroupCount.disabled = !customGroupingEnabled.checked;
         customGroupCount.value = String(customSelections.length);
         customBuilder.hidden = selectedPreset !== 'CUSTOM';
@@ -518,10 +575,10 @@ document.addEventListener('DOMContentLoaded', () => {
       customBuilder.hidden = false;
       renderCustomRows();
     } else {
-      customSelections = [code];
-      customGroupingEnabled.checked = false;
-      customGroupCount.disabled = true;
-      customGroupCount.value = '1';
+      customSelections = [...preset.treatments];
+      customGroupingEnabled.checked = customSelections.length > 1;
+      customGroupCount.disabled = !customGroupingEnabled.checked;
+      customGroupCount.value = String(customSelections.length);
       customBuilder.hidden = true;
       participantInput.value = String(preset.humans);
       syncCustomSpec();

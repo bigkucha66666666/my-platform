@@ -252,7 +252,9 @@ SESSION_CONFIGS = [
             '各组独立排队和结算，同轮共享同一条随机服务率序列。'
         ),
         participant_password=PROD_PARTICIPANT_PASSWORD,
-        group_treatment_spec='G01:H-I0',
+        participant_label_file='_rooms/econ101.txt',
+        participant_label_assignment='sequential',
+        group_treatment_spec='G01:H-I0;G02:HA-I0',
         capacity_information_condition='I0',
         api_agent_mode='off',
         api_agent_count_per_group=0,
@@ -260,7 +262,7 @@ SESSION_CONFIGS = [
         rl_agent_count_per_group=0,
         rel_parameters_frozen=1,
         capacity_sequence_id='S01',
-        num_demo_participants=30,
+        num_demo_participants=40,
     ),
     dict(
         DYNAMIC_BOTTLENECK_ROUND_COMMON,

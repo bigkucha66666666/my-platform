@@ -687,12 +687,20 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
     def test_first_formal_round_does_not_receive_warmup_history(self):
         group, participant = self.make_record_group()
-        group.round_number = 6
+        group.round_number = app.C.WARMUP_ROUNDS + 1
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '5': {'round_number': 5, 'dynamic_capacity': 2},
+            str(app.C.WARMUP_ROUNDS): {
+                'round_number': app.C.WARMUP_ROUNDS,
+                'dynamic_capacity': 2,
+            },
         }
         participant.vars[app.AGENT_DECISIONS_PARTICIPANT_VAR] = {
-            '5': [{'agent_id': 'G01_API_01', 'round_number': 5}],
+            str(app.C.WARMUP_ROUNDS): [
+                {
+                    'agent_id': 'G01_API_01',
+                    'round_number': app.C.WARMUP_ROUNDS,
+                }
+            ],
         }
 
         self.assertEqual(
@@ -1140,7 +1148,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         group = SimpleNamespace(
             session=session,
-            round_number=6,
+            round_number=app.C.WARMUP_ROUNDS + 1,
             id_in_subsession=1,
             dynamic_capacity=3,
             get_players=lambda: [player],
@@ -1152,7 +1160,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'decision_source': 'deepseek_api',
         }
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '6': {
+            str(group.round_number): {
                 'round_number': 1,
                 'dynamic_capacity': 3,
                 'departure_outcomes': [
@@ -1195,7 +1203,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'rl_fallback_enabled': 1,
         })
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '6': {
+            str(group.round_number): {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1236,7 +1244,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'departure_slot': 2,
         }
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '6': {
+            str(group.round_number): {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1310,7 +1318,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         player.field_maybe_none = lambda field_name: getattr(player, field_name, None)
         group = SimpleNamespace(
             session=session,
-            round_number=6,
+            round_number=app.C.WARMUP_ROUNDS + 1,
             id_in_subsession=1,
             dynamic_capacity=2,
             capacity_level='low',
@@ -1383,7 +1391,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         records[0]['total_cost'] = 5
         records[1]['total_cost'] = 17
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '6': {
+            str(group.round_number): {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1412,7 +1420,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         records[0]['total_cost'] = 5
         records[1]['total_cost'] = 17
         participant.vars[app.PUBLIC_FEEDBACK_PARTICIPANT_VAR] = {
-            '6': {
+            str(group.round_number): {
                 'round_number': 1,
                 'dynamic_capacity': 2,
                 'departure_outcomes': [
@@ -1639,8 +1647,8 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             encoding='utf-8'
         )
 
-        self.assertIn('{% extends "otree/BaseAdmin.html" %}', html)
-        self.assertNotIn('{% extends "otree/BaseAdminRegular.html" %}', html)
+        self.assertIn('{% extends "otree/BaseAdminRegular.html" %}', html)
+        self.assertNotIn('{% extends "otree/BaseAdmin.html" %}', html)
 
     def test_dynamic_controls_define_fixed_treatments_and_custom_builder(self):
         html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
@@ -1674,6 +1682,34 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             'dynamic_bottleneck_round_prod_custom',
         ):
             self.assertNotIn(retired, html)
+
+    def test_dynamic_controls_offer_separate_manual_flow_preview(self):
+        html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
+            encoding='utf-8'
+        )
+
+        for value in (
+            '手动流程预览',
+            'flow-preview-enabled',
+            'flow-preview-participant-count',
+            'flow-preview-information-condition',
+            'flow_preview_enabled',
+            '<option value="I0">',
+            '<option value="I1">',
+        ):
+            with self.subTest(value=value):
+                self.assertIn(value, html)
+
+    def test_flow_preview_does_not_overwrite_rl_fallback_preference(self):
+        html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
+            encoding='utf-8'
+        )
+        preview_function = html.split('function syncFlowPreview()', 1)[1].split(
+            'function renderCustomRows()',
+            1,
+        )[0]
+
+        self.assertNotIn("setSource('rl_fallback_enabled'", preview_function)
 
     def test_create_session_page_has_dynamic_agent_toggle(self):
         html = Path(

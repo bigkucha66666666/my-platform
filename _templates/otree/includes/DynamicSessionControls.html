@@ -113,6 +113,39 @@
   }
   .custom-group-row label { margin: 0; font-weight: 700; }
   .custom-group-builder__totals { margin: 12px 0 0; color: #40544e; }
+  .flow-preview-builder {
+    margin-top: 15px;
+    padding: 15px;
+    border: 1px dashed #b7c8c2;
+    border-radius: 5px;
+    background: #fdfefe;
+  }
+  .flow-preview-builder__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .flow-preview-builder__heading strong { color: #263a35; }
+  .flow-preview-builder__fields {
+    display: grid;
+    grid-template-columns: minmax(150px, 220px) minmax(240px, 1fr);
+    gap: 14px;
+    margin-top: 13px;
+  }
+  .flow-preview-builder__fields label {
+    display: block;
+    margin-bottom: 6px;
+    color: #263a35;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .flow-preview-builder__note {
+    margin: 11px 0 0;
+    color: #65736f;
+    font-size: 12px;
+    line-height: 1.5;
+  }
   .session-agent-control {
     margin: 0 0 20px;
     padding: 15px 17px;
@@ -132,7 +165,8 @@
     .session-shortcuts__heading { display: block; }
     .session-shortcuts__heading p { margin-top: 5px; }
     .session-presets, .session-preset-summary, .session-agent-control__grid,
-    .session-sequence-control, .custom-group-row { grid-template-columns: 1fr; }
+    .session-sequence-control, .custom-group-row,
+    .flow-preview-builder__fields { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -192,6 +226,32 @@
     </div>
     <div id="custom-group-rows" class="custom-group-builder__rows"></div>
     <p id="custom-group-totals" class="custom-group-builder__totals"></p>
+  </div>
+  <div id="flow-preview-builder" class="flow-preview-builder">
+    <div class="flow-preview-builder__heading">
+      <div>
+        <strong>手动流程预览</strong>
+        <p class="flow-preview-builder__note">用少量 Human 账号走完正式场景页面，不作为正式实验样本。</p>
+      </div>
+      <div class="form-check form-switch">
+        <input id="flow-preview-enabled" class="form-check-input" type="checkbox" role="switch">
+        <label class="form-check-label" for="flow-preview-enabled">启用预览</label>
+      </div>
+    </div>
+    <div id="flow-preview-fields" class="flow-preview-builder__fields" hidden>
+      <div>
+        <label for="flow-preview-participant-count">预览人数</label>
+        <input id="flow-preview-participant-count" class="form-control" type="number" min="1" max="30" step="1" value="1">
+      </div>
+      <div>
+        <label for="flow-preview-information-condition">信息条件</label>
+        <select id="flow-preview-information-condition" class="form-select">
+          <option value="I0">I0 · 决策前仅知均匀分布范围</option>
+          <option value="I1">I1 · 决策前知道本轮精确服务率</option>
+        </select>
+      </div>
+    </div>
+    <p class="flow-preview-builder__note">预览模式不生成 Agent，不要求 Room 标签；选择上方任一快捷方案即恢复正式规则。</p>
   </div>
   <div class="session-sequence-control">
     <div>
@@ -285,6 +345,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const customGroupCount = document.getElementById('custom-group-count');
   const customGroupRows = document.getElementById('custom-group-rows');
   const customGroupTotals = document.getElementById('custom-group-totals');
+  const flowPreviewBuilder = document.getElementById('flow-preview-builder');
+  const flowPreviewEnabled = document.getElementById('flow-preview-enabled');
+  const flowPreviewFields = document.getElementById('flow-preview-fields');
+  const flowPreviewParticipantCount = document.getElementById('flow-preview-participant-count');
+  const flowPreviewInformationCondition = document.getElementById('flow-preview-information-condition');
 
   if (!dropdown || !participantInput || !createButton || !shortcutPanel
       || !singleControl || !singleCountInput || !dynamicControl
@@ -293,7 +358,9 @@ document.addEventListener('DOMContentLoaded', () => {
       || !independentRlCountWrap || !independentRlCountInput
       || !sequencePreset || !sequenceHint || !customBuilder
       || !customGroupingEnabled || !customGroupCount || !customGroupRows
-      || !customGroupTotals) {
+      || !customGroupTotals || !flowPreviewBuilder || !flowPreviewEnabled
+      || !flowPreviewFields || !flowPreviewParticipantCount
+      || !flowPreviewInformationCondition) {
     return;
   }
 
@@ -304,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'group_treatment_spec', 'capacity_information_condition',
     'capacity_sequence_id', 'capacity_sequence_seed',
     'participant_label_file', 'participant_label_assignment',
+    'flow_preview_enabled',
   ];
   const replacedAgentFields = new Set([
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
@@ -329,6 +397,8 @@ document.addEventListener('DOMContentLoaded', () => {
     sourceFor(configName, 'participant_label_file')
       ?.closest('tr')?.setAttribute('hidden', 'hidden');
     sourceFor(configName, 'participant_label_assignment')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
+    sourceFor(configName, 'flow_preview_enabled')
       ?.closest('tr')?.setAttribute('hidden', 'hidden');
   }
   if ([...activeAgentConfigs, ...dynamicAgentConfigs].some(
@@ -463,6 +533,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setSource('rl_agent_enabled', haGroups ? 1 : 0);
     setSource('rl_agent_count_per_group', haGroups ? 10 : 0);
     setSource('capacity_information_condition', customSelections[0].endsWith('I1') ? 'I1' : 'I0');
+    setSource('participant_label_file', '_rooms/econ101.txt');
+    setSource('participant_label_assignment', 'sequential');
+    setSource('flow_preview_enabled', 0);
     customGroupTotals.textContent = `共 ${count} 组：${humans} 个 Human 登录席位 + ${agents} 个虚拟 Agent；每组总主体数 30。`;
     let nextLabelNumber = 1;
     summary.innerHTML = customSelections.map((treatment, index) => {
@@ -474,6 +547,35 @@ document.addEventListener('DOMContentLoaded', () => {
         : '30 Human';
       return `<div class="session-preset-summary__group"><b>G${String(index + 1).padStart(2, '0')} · ${treatment} · ${labelRange}</b><span>${members} · 总主体数 30</span></div>`;
     }).join('') + '<p class="session-preset-summary__note">各组独立排队与结算，同轮共享上方选定的随机服务率序列。</p>';
+    summary.hidden = false;
+  }
+  function syncFlowPreview() {
+    const enabled = flowPreviewEnabled.checked;
+    flowPreviewFields.hidden = !enabled;
+    setSource('flow_preview_enabled', enabled ? 1 : 0);
+    if (!enabled) return;
+
+    const requestedCount = Number.parseInt(flowPreviewParticipantCount.value, 10) || 1;
+    const participantCount = Math.min(30, Math.max(1, requestedCount));
+    const condition = flowPreviewInformationCondition.value === 'I1' ? 'I1' : 'I0';
+    flowPreviewParticipantCount.value = String(participantCount);
+    participantInput.value = String(participantCount);
+    customSelections = [`H-${condition}`];
+    selectedPreset = '';
+    customBuilder.hidden = true;
+    setSource('group_treatment_spec', `G01:H-${condition}`);
+    setSource('grouping_enabled', 0);
+    setSource('cohort_size', 0);
+    setSource('manual_grouping_spec', '');
+    setSource('group_agent_spec', '');
+    setSource('api_agent_mode', 'off');
+    setSource('api_agent_count_per_group', 0);
+    setSource('rl_agent_enabled', 0);
+    setSource('rl_agent_count_per_group', 0);
+    setSource('capacity_information_condition', condition);
+    setSource('participant_label_assignment', '');
+    markPresetSelected('');
+    summary.innerHTML = `<div class="session-preset-summary__group"><b>手动预览 · ${condition}</b><span>${participantCount} Human · 无 Agent · 无 Room 标签绑定</span></div><p class="session-preset-summary__note">轮次、服务率序列、决策页和成本计算与正式场景一致。</p>`;
     summary.hidden = false;
   }
   function renderCustomRows() {
@@ -499,6 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formalVisible = formalDynamicConfigs.has(currentConfig);
     const singleVisible = activeAgentConfigs.has(currentConfig);
     shortcutPanel.hidden = !formalVisible;
+    flowPreviewBuilder.hidden = !formalVisible;
     dynamicControl.hidden = !dynamicVisible || formalVisible;
     singleControl.hidden = !singleVisible;
     if (singleVisible) singleCountInput.value = readSource('api_agent_count_per_group', '1') || '1';
@@ -518,20 +621,33 @@ document.addEventListener('DOMContentLoaded', () => {
       dynamicCountWrap.hidden = !dynamicEnabled.checked;
       independentRlCountWrap.hidden = !independentRlEnabled.checked;
       if (formalVisible) {
-        customSelections = parseStoredTreatments();
-        selectedPreset = presetCodeForTreatments(customSelections);
-        customGroupingEnabled.checked = customSelections.length > 1;
-        customGroupCount.disabled = !customGroupingEnabled.checked;
-        customGroupCount.value = String(customSelections.length);
-        customBuilder.hidden = selectedPreset !== 'CUSTOM';
-        if (selectedPreset === 'CUSTOM') {
-          renderCustomRows();
+        const previewActive = readSource('flow_preview_enabled', '0') === '1';
+        flowPreviewEnabled.checked = previewActive;
+        flowPreviewFields.hidden = !previewActive;
+        if (previewActive) {
+          flowPreviewParticipantCount.value = participantInput.value || '1';
+          flowPreviewInformationCondition.value = (
+            readSource('capacity_information_condition', 'I0') === 'I1' ? 'I1' : 'I0'
+          );
+          syncFlowPreview();
         } else {
-          syncCustomSpec();
-          showPresetSummary(presets[selectedPreset]);
+          customSelections = parseStoredTreatments();
+          selectedPreset = presetCodeForTreatments(customSelections);
+          customGroupingEnabled.checked = customSelections.length > 1;
+          customGroupCount.disabled = !customGroupingEnabled.checked;
+          customGroupCount.value = String(customSelections.length);
+          customBuilder.hidden = selectedPreset !== 'CUSTOM';
+          if (selectedPreset === 'CUSTOM') {
+            renderCustomRows();
+          } else {
+            syncCustomSpec();
+            showPresetSummary(presets[selectedPreset]);
+          }
+          markPresetSelected(selectedPreset);
         }
-        markPresetSelected(selectedPreset);
       } else {
+        flowPreviewEnabled.checked = false;
+        flowPreviewFields.hidden = true;
         customBuilder.hidden = true;
       }
     }
@@ -543,7 +659,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dynamicAgentConfigs.has(currentConfig)) return;
     storeSequenceSelection();
     if (formalDynamicConfigs.has(currentConfig)) {
-      syncCustomSpec();
+      if (flowPreviewEnabled.checked) syncFlowPreview();
+      else syncCustomSpec();
       return;
     }
     setSource('api_agent_mode', dynamicEnabled.checked ? 'active' : 'off');
@@ -568,6 +685,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const preset = presets[code];
     if (code !== 'CUSTOM' && !preset) return;
     applyingPreset = true;
+    flowPreviewEnabled.checked = false;
+    flowPreviewFields.hidden = true;
+    setSource('flow_preview_enabled', 0);
     selectedPreset = code;
     if (code === 'CUSTOM') {
       customGroupingEnabled.checked = customSelections.length > 1;
@@ -635,8 +755,23 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCustomRows();
   });
   customGroupCount.addEventListener('input', renderCustomRows);
+  flowPreviewEnabled.addEventListener('change', () => {
+    if (flowPreviewEnabled.checked) {
+      syncFlowPreview();
+    } else {
+      applyPreset('PAIR-I0');
+    }
+  });
+  flowPreviewParticipantCount.addEventListener('input', syncFlowPreview);
+  flowPreviewInformationCondition.addEventListener('change', syncFlowPreview);
   createButton.addEventListener('click', event => {
     storeVisibleControls();
+    if (flowPreviewEnabled.checked && !flowPreviewParticipantCount.checkValidity()) {
+      flowPreviewParticipantCount.reportValidity();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     const activeCountInput = activeAgentConfigs.has(currentConfig)
       ? singleCountInput : dynamicEnabled.checked ? dynamicCountInput : null;
     if (activeCountInput && !activeCountInput.checkValidity()) {

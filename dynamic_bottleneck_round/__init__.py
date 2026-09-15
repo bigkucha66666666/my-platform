@@ -76,6 +76,14 @@ AUTO_CHOICE_NEUTRAL_BASELINE = 'neutral_baseline'
 CAPACITY_SEQUENCE_SESSION_VAR = 'dynamic_bottleneck_round_capacity_sequence_v2'
 TOTAL_PAYOFF_VAR = 'dynamic_bottleneck_round_total_payoff'
 COMPREHENSION_SEEN_VAR = 'dynamic_bottleneck_round_comprehension_seen'
+COMPREHENSION_SCORE_VAR = 'dynamic_bottleneck_round_comprehension_score'
+COMPREHENSION_ATTEMPTS_VAR = 'dynamic_bottleneck_round_comprehension_attempts'
+COMPREHENSION_ANSWER_FIELDS = (
+    'comprehension_q1',
+    'comprehension_q2',
+    'comprehension_q3',
+    'comprehension_q4',
+)
 DEPARTURE_SCHEDULE_VAR = 'dynamic_bottleneck_round_departure_schedule'
 API_AGENT_MODE_OFF = 'off'
 API_AGENT_MODE_ACTIVE = 'active'
@@ -173,8 +181,10 @@ def capacity_reveal_description(config: StochasticCapacityConfig) -> str:
 
 
 def comprehension_queue_example(config: StochasticCapacityConfig):
-    capacity = config.theoretical_mean
-    people = max(5, ceil(2 * capacity + 1))
+    # Keep this teaching example independent of the configured stochastic mean:
+    # integer inputs make the queueing mechanism easier to verify by hand.
+    capacity = 2
+    people = 6
     departure_minute = 474
     wait_minutes = service_batch_wait_minutes(
         departure_minute=departure_minute,
@@ -194,6 +204,25 @@ def comprehension_queue_example(config: StochasticCapacityConfig):
     }
 
 
+def comprehension_answer_key(config: StochasticCapacityConfig):
+    return {
+        'comprehension_q1': 'b',
+        'comprehension_q2': 'a',
+        'comprehension_q3': 'c',
+        'comprehension_q4': (
+            'b' if config.information_condition == INFO_I1 else 'a'
+        ),
+    }
+
+
+def comprehension_score(config: StochasticCapacityConfig, answers):
+    answer_key = comprehension_answer_key(config)
+    return sum(
+        str(answers.get(field_name, '') or '').strip().lower() == correct_answer
+        for field_name, correct_answer in answer_key.items()
+    )
+
+
 def round_start_wait_seconds(round_number):
     return 120 if int(round_number) == 1 else 60
 
@@ -205,7 +234,7 @@ def should_start_round(*, ready_count, group_size, now_ts, deadline_ts):
 class C(BaseConstants):
     NAME_IN_URL = 'dynamic_bottleneck_round'
     PLAYERS_PER_GROUP = None
-    WARMUP_ROUNDS = 5
+    WARMUP_ROUNDS = 3
     FORMAL_ROUNDS = 30
     NUM_ROUNDS = WARMUP_ROUNDS + FORMAL_ROUNDS
 
@@ -228,7 +257,7 @@ class C(BaseConstants):
     FIXED_TRAVEL_TIME_COST = 0
     QUEUE_COST_PER_MINUTE = 2
     EARLY_COST_PER_MINUTE = 1
-    LATE_COST_PER_MINUTE = 5
+    LATE_COST_PER_MINUTE = 3
 
 
 def is_warmup_round(round_number):
@@ -277,7 +306,7 @@ def formal_payoff_total(player):
     )
 
 
-WARMUP_CAPACITIES = (1.33, 2.00, 2.67, 3.33, 4.00)
+WARMUP_CAPACITIES = (1.33, 2.67, 4.00)
 
 
 def parse_warmup_capacity(session_config, capacity_config, round_number=1):
@@ -321,6 +350,13 @@ class Player(BasePlayer):
     capacity_sequence_id = models.StringField(blank=True)
     capacity_sequence_seed = models.IntegerField(initial=0)
     actor_composition = models.StringField(blank=True)
+
+    comprehension_q1 = models.StringField(blank=True)
+    comprehension_q2 = models.StringField(blank=True)
+    comprehension_q3 = models.StringField(blank=True)
+    comprehension_q4 = models.StringField(blank=True)
+    comprehension_score = models.IntegerField(initial=0)
+    comprehension_attempts = models.IntegerField(initial=0, min=0)
 
     departure_slot = models.IntegerField(choices=DEPARTURE_SLOT_CHOICES)
     departure_minute = models.FloatField(initial=0)
@@ -368,6 +404,9 @@ EXPORT_HEADERS = [
     'treatment_condition',
     'actor_composition',
     'information_condition',
+    'flow_preview_enabled',
+    'comprehension_score',
+    'comprehension_attempts',
     'dynamic_capacity',
     'actual_capacity',
     'capacity_level',
@@ -467,6 +506,12 @@ def _canonical_group_label(group_id) -> str:
 
 def is_formal_session(session) -> bool:
     return session.config.get('name') in FORMAL_SESSION_CONFIG_NAMES
+
+
+def is_flow_preview_session(session) -> bool:
+    return is_formal_session(session) and config_flag(
+        session.config.get('flow_preview_enabled', 0)
+    )
 
 
 def parse_group_treatment_spec(spec):
@@ -859,6 +904,20 @@ def validate_formal_actor_composition(session, matrix):
     if not is_formal_session(session):
         return 'demo'
     treatments = configure_formal_treatments(session)
+    if is_flow_preview_session(session):
+        if len(matrix) != 1 or len(treatments) != 1:
+            raise ValueError('手动流程预览只允许一个 Human-only 小组。')
+        expected = treatments['G01']
+        human_count = len(matrix[0])
+        if (
+            expected['actor_composition'] != 'H'
+            or api_agent_count_per_group(session, 1) != 0
+            or rl_agent_count_per_group(session, 1) != 0
+        ):
+            raise ValueError('手动流程预览只支持 Human-only 配置。')
+        if not 1 <= human_count <= 30:
+            raise ValueError('手动流程预览人数必须在 1 到 30 之间。')
+        return 'preview'
     if len(matrix) != len(treatments):
         raise ValueError(
             '正式 Session 的实际分组数必须与 '
@@ -1131,6 +1190,25 @@ def assign_formal_room_labels(players, treatments, session_config):
     return plan
 
 
+def prepare_formal_group_matrix(session, players):
+    treatments = configure_formal_treatments(session)
+    if is_flow_preview_session(session):
+        session.config = {
+            **session.config,
+            'participant_label_assignment': '',
+        }
+        session.vars.pop(ROOM_LABEL_PLAN_SESSION_VAR, None)
+        return [players], {}
+
+    label_plan = assign_formal_room_labels(
+        players,
+        treatments,
+        session.config,
+    )
+    session.vars[ROOM_LABEL_PLAN_SESSION_VAR] = deepcopy(label_plan)
+    return build_treatment_group_matrix(players, treatments), label_plan
+
+
 def parse_manual_grouping_spec(spec):
     groups = []
     for raw_group in str(spec or '').replace('\n', ';').split(';'):
@@ -1351,16 +1429,10 @@ def creating_session(subsession):
     if subsession.round_number == 1:
         players = subsession.get_players()
         if is_formal_session(subsession.session):
-            treatments = configure_formal_treatments(subsession.session)
-            label_plan = assign_formal_room_labels(
+            matrix, _label_plan = prepare_formal_group_matrix(
+                subsession.session,
                 players,
-                treatments,
-                subsession.session.config,
             )
-            subsession.session.vars[ROOM_LABEL_PLAN_SESSION_VAR] = deepcopy(
-                label_plan
-            )
-            matrix = build_treatment_group_matrix(players, treatments)
             grouping_enabled = len(matrix) > 1
         else:
             grouping_enabled = config_flag(
@@ -2996,6 +3068,7 @@ def export_row_for_player(player):
         'group_id': player.group.id_in_subsession,
         'round_number': formal_round_number(player.round_number),
         'formal_round_number': formal_round_number(player.round_number),
+        'flow_preview_enabled': is_flow_preview_session(player.session),
         'actual_capacity': round(float(player.dynamic_capacity), 6),
         'capacity_revealed_before_decision': bool(
             getattr(player, 'capacity_revealed_before_decision', False)
@@ -3045,6 +3118,12 @@ def export_row_for_player(player):
         ),
         'actor_type': 'human',
         'api_agent_mode': api_agent_mode(player.session),
+        'comprehension_score': int(
+            participant_var(player, COMPREHENSION_SCORE_VAR, 0) or 0
+        ),
+        'comprehension_attempts': int(
+            participant_var(player, COMPREHENSION_ATTEMPTS_VAR, 0) or 0
+        ),
         'agent_policy_version': '',
         'agent_fallback_reason': '',
     }
@@ -3077,6 +3156,8 @@ def export_row_for_agent_record(record, reference_player):
     row = export_row_for_player(reference_player)
     values = {
         'participant_code': '',
+        'comprehension_score': '',
+        'comprehension_attempts': '',
         'group_id': record.get('group_id', reference_player.group.id_in_subsession),
         'round_number': formal_round_number(reference_player.round_number),
         'formal_round_number': formal_round_number(reference_player.round_number),
@@ -3352,6 +3433,9 @@ class Introduction(Page):
 
 
 class ComprehensionCheck(Page):
+    form_model = 'player'
+    form_fields = [*COMPREHENSION_ANSWER_FIELDS, 'comprehension_attempts']
+
     @staticmethod
     def is_displayed(player):
         return player.round_number == 1 and access_allowed(player)
@@ -3359,6 +3443,7 @@ class ComprehensionCheck(Page):
     @staticmethod
     def vars_for_template(player):
         config = capacity_config_for_player(player)
+        answer_key = comprehension_answer_key(config)
         queue_example = comprehension_queue_example(config)
         example_people = queue_example['people']
         example_capacity = queue_example['capacity']
@@ -3370,7 +3455,6 @@ class ComprehensionCheck(Page):
         ]
         example_arrival = queue_example['arrival_minute']
         example_queue_minutes = 4
-        example_toll = max(3, float(player.coarse_toll_points))
         return {
             'capacity_states': capacity_state_rows(config),
             'example_people': example_people,
@@ -3400,14 +3484,46 @@ class ComprehensionCheck(Page):
             ),
             'example_early_minutes': 3,
             'example_early_cost': number_display(3 * C.EARLY_COST_PER_MINUTE),
-            'example_toll': number_display(example_toll),
-            'example_total_with_toll': number_display(10 + example_toll),
-            'coarse_toll_description': coarse_toll_description_for_player(player),
+            'capacity_reveal_description': capacity_reveal_description(config),
+            'comprehension_q4_correct': answer_key['comprehension_q4'],
+            'comprehension_q4_correct_text': (
+                '正确。同一小组、同一轮的服务率相同；'
+                + capacity_reveal_description(config)
+            ),
         }
 
     @staticmethod
+    def error_message(player, values):
+        incomplete = [
+            field_name
+            for field_name in COMPREHENSION_ANSWER_FIELDS
+            if str(values.get(field_name, '') or '').strip().lower()
+            not in {'a', 'b', 'c'}
+        ]
+        if incomplete:
+            return '请完成全部 4 道题，再进入练习阶段。'
+        if int(values.get('comprehension_attempts') or 0) < 1:
+            return '请先点击“检查答案”完成理解测试。'
+
+    @staticmethod
     def before_next_page(player, timeout_happened):
+        config = capacity_config_for_player(player)
+        answers = {
+            field_name: getattr(player, field_name, '')
+            for field_name in COMPREHENSION_ANSWER_FIELDS
+        }
+        player.comprehension_score = comprehension_score(config, answers)
+        player.comprehension_attempts = max(
+            1,
+            int(player.comprehension_attempts or 0),
+        )
         player.participant.vars[COMPREHENSION_SEEN_VAR] = True
+        player.participant.vars[
+            COMPREHENSION_SCORE_VAR
+        ] = player.comprehension_score
+        player.participant.vars[
+            COMPREHENSION_ATTEMPTS_VAR
+        ] = player.comprehension_attempts
 
 
 class WarmupStart(Page):

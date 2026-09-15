@@ -35,10 +35,10 @@ from . import (
 
 
 class WarmupRoundPhaseTests(unittest.TestCase):
-    def test_five_warmup_rounds_precede_thirty_formal_rounds(self):
-        self.assertEqual(getattr(C, 'WARMUP_ROUNDS', None), 5)
+    def test_three_warmup_rounds_precede_thirty_formal_rounds(self):
+        self.assertEqual(getattr(C, 'WARMUP_ROUNDS', None), 3)
         self.assertEqual(getattr(C, 'FORMAL_ROUNDS', None), 30)
-        self.assertEqual(C.NUM_ROUNDS, 35)
+        self.assertEqual(C.NUM_ROUNDS, 33)
 
     def test_raw_rounds_map_to_warmup_and_formal_round_numbers(self):
         is_warmup_round = getattr(dynamic_app, 'is_warmup_round', None)
@@ -48,12 +48,12 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         self.assertIsNotNone(formal_round_number)
         self.assertTrue(is_warmup_round(1))
         self.assertTrue(is_warmup_round(2))
-        self.assertTrue(is_warmup_round(5))
-        self.assertFalse(is_warmup_round(6))
+        self.assertTrue(is_warmup_round(3))
+        self.assertFalse(is_warmup_round(4))
         self.assertIsNone(formal_round_number(1))
-        self.assertIsNone(formal_round_number(5))
-        self.assertEqual(formal_round_number(6), 1)
-        self.assertEqual(formal_round_number(35), 30)
+        self.assertIsNone(formal_round_number(3))
+        self.assertEqual(formal_round_number(4), 1)
+        self.assertEqual(formal_round_number(33), 30)
 
     def test_warmup_capacities_are_fixed_and_span_the_distribution(self):
         parse_warmup_capacity = getattr(dynamic_app, 'parse_warmup_capacity', None)
@@ -61,8 +61,8 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         config = dynamic_app.parse_stochastic_capacity_config({})
 
         self.assertEqual(
-            [parse_warmup_capacity({}, config, round_number) for round_number in range(1, 6)],
-            [1.33, 2.00, 2.67, 3.33, 4.00],
+            [parse_warmup_capacity({}, config, round_number) for round_number in range(1, 4)],
+            [1.33, 2.67, 4.00],
         )
 
     def test_phase_context_uses_participant_facing_round_numbers(self):
@@ -75,12 +75,12 @@ class WarmupRoundPhaseTests(unittest.TestCase):
                 'is_warmup': True,
                 'phase_name': 'warmup',
                 'display_round_number': 2,
-                'display_total_rounds': 5,
+                'display_total_rounds': 3,
                 'round_label': '热身第 2 轮',
             },
         )
         self.assertEqual(
-            round_phase_context(6),
+            round_phase_context(4),
             {
                 'is_warmup': False,
                 'phase_name': 'formal',
@@ -99,17 +99,17 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         with patch.object(dynamic_app, 'access_allowed', return_value=True):
             self.assertTrue(warmup_start.is_displayed(SimpleNamespace(round_number=1)))
             self.assertFalse(warmup_start.is_displayed(SimpleNamespace(round_number=2)))
-            self.assertTrue(formal_start.is_displayed(SimpleNamespace(round_number=6)))
-            self.assertFalse(formal_start.is_displayed(SimpleNamespace(round_number=7)))
+            self.assertTrue(formal_start.is_displayed(SimpleNamespace(round_number=4)))
+            self.assertFalse(formal_start.is_displayed(SimpleNamespace(round_number=5)))
 
     def test_formal_payoff_total_excludes_warmup_rounds(self):
         formal_payoff_total = getattr(dynamic_app, 'formal_payoff_total', None)
         self.assertIsNotNone(formal_payoff_total)
         rounds = [
             SimpleNamespace(round_number=1, payoff=99),
-            SimpleNamespace(round_number=5, payoff=98),
-            SimpleNamespace(round_number=6, payoff=10),
-            SimpleNamespace(round_number=7, payoff=20),
+            SimpleNamespace(round_number=3, payoff=98),
+            SimpleNamespace(round_number=4, payoff=10),
+            SimpleNamespace(round_number=5, payoff=20),
         ]
         player = SimpleNamespace(in_all_rounds=lambda: rounds)
 
@@ -117,8 +117,8 @@ class WarmupRoundPhaseTests(unittest.TestCase):
 
     def test_formal_payoff_total_prefers_unrounded_payoff(self):
         rounds = [
-            SimpleNamespace(round_number=6, payoff=10, payoff_unrounded=10.25),
-            SimpleNamespace(round_number=7, payoff=20, payoff_unrounded=20.125),
+            SimpleNamespace(round_number=4, payoff=10, payoff_unrounded=10.25),
+            SimpleNamespace(round_number=5, payoff=20, payoff_unrounded=20.125),
         ]
         player = SimpleNamespace(in_all_rounds=lambda: rounds)
 
@@ -129,7 +129,7 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         )
 
     def test_custom_export_omits_warmup_and_renumbers_formal_rounds(self):
-        players = [SimpleNamespace(round_number=value) for value in (1, 5, 6, 7)]
+        players = [SimpleNamespace(round_number=value) for value in (1, 3, 4, 5)]
 
         with (
             patch.object(
@@ -150,7 +150,7 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         group = SimpleNamespace(id_in_subsession=1, session=session)
         players = [
             SimpleNamespace(round_number=round_number, group=group)
-            for round_number in (1, 5)
+            for round_number in (1, 3)
         ]
 
         rows, states, _summary = dynamic_app.build_admin_report_rows(players)
@@ -363,9 +363,9 @@ class DynamicCostExportTests(unittest.TestCase):
 
         self.assertEqual(components['fixed_cost'], 0)
         self.assertEqual(components['queue_cost'], 4)
-        self.assertEqual(components['late_cost'], 5)
+        self.assertEqual(components['late_cost'], 3)
         self.assertEqual(components['toll_cost'], 0)
-        self.assertEqual(components['total_cost'], 9)
+        self.assertEqual(components['total_cost'], 7)
 
     def test_export_contains_fixed_schedule_but_no_toll_metadata(self):
         required = {
@@ -886,23 +886,118 @@ class DynamicPresentationContextTests(unittest.TestCase):
 
         self.assertIn('均匀分布', capacity_reveal_description(config))
 
-    def test_queue_example_uses_uniform_distribution_mean(self):
+    def test_queue_example_uses_integer_teaching_values(self):
         config = dynamic_app.parse_stochastic_capacity_config({})
 
         example = comprehension_queue_example(config)
 
-        self.assertEqual(example['capacity'], config.theoretical_mean)
-        self.assertGreater(example['wait_minutes'], 0)
+        self.assertEqual(example['capacity'], 2)
+        self.assertEqual(example['people'], 6)
+        self.assertEqual(example['departure_minute'], 474)
+        self.assertEqual(example['wait_minutes'], 2)
+        self.assertEqual(example['arrival_without_queue_minute'], 480)
+        self.assertEqual(example['arrival_with_short_wait_minute'], 481)
+        self.assertEqual(example['arrival_minute'], 482)
+
+    def test_comprehension_answer_key_depends_on_information_condition(self):
+        answer_key = getattr(dynamic_app, 'comprehension_answer_key', None)
+        self.assertIsNotNone(answer_key)
+        i0_config = dynamic_app.parse_stochastic_capacity_config(
+            {'capacity_information_condition': 'I0'}
+        )
+        i1_config = dynamic_app.parse_stochastic_capacity_config(
+            {'capacity_information_condition': 'I1'}
+        )
+
         self.assertEqual(
-            len(
-                {
-                    example['arrival_without_queue_minute'],
-                    example['arrival_with_short_wait_minute'],
-                    example['arrival_minute'],
-                }
-            ),
+            answer_key(i0_config),
+            {
+                'comprehension_q1': 'b',
+                'comprehension_q2': 'a',
+                'comprehension_q3': 'c',
+                'comprehension_q4': 'a',
+            },
+        )
+        self.assertEqual(answer_key(i1_config)['comprehension_q4'], 'b')
+
+    def test_comprehension_server_validation_allows_wrong_completed_answers(self):
+        player = SimpleNamespace()
+        i0_config = dynamic_app.parse_stochastic_capacity_config(
+            {'capacity_information_condition': 'I0'}
+        )
+        correct = {
+            'comprehension_q1': 'b',
+            'comprehension_q2': 'a',
+            'comprehension_q3': 'c',
+            'comprehension_q4': 'a',
+            'comprehension_attempts': 2,
+        }
+
+        with patch.object(
+            dynamic_app,
+            'capacity_config_for_player',
+            return_value=i0_config,
+        ):
+            self.assertIsNone(ComprehensionCheck.error_message(player, correct))
+            wrong = {**correct, 'comprehension_q4': 'b'}
+            self.assertIsNone(ComprehensionCheck.error_message(player, wrong))
+            incomplete = {**correct, 'comprehension_q3': ''}
+            self.assertIn(
+                '完成全部 4 道题',
+                ComprehensionCheck.error_message(player, incomplete),
+            )
+            unchecked = {**correct, 'comprehension_attempts': 0}
+            self.assertIn(
+                '检查答案',
+                ComprehensionCheck.error_message(player, unchecked),
+            )
+
+    def test_comprehension_page_persists_validated_score_and_attempts(self):
+        i1_config = dynamic_app.parse_stochastic_capacity_config(
+            {'capacity_information_condition': 'I1'}
+        )
+        player = SimpleNamespace(
+            comprehension_q1='b',
+            comprehension_q2='a',
+            comprehension_q3='c',
+            comprehension_q4='b',
+            comprehension_score=0,
+            comprehension_attempts=3,
+            participant=SimpleNamespace(vars={}),
+        )
+
+        with patch.object(
+            dynamic_app,
+            'capacity_config_for_player',
+            return_value=i1_config,
+        ):
+            ComprehensionCheck.before_next_page(player, False)
+
+        self.assertEqual(player.comprehension_score, 4)
+        self.assertEqual(player.comprehension_attempts, 3)
+        self.assertTrue(player.participant.vars[COMPREHENSION_SEEN_VAR])
+        self.assertEqual(
+            player.participant.vars[dynamic_app.COMPREHENSION_SCORE_VAR],
+            4,
+        )
+        self.assertEqual(
+            player.participant.vars[dynamic_app.COMPREHENSION_ATTEMPTS_VAR],
             3,
         )
+
+    def test_comprehension_fields_and_export_metadata_are_declared(self):
+        self.assertEqual(
+            ComprehensionCheck.form_fields,
+            [
+                'comprehension_q1',
+                'comprehension_q2',
+                'comprehension_q3',
+                'comprehension_q4',
+                'comprehension_attempts',
+            ],
+        )
+        self.assertIn('comprehension_score', EXPORT_HEADERS)
+        self.assertIn('comprehension_attempts', EXPORT_HEADERS)
 
 
 class TemplateContractTests(unittest.TestCase):
@@ -946,17 +1041,29 @@ class TemplateContractTests(unittest.TestCase):
             html,
         )
 
-    def test_comprehension_check_tests_group_capacity_equality(self):
+    def test_comprehension_check_tests_condition_specific_information_boundary(self):
         html = self.template_text('ComprehensionCheck.html')
 
         self.assertIn('同一小组、同一轮', html)
         self.assertIn('排队成本', html)
         self.assertIn('早到成本', html)
-        self.assertIn('最终选择成本', html)
+        self.assertIn('决策前', html)
+        self.assertIn('均匀分布范围', html)
+        self.assertIn('本轮精确服务率和容量等级', html)
+        self.assertIn('{{ comprehension_q4_correct }}', html)
+        self.assertNotIn('粗收费', html)
         self.assertIn('class="scenario-box"', html)
         self.assertIn('class="answer-feedback"', html)
         self.assertIn('{{ example_arrival_time }}', html)
         self.assertEqual(html.count('class="question-card"'), 4)
+        self.assertIn('name="comprehension_q1"', html)
+        self.assertIn('name="comprehension_q4"', html)
+        self.assertIn('name="comprehension_attempts"', html)
+        self.assertIn('进入练习阶段', html)
+        self.assertIn(
+            'nextButton.disabled = answeredCount !== cards.length;',
+            html,
+        )
 
     def test_decision_has_i0_and_i1_capacity_messages(self):
         html = self.template_text('Decision.html')
@@ -1071,9 +1178,9 @@ class SettingsContractTests(unittest.TestCase):
             self.assertNotIn('coarse_toll_enabled', config)
             self.assertNotIn('reward_treatment_enabled', config)
             self.assertEqual(config['payoff_rounds'], 30)
-        self.assertEqual(C.WARMUP_ROUNDS, 5)
+        self.assertEqual(C.WARMUP_ROUNDS, 3)
         self.assertEqual(C.FORMAL_ROUNDS, 30)
-        self.assertEqual(C.NUM_ROUNDS, 35)
+        self.assertEqual(C.NUM_ROUNDS, 33)
         self.assertEqual(C.SYNC_POLL_INTERVAL_SECONDS, 1.5)
 
         for name in ('single_bottleneck_demo', 'single_bottleneck_prod'):
@@ -1136,6 +1243,7 @@ class UniformCapacityExperimentContractTests(unittest.TestCase):
         self.assertEqual(formal['api_agent_count_per_group'], 0)
         self.assertEqual(formal['rl_agent_count_per_group'], 0)
         self.assertEqual(formal['capacity_information_condition'], 'I0')
+        self.assertEqual(formal['flow_preview_enabled'], 0)
         self.assertEqual(formal['payoff_rounds'], 30)
         for retired in (
             'dynamic_bottleneck_round_prod_h_i0',
@@ -1147,14 +1255,14 @@ class UniformCapacityExperimentContractTests(unittest.TestCase):
             self.assertNotIn(retired, configs)
 
     def test_rounds_costs_and_fixed_action_space_match_approved_design(self):
-        self.assertEqual(C.WARMUP_ROUNDS, 5)
+        self.assertEqual(C.WARMUP_ROUNDS, 3)
         self.assertEqual(C.FORMAL_ROUNDS, 30)
-        self.assertEqual(C.NUM_ROUNDS, 35)
+        self.assertEqual(C.NUM_ROUNDS, 33)
         self.assertEqual(C.NUM_DEPARTURE_SLOTS, 16)
         self.assertEqual(C.FIXED_TRAVEL_TIME_COST, 0)
         self.assertEqual(C.QUEUE_COST_PER_MINUTE, 2)
         self.assertEqual(C.EARLY_COST_PER_MINUTE, 1)
-        self.assertEqual(C.LATE_COST_PER_MINUTE, 5)
+        self.assertEqual(C.LATE_COST_PER_MINUTE, 3)
 
         schedule = dynamic_app.static_departure_schedule()
         self.assertEqual(schedule['num_slots'], 16)
@@ -1308,6 +1416,75 @@ class UniformCapacityExperimentContractTests(unittest.TestCase):
 
         self.assertEqual(result, 'demo')
 
+    def test_formal_preview_allows_one_human_and_keeps_selected_information(self):
+        session = self.make_session(
+            'dynamic_bottleneck_round_prod',
+            treatment='H-I1',
+        )
+        session.config['flow_preview_enabled'] = 1
+
+        result = dynamic_app.validate_formal_actor_composition(
+            session,
+            [[object()]],
+        )
+
+        self.assertEqual(result, 'preview')
+        self.assertEqual(dynamic_app.information_condition_for_group(session, 1), 'I1')
+
+    def test_formal_preview_rejects_agent_treatment(self):
+        session = self.make_session(
+            'dynamic_bottleneck_round_prod',
+            treatment='HA-I0',
+            api_mode='active',
+            api_count=10,
+            rl_enabled='1',
+            rl_count=10,
+        )
+        session.config['flow_preview_enabled'] = 1
+
+        with self.assertRaisesRegex(ValueError, 'Human-only'):
+            dynamic_app.validate_formal_actor_composition(
+                session,
+                [[object()]],
+            )
+
+    def test_formal_preview_rejects_multiple_groups(self):
+        session = self.make_session('dynamic_bottleneck_round_prod')
+        session.config.update(
+            {
+                'flow_preview_enabled': 1,
+                'group_treatment_spec': 'G01:H-I0;G02:H-I1',
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, '只允许一个'):
+            dynamic_app.validate_formal_actor_composition(
+                session,
+                [[object()], [object()]],
+            )
+
+    def test_formal_preview_group_matrix_skips_room_label_binding(self):
+        session = self.make_session(
+            'dynamic_bottleneck_round_prod',
+            treatment='H-I0',
+        )
+        session.config.update(
+            {
+                'flow_preview_enabled': 1,
+                'participant_label_assignment': 'sequential',
+            }
+        )
+        players = [object()]
+
+        matrix, label_plan = dynamic_app.prepare_formal_group_matrix(
+            session,
+            players,
+        )
+
+        self.assertEqual(matrix, [players])
+        self.assertEqual(label_plan, {})
+        self.assertEqual(session.config['participant_label_assignment'], '')
+
 
 class DynamicCapacityLifecycleTests(unittest.TestCase):
     @staticmethod
@@ -1398,7 +1575,7 @@ class DynamicCapacityLifecycleTests(unittest.TestCase):
         session.vars[dynamic_app.CAPACITY_SEQUENCE_SESSION_VAR] = formal_records
         player = self.make_player()
         group = SimpleNamespace(
-            round_number=5,
+            round_number=3,
             session=session,
             get_players=lambda: [player],
         )
@@ -1557,7 +1734,7 @@ class UniformCapacityLifecycleContractTests(unittest.TestCase):
         dynamic_app.apply_round_capacity(group)
 
         self.assertEqual(group.dynamic_capacity, dynamic_app.WARMUP_CAPACITIES[2])
-        self.assertEqual(group.capacity_level, 'medium')
+        self.assertEqual(group.capacity_level, 'high')
         self.assertEqual(group.capacity_sequence_id, 'warmup')
         self.assertEqual(session.vars[dynamic_app.CAPACITY_SEQUENCE_SESSION_VAR], formal_records)
         self.assertEqual(player.dynamic_capacity, group.dynamic_capacity)
@@ -1676,9 +1853,9 @@ class DynamicUniformCapacityCostTests(unittest.TestCase):
                 'fixed_cost': 0.0,
                 'queue_cost': 4.0,
                 'early_cost': 3.0,
-                'late_cost': 20.0,
+                'late_cost': 12.0,
                 'toll_cost': 0.0,
-                'total_cost': 27.0,
+                'total_cost': 19.0,
             },
         )
 
@@ -1786,6 +1963,7 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
             'treatment_condition',
             'actor_composition',
             'information_condition',
+            'flow_preview_enabled',
             'dynamic_capacity',
             'capacity_level',
             'capacity_distribution',
@@ -1825,6 +2003,12 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
 
     def test_human_export_rounds_continuous_results_to_six_decimals(self):
         player, _group = self.make_player_and_group()
+        player.participant.vars.update(
+            {
+                dynamic_app.COMPREHENSION_SCORE_VAR: 3,
+                dynamic_app.COMPREHENSION_ATTEMPTS_VAR: 2,
+            }
+        )
 
         exported = dict(zip(
             EXPORT_HEADERS,
@@ -1837,9 +2021,33 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
         self.assertEqual(exported['late_minutes'], 1.234568)
         self.assertEqual(exported['total_cost'], 8.641975)
         self.assertEqual(exported['payoff'], 131.358025)
+        self.assertEqual(exported['comprehension_score'], 3)
+        self.assertEqual(exported['comprehension_attempts'], 2)
+
+    def test_custom_export_marks_formal_flow_preview_rows(self):
+        player, _group = self.make_player_and_group()
+        player.session.config.update(
+            {
+                'name': 'dynamic_bottleneck_round_prod',
+                'flow_preview_enabled': 1,
+            }
+        )
+
+        exported = dict(zip(
+            EXPORT_HEADERS,
+            dynamic_app.export_row_for_player(player),
+        ))
+
+        self.assertIs(exported['flow_preview_enabled'], True)
 
     def test_agent_export_uses_agent_batch_load_and_six_decimal_capacity(self):
         player, _group = self.make_player_and_group()
+        player.participant.vars.update(
+            {
+                dynamic_app.COMPREHENSION_SCORE_VAR: 4,
+                dynamic_app.COMPREHENSION_ATTEMPTS_VAR: 2,
+            }
+        )
         record = {
             'group_id': 1,
             'dynamic_capacity': 1.50123456789,
@@ -1867,6 +2075,8 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
         self.assertEqual(exported['queue_delay_minutes'], 2.345679)
         self.assertEqual(exported['queue_delay'], 2.345679)
         self.assertEqual(exported['total_cost'], 21.419752)
+        self.assertEqual(exported['comprehension_score'], '')
+        self.assertEqual(exported['comprehension_attempts'], '')
 
 
 class DynamicCapacityPresentationBackendTests(unittest.TestCase):
@@ -1957,8 +2167,8 @@ class DynamicCapacityPresentationBackendTests(unittest.TestCase):
 
         self.assertEqual(
             [dynamic_app.parse_warmup_capacity({}, config, round_number)
-             for round_number in range(1, 6)],
-            [1.33, 2.00, 2.67, 3.33, 4.00],
+             for round_number in range(1, 4)],
+            [1.33, 2.67, 4.00],
         )
 
 
@@ -2001,8 +2211,27 @@ class PlayerBot(Bot):
             expect('均匀分布', 'in', self.html)
             yield Submission(Introduction, check_html=False)
             expect('同一小组、同一轮', 'in', self.html)
-            yield Submission(ComprehensionCheck, check_html=False)
+            capacity_config = dynamic_app.capacity_config_for_player(self.player)
+            comprehension_answers = dynamic_app.comprehension_answer_key(
+                capacity_config
+            )
+            expected_comprehension_score = 4
+            if self.case == 'same_time':
+                comprehension_answers['comprehension_q1'] = 'a'
+                expected_comprehension_score = 3
+            comprehension_answers['comprehension_attempts'] = 1
+            yield Submission(
+                ComprehensionCheck,
+                comprehension_answers,
+                check_html=False,
+            )
             expect(self.participant.vars.get(COMPREHENSION_SEEN_VAR), '==', True)
+            expect(
+                self.player.comprehension_score,
+                '==',
+                expected_comprehension_score,
+            )
+            expect(self.player.comprehension_attempts, '==', 1)
             expect('热身环节开始', 'in', self.html)
             expect('不计入正式实验数据', 'in', self.html)
             yield Submission(WarmupStart, check_html=False)

@@ -1,5 +1,5 @@
 {{ block title }}
-    正式实验前规则测试
+    练习阶段前规则测试
 {{ endblock }}
 
 {{ block global_styles }}
@@ -311,11 +311,11 @@
 {{ block content }}
     <div class="check-shell">
         <section class="check-hero">
-            <div class="check-kicker">正式实验前确认</div>
+            <div class="check-kicker">练习前确认</div>
             <p class="check-title">请完成 4 个场景题</p>
             <p class="check-note">
-                这些题只用于确认你理解成本计算，不计入正式实验结果，也不会进入后台导出。
-                点击“检查答案”后会显示计算过程；无论答对多少题，阅读解释后都可以进入第 1 轮正式选择。
+                这些题用于确认你理解成本计算、瓶颈规则和本组信息条件。
+                请完成 4 题并点击“检查答案”阅读解释，检查后即可进入 3 轮练习。
             </p>
         </section>
 
@@ -333,8 +333,8 @@
                 </p>
             </div>
             <div class="check-context-item">
-                <p class="check-context-key">收费处理</p>
-                <p class="check-context-value">{{ coarse_toll_description }}</p>
+                <p class="check-context-key">本组信息条件</p>
+                <p class="check-context-value">{{ capacity_reveal_description }}</p>
             </div>
         </section>
 
@@ -354,15 +354,15 @@
             </div>
             <div class="answer-options">
                 <label class="answer-option">
-                    <input type="radio" name="q1" value="a">
+                    <input type="radio" name="comprehension_q1" value="a">
                     <span>4 成本</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q1" value="b">
+                    <input type="radio" name="comprehension_q1" value="b">
                     <span>{{ example_queue_cost }} 成本</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q1" value="c">
+                    <input type="radio" name="comprehension_q1" value="c">
                     <span>12 成本</span>
                 </label>
             </div>
@@ -385,15 +385,15 @@
             </div>
             <div class="answer-options">
                 <label class="answer-option">
-                    <input type="radio" name="q2" value="a">
+                    <input type="radio" name="comprehension_q2" value="a">
                     <span>{{ example_early_cost }} 成本</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q2" value="b">
+                    <input type="radio" name="comprehension_q2" value="b">
                     <span>6 成本</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q2" value="c">
+                    <input type="radio" name="comprehension_q2" value="c">
                     <span>9 成本</span>
                 </label>
             </div>
@@ -416,15 +416,15 @@
             </div>
             <div class="answer-options">
                 <label class="answer-option">
-                    <input type="radio" name="q3" value="a">
+                    <input type="radio" name="comprehension_q3" value="a">
                     <span>{{ example_arrival_without_queue_time }}</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q3" value="b">
+                    <input type="radio" name="comprehension_q3" value="b">
                     <span>{{ example_arrival_with_short_wait_time }}</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q3" value="c">
+                    <input type="radio" name="comprehension_q3" value="c">
                     <span>{{ example_arrival_time }}</span>
                 </label>
             </div>
@@ -432,40 +432,41 @@
         </section>
 
 
-        <section class="question-card" data-correct="c">
+        <section class="question-card" data-correct="{{ comprehension_q4_correct }}">
             <div class="question-head">
                 <span class="question-number">4</span>
-                <p class="question-title">场景四：同一小组、同一轮的所有参与者面对的瓶颈服务率是否相同？如果某出发时间原有成本为 10，且标注粗收费 {{ example_toll }}，最终选择成本是多少？</p>
+                <p class="question-title">场景四：同一小组、同一轮的瓶颈服务率是否相同？按照你所在组的条件，决策前能看到哪些本轮信息？</p>
             </div>
             <div class="scenario-box">
-                <p class="scenario-label">已知条件</p>
+                <p class="scenario-label">本组规则</p>
                 <div class="scenario-grid">
-                    <div class="scenario-chip"><b>服务率规则</b><span>同一轮统一确定</span></div>
-                    <div class="scenario-chip"><b>原有成本</b><span>10 成本</span></div>
-                    <div class="scenario-chip"><b>粗收费</b><span>{{ example_toll }} 成本</span></div>
-                    <div class="scenario-chip"><b>计算方式</b><span>原有成本 + 粗收费</span></div>
+                    <div class="scenario-chip"><b>组内关系</b><span>同组同轮面对同一服务率</span></div>
+                    <div class="scenario-chip"><b>可能范围</b><span>1.33–4.00 主体 / 分钟</span></div>
+                    <div class="scenario-chip"><b>你的条件</b><span>{{ capacity_reveal_description }}</span></div>
+                    <div class="scenario-chip"><b>判断时点</b><span>提交本轮出发时间之前</span></div>
                 </div>
             </div>
             <div class="answer-options">
                 <label class="answer-option">
-                    <input type="radio" name="q4" value="a">
-                    <span>服务率因人而异，最终选择成本仍为 10</span>
+                    <input type="radio" name="comprehension_q4" value="a">
+                    <span>同组同轮服务率相同；决策前只知服务率的均匀分布范围，提交后才看到本轮精确值</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q4" value="b">
-                    <span>服务率相同，但粗收费不计入最终选择成本</span>
+                    <input type="radio" name="comprehension_q4" value="b">
+                    <span>同组同轮服务率相同；决策前就能看到本轮精确服务率和容量等级</span>
                 </label>
                 <label class="answer-option">
-                    <input type="radio" name="q4" value="c">
-                    <span>服务率相同，最终选择成本为 {{ example_total_with_toll }}</span>
+                    <input type="radio" name="comprehension_q4" value="c">
+                    <span>同组参与者的服务率因人而异，决策前只能看到上一轮服务率</span>
                 </label>
             </div>
-            <p class="answer-feedback" data-correct-text="正确。同一小组、同一轮的所有参与者面对相同服务率；最终选择成本 = 原有成本 10 + 粗收费 {{ example_toll }} = {{ example_total_with_toll }}。" data-wrong-text="请重新看规则：同一小组、同一轮的所有参与者面对相同服务率；标注的粗收费会直接加入最终选择成本，因此结果为 {{ example_total_with_toll }}。"></p>
+            <p class="answer-feedback" data-correct-text="{{ comprehension_q4_correct_text }}" data-wrong-text="请重新看本组规则：同一小组、同一轮面对相同服务率；{{ capacity_reveal_description }}"></p>
         </section>
 
         <div class="check-actions">
+            <input type="hidden" name="comprehension_attempts" id="comprehension-attempts" value="0">
             <button class="check-button" type="button" id="check-answers">检查答案</button>
-            <button class="otree-btn-next btn btn-primary comprehension-next" id="comprehension-next" disabled>进入正式实验</button>
+            <button class="otree-btn-next btn btn-primary comprehension-next" id="comprehension-next" disabled>进入练习阶段</button>
             <p class="check-status" id="check-status">请先完成 4 个场景题，并点击“检查答案”。</p>
         </div>
     </div>
@@ -475,10 +476,22 @@
             var checkButton = document.getElementById('check-answers');
             var nextButton = document.getElementById('comprehension-next');
             var statusEl = document.getElementById('check-status');
+            var attemptsInput = document.getElementById('comprehension-attempts');
             var cards = Array.prototype.slice.call(document.querySelectorAll('.question-card'));
+
+            cards.forEach(function (card) {
+                var inputs = card.querySelectorAll('input[type="radio"]');
+                Array.prototype.forEach.call(inputs, function (input) {
+                    input.addEventListener('change', function () {
+                        nextButton.disabled = true;
+                    });
+                });
+            });
 
             checkButton.addEventListener('click', function () {
                 var correctCount = 0;
+                var answeredCount = 0;
+                attemptsInput.value = String(Number(attemptsInput.value || 0) + 1);
                 cards.forEach(function (card) {
                     var correct = card.getAttribute('data-correct');
                     var checked = card.querySelector('input[type="radio"]:checked');
@@ -491,6 +504,8 @@
                         return;
                     }
 
+                    answeredCount += 1;
+
                     if (checked.value === correct) {
                         correctCount += 1;
                         card.classList.add('is-correct');
@@ -502,8 +517,12 @@
                     feedback.textContent = feedback.getAttribute('data-wrong-text');
                 });
 
-                nextButton.disabled = false;
-                statusEl.textContent = '你答对 ' + correctCount + ' / ' + cards.length + ' 题。请阅读计算过程后进入正式实验。';
+                nextButton.disabled = answeredCount !== cards.length;
+                if (nextButton.disabled) {
+                    statusEl.textContent = '你已回答 ' + answeredCount + ' / ' + cards.length + ' 题。请完成全部题目后再次检查。';
+                } else {
+                    statusEl.textContent = '你答对 ' + correctCount + ' / ' + cards.length + ' 题。请阅读解释，现在可以进入 3 轮练习。';
+                }
             });
         })();
     </script>

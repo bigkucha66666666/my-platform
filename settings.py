@@ -119,6 +119,7 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     cohort_size=0,
     grouping_enabled=0,
     manual_grouping_spec='',
+    flow_preview_enabled=0,
     capacity_distribution='uniform',
     capacity_min=1.33,
     capacity_max=4.00,
@@ -270,7 +271,7 @@ SESSION_CONFIGS = [
         display_name="演示测试 · 动态瓶颈服务率",
         app_sequence=['dynamic_bottleneck_round', 'dynamic_bottleneck_survey'],
         doc=(
-            "用于 5 轮练习 + 30 轮随机服务率动态瓶颈正式实验的流程走查。\n"
+            "用于 3 轮练习 + 30 轮随机服务率动态瓶颈正式实验的流程走查。\n"
             "默认按固定种子生成可复现的分层均匀序列；可切换 S01-S05 固定序列。"
         ),
         api_agent_mode='off',

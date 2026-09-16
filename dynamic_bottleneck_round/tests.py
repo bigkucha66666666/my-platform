@@ -335,8 +335,8 @@ class DynamicCapacityQueueTests(unittest.TestCase):
             capacity=3,
         )
 
-        self.assertEqual(slow_wait, 4)
-        self.assertAlmostEqual(fast_wait, 2 / 3)
+        self.assertEqual(slow_wait, 5)
+        self.assertAlmostEqual(fast_wait, 5 / 3)
 
     def test_queue_left_by_earlier_departures_is_included(self):
         wait = service_batch_wait_minutes(
@@ -346,7 +346,23 @@ class DynamicCapacityQueueTests(unittest.TestCase):
             capacity=2,
         )
 
-        self.assertEqual(wait, 3.5)
+        self.assertEqual(wait, 4.5)
+
+    def test_under_capacity_still_counts_full_service_time(self):
+        self.assertEqual(service_batch_wait_minutes(
+            departure_minute=474,
+            first_service_start_minute=474,
+            load=1,
+            capacity=2,
+        ), 0.5)
+
+    def test_empty_batch_has_no_extra_travel_time(self):
+        self.assertEqual(service_batch_wait_minutes(
+            departure_minute=474,
+            first_service_start_minute=478,
+            load=0,
+            capacity=2,
+        ), 0)
 
 
 class DynamicCostExportTests(unittest.TestCase):
@@ -894,10 +910,10 @@ class DynamicPresentationContextTests(unittest.TestCase):
         self.assertEqual(example['capacity'], 2)
         self.assertEqual(example['people'], 6)
         self.assertEqual(example['departure_minute'], 474)
-        self.assertEqual(example['wait_minutes'], 2)
+        self.assertEqual(example['wait_minutes'], 3)
         self.assertEqual(example['arrival_without_queue_minute'], 480)
         self.assertEqual(example['arrival_with_short_wait_minute'], 481)
-        self.assertEqual(example['arrival_minute'], 482)
+        self.assertEqual(example['arrival_minute'], 483)
 
     def test_comprehension_answer_key_depends_on_information_condition(self):
         answer_key = getattr(dynamic_app, 'comprehension_answer_key', None)
@@ -1789,7 +1805,7 @@ class DynamicContinuousQueueTests(unittest.TestCase):
             capacity=1.5,
         )
 
-        self.assertAlmostEqual(wait, 5 / 1.5 - 1, places=10)
+        self.assertAlmostEqual(wait, 5 / 1.5, places=10)
 
     def test_clear_time_preserves_unrounded_fraction_for_next_batch(self):
         first_clear = dynamic_app.service_batch_clear_minute(474, 5, 1.5)
@@ -1803,7 +1819,7 @@ class DynamicContinuousQueueTests(unittest.TestCase):
         self.assertAlmostEqual(first_clear, 474 + 5 / 1.5, places=10)
         self.assertAlmostEqual(
             second_wait,
-            (first_clear - 476) + (2 / 1.5 - 1),
+            (first_clear - 476) + 2 / 1.5,
             places=10,
         )
 
@@ -2402,12 +2418,12 @@ class PlayerBot(Bot):
             expected_wait = None
             for minute in sorted(actors_by_minute):
                 first_service_start = max(minute, next_available)
-                wait = dynamic_app.service_batch_wait_minutes(
-                    departure_minute=minute,
-                    first_service_start_minute=first_service_start,
-                    load=actors_by_minute[minute],
-                    capacity=self.player.dynamic_capacity,
-                    capacity_window_minutes=C.CAPACITY_WINDOW_MINUTES,
+                # Independent expected value: all bottleneck passage time is
+                # additional, including the first service window.
+                wait = (
+                    first_service_start - minute
+                    + actors_by_minute[minute] / self.player.dynamic_capacity
+                    * C.CAPACITY_WINDOW_MINUTES
                 )
                 if minute == chosen_minute:
                     expected_wait = wait

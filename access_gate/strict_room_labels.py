@@ -2,6 +2,10 @@
 
 
 STRICT_LOOKUP_MARKER = '_economics_experiment_strict_room_label_lookup'
+LOOKUP_FUNCTION_NAMES = (
+    'get_existing_or_new_participant',
+    'get_participant_by_label',
+)
 
 
 def strict_room_participant_lookup(session, label, fallback_lookup):
@@ -22,16 +26,24 @@ def install_strict_room_label_lookup():
 
     from otree.views import participant as participant_views
 
-    current_lookup = participant_views.get_participant_by_label
-    if getattr(current_lookup, STRICT_LOOKUP_MARKER, False):
-        return
+    found_lookup = False
+    for function_name in LOOKUP_FUNCTION_NAMES:
+        current_lookup = getattr(participant_views, function_name, None)
+        if not callable(current_lookup):
+            continue
+        found_lookup = True
+        if getattr(current_lookup, STRICT_LOOKUP_MARKER, False):
+            continue
 
-    def guarded_lookup(session, label):
-        return strict_room_participant_lookup(
-            session,
-            label,
-            current_lookup,
-        )
+        def guarded_lookup(session, label, _fallback=current_lookup):
+            return strict_room_participant_lookup(
+                session,
+                label,
+                _fallback,
+            )
 
-    setattr(guarded_lookup, STRICT_LOOKUP_MARKER, True)
-    participant_views.get_participant_by_label = guarded_lookup
+        setattr(guarded_lookup, STRICT_LOOKUP_MARKER, True)
+        setattr(participant_views, function_name, guarded_lookup)
+
+    if not found_lookup:
+        raise RuntimeError('Unsupported oTree participant-label lookup API.')

@@ -121,11 +121,25 @@ class StrictRoomLookupTests(unittest.TestCase):
         from otree.views import participant as participant_views
 
         install_strict_room_label_lookup()
-        installed = participant_views.get_participant_by_label
+        installed = {
+            function_name: getattr(participant_views, function_name)
+            for function_name in (
+                'get_existing_or_new_participant',
+                'get_participant_by_label',
+            )
+            if hasattr(participant_views, function_name)
+        }
+        self.assertTrue(installed)
         install_strict_room_label_lookup()
 
-        self.assertIs(participant_views.get_participant_by_label, installed)
-        self.assertTrue(getattr(installed, STRICT_LOOKUP_MARKER, False))
+        for function_name, installed_lookup in installed.items():
+            self.assertIs(
+                getattr(participant_views, function_name),
+                installed_lookup,
+            )
+            self.assertTrue(
+                getattr(installed_lookup, STRICT_LOOKUP_MARKER, False)
+            )
 
 
 if __name__ == '__main__':

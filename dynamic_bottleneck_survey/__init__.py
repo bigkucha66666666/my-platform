@@ -1,44 +1,7 @@
 from otree.api import *
 
 
-NOTICE_ROUND_CHOICES = [
-    ['none', '未发现明显变化'],
-    *[[str(round_number), f'正式第 {round_number} 轮'] for round_number in range(1, 31)],
-]
-
-PATTERN_CHOICES = [
-    [1, '完全没有规律'],
-    [2, '比较没有规律'],
-    [3, '不确定'],
-    [4, '有一定规律'],
-    [5, '规律非常明显'],
-]
-
-REFERENCE_CHOICES = [
-    [1, '完全不参考'],
-    [2, '很少参考'],
-    [3, '一般'],
-    [4, '经常参考'],
-    [5, '非常依赖'],
-]
-
-FREQUENCY_CHOICES = [
-    [1, '完全不会'],
-    [2, '很少'],
-    [3, '偶尔'],
-    [4, '经常'],
-    [5, '几乎每轮都会'],
-]
-
-ADJUSTMENT_CHOICES = [
-    [1, '完全不会'],
-    [2, '很少'],
-    [3, '偶尔'],
-    [4, '经常'],
-    [5, '几乎一定会'],
-]
-
-AGREEMENT_CHOICES = [
+LIKERT_CHOICES = [
     [1, '完全不同意'],
     [2, '比较不同意'],
     [3, '不确定'],
@@ -46,38 +9,60 @@ AGREEMENT_CHOICES = [
     [5, '完全同意'],
 ]
 
-AGENT_INFLUENCE_CHOICES = [
-    [1, '完全没有影响'],
-    [2, '影响较小'],
-    [3, '一般'],
-    [4, '影响较大'],
-    [5, '影响非常大'],
+SERVICE_RATE_UNDERSTANDING_CHOICES = [
+    ['fewer_pass_more_queue', '每分钟能通过的主体更少，更容易形成排队'],
+    ['more_pass_less_queue', '每分钟能通过的主体更多，更不容易形成排队'],
+    ['schedule_only', '服务率只影响早到或迟到，不影响排队'],
+    ['uncertain', '不确定'],
 ]
 
-AGENT_PREDICTABILITY_CHOICES = [
-    [1, '明显更难预测'],
-    [2, '稍微更难预测'],
-    [3, '没有明显变化'],
-    [4, '稍微更容易预测'],
-    [5, '明显更容易预测'],
+PREDECISION_CAPACITY_ACCESS_CHOICES = [
+    ['exact_current_rate', '知道本轮的精确服务率'],
+    [
+        'distribution_then_reveal',
+        '只知道服务率的取值范围和分布，本轮精确值在结算后才能看到',
+    ],
+    ['no_capacity_information', '既不知道分布，也不知道本轮精确值'],
+    ['uncertain', '不确定'],
 ]
 
-COMMON_STRATEGY_FIELDS = [
-    'reference_previous_capacity',
-    'predict_next_capacity',
+PRIMARY_DECISION_BASIS_CHOICES = [
+    ['current_rate', '本轮显示的精确服务率'],
+    ['distribution', '服务率的整体取值范围和分布'],
+    ['history_cost', '前几轮的服务率、排队和个人成本'],
+    ['others', '对其他参与者出发时刻的预测'],
+    ['fixed_time', '一个相对固定的习惯出发时刻'],
+    ['no_fixed_rule', '没有固定依据，多数时候凭感觉选择'],
+]
+
+PAGE_ONE_FIELDS = [
+    'service_rate_understanding',
+    'predecision_capacity_access',
+    'primary_decision_basis',
+]
+
+PAGE_TWO_FIELDS = [
     'adjust_after_high_cost',
-    'expect_capacity_persistence',
+    'anticipate_others',
+    'avoid_crowded_slots',
+    'decision_confidence',
+    'perceived_information_benefit',
+    'perceived_departure_concentration',
 ]
 
 AGENT_FIELDS = [
-    'agent_choice_influence',
-    'agent_predictability_effect',
+    'agent_changed_strategy',
+    'expected_agent_consistency',
+    'agent_induced_avoidance',
 ]
+
+ANSWER_FIELDS = PAGE_ONE_FIELDS + PAGE_TWO_FIELDS + AGENT_FIELDS
 
 EXPORT_HEADERS = [
     'session_code',
     'participant_code',
     'participant_label',
+    'group_id',
     'dynamic_group_id',
     'dynamic_group_label',
     'treatment_group',
@@ -85,16 +70,7 @@ EXPORT_HEADERS = [
     'treatment_condition',
     'api_agent_count',
     'rl_agent_count',
-    'pattern_recognition',
-    'noticed_pattern_round',
-    'noticed_pattern_round_label',
-    'pattern_description',
-    'reference_previous_capacity',
-    'predict_next_capacity',
-    'adjust_after_high_cost',
-    'expect_capacity_persistence',
-    'agent_choice_influence',
-    'agent_predictability_effect',
+    *ANSWER_FIELDS,
 ]
 
 
@@ -121,47 +97,65 @@ class Player(BasePlayer):
     api_agent_count = models.IntegerField(initial=0)
     rl_agent_count = models.IntegerField(initial=0)
 
-    pattern_recognition = models.IntegerField(
-        label='你是否感觉实验后半段的瓶颈服务率变化存在一定规律？',
-        choices=PATTERN_CHOICES,
+    service_rate_understanding = models.StringField(
+        label='在其他条件相同时，瓶颈服务率越低，通常意味着什么？',
+        choices=SERVICE_RATE_UNDERSTANDING_CHOICES,
         widget=widgets.RadioSelect,
     )
-    noticed_pattern_round = models.StringField(
-        label='如果你感觉服务率变化规律发生过变化，大约从第几轮开始注意到？',
-        choices=NOTICE_ROUND_CHOICES,
-    )
-    pattern_description = models.LongStringField(
-        label='请用一句话描述你认为实验后半段服务率的变化规律。',
-    )
-    reference_previous_capacity = models.IntegerField(
-        label='你做本轮出发时间选择时，会多大程度参考上一轮的服务率？',
-        choices=REFERENCE_CHOICES,
+    predecision_capacity_access = models.StringField(
+        label='在正式实验的每一轮，你在提交出发时刻之前可以获得哪种服务率信息？',
+        choices=PREDECISION_CAPACITY_ACCESS_CHOICES,
         widget=widgets.RadioSelect,
     )
-    predict_next_capacity = models.IntegerField(
-        label='你是否会根据过去几轮的服务率变化，预测下一轮可能出现的服务率？',
-        choices=FREQUENCY_CHOICES,
+    primary_decision_basis = models.StringField(
+        label='以下哪一项最符合你在大多数轮次中选择出发时刻的主要依据？',
         widget=widgets.RadioSelect,
     )
     adjust_after_high_cost = models.IntegerField(
-        label='上一轮成本较高或排队较严重时，你是否会在下一轮改变出发时间？',
-        choices=ADJUSTMENT_CHOICES,
+        label='上一轮成本较高或排队较严重时，我会在下一轮改变出发时刻。',
+        choices=LIKERT_CHOICES,
         widget=widgets.RadioSelect,
     )
-    expect_capacity_persistence = models.IntegerField(
-        label='当上一轮服务率较低时，你提前出发主要是因为你认为下一轮服务率仍可能较低。',
-        choices=AGREEMENT_CHOICES,
+    anticipate_others = models.IntegerField(
+        label='做选择时，我会考虑其他参与者可能选择哪些出发时刻。',
+        choices=LIKERT_CHOICES,
         widget=widgets.RadioSelect,
     )
-    agent_choice_influence = models.IntegerField(
-        label='自动决策主体（Agent）的存在是否影响了你的出发时间选择？',
-        choices=AGENT_INFLUENCE_CHOICES,
+    avoid_crowded_slots = models.IntegerField(
+        label='我会主动避开自己认为可能较拥挤的出发时刻。',
+        choices=LIKERT_CHOICES,
+        widget=widgets.RadioSelect,
+    )
+    decision_confidence = models.IntegerField(
+        label='在大多数轮次中，我对自己的出发时刻选择有信心。',
+        choices=LIKERT_CHOICES,
+        widget=widgets.RadioSelect,
+    )
+    perceived_information_benefit = models.IntegerField(
+        label='实验中提供的服务率相关信息有助于我降低个人成本。',
+        choices=LIKERT_CHOICES,
+        widget=widgets.RadioSelect,
+    )
+    perceived_departure_concentration = models.IntegerField(
+        label='我感觉参与者的选择经常集中在少数几个出发时刻。',
+        choices=LIKERT_CHOICES,
+        widget=widgets.RadioSelect,
+    )
+    agent_changed_strategy = models.IntegerField(
+        label='知道本组中存在Agent后，我改变了自己的出发时刻策略。',
+        choices=LIKERT_CHOICES,
         widget=widgets.RadioSelect,
         blank=True,
     )
-    agent_predictability_effect = models.IntegerField(
-        label='你认为 Agent 的加入使整个交通环境变得：',
-        choices=AGENT_PREDICTABILITY_CHOICES,
+    expected_agent_consistency = models.IntegerField(
+        label='我预期Agent会比人类更一致地根据服务率相关信息调整出发时刻。',
+        choices=LIKERT_CHOICES,
+        widget=widgets.RadioSelect,
+        blank=True,
+    )
+    agent_induced_avoidance = models.IntegerField(
+        label='由于本组中存在Agent，我会更主动地避开可能拥挤的出发时刻。',
+        choices=LIKERT_CHOICES,
         widget=widgets.RadioSelect,
         blank=True,
     )
@@ -201,6 +195,13 @@ def information_condition_for_player(player):
         if condition in {'I0', 'I1'}:
             return condition
     return ''
+
+
+def primary_decision_basis_choices(player):
+    choices = list(PRIMARY_DECISION_BASIS_CHOICES)
+    if information_condition_for_player(player) != 'I1':
+        choices = [choice for choice in choices if choice[0] != 'current_rate']
+    return choices
 
 
 def copy_experiment_metadata(player):
@@ -244,25 +245,21 @@ def survey_context(player, step):
     }
 
 
-class PatternRecognition(Page):
+class UnderstandingAndStrategy(Page):
     form_model = 'player'
-    form_fields = [
-        'pattern_recognition',
-        'noticed_pattern_round',
-        'pattern_description',
-    ]
+    form_fields = PAGE_ONE_FIELDS
 
     @staticmethod
     def vars_for_template(player):
         return survey_context(player, 1)
 
 
-class StrategySurvey(Page):
+class DecisionExperience(Page):
     form_model = 'player'
 
     @staticmethod
     def get_form_fields(player):
-        fields = list(COMMON_STRATEGY_FIELDS)
+        fields = list(PAGE_TWO_FIELDS)
         if treatment_group_for_player(player) == 'HA':
             fields.extend(AGENT_FIELDS)
         return fields
@@ -288,29 +285,21 @@ class SurveyComplete(Page):
     def vars_for_template(player):
         copy_experiment_metadata(player)
         return {
-            'answered_questions': 9 if player.treatment_group == 'HA' else 7,
+            'answered_questions': 12 if player.treatment_group == 'HA' else 9,
             'has_payment_page': 'payment_info' in player.session.config.get(
                 'app_sequence', []
             ),
         }
 
 
-def noticed_round_label(player):
-    value = player.field_maybe_none('noticed_pattern_round')
-    if value == 'none':
-        return '未发现明显变化'
-    if value:
-        return f'正式第 {value} 轮'
-    return ''
-
-
 def custom_export(players):
     yield EXPORT_HEADERS
     for player in players:
-        yield [
+        metadata = [
             player.session.code,
             player.participant.code,
             player.participant.label or '',
+            player.dynamic_group_id,
             player.dynamic_group_id,
             player.dynamic_group_label,
             player.treatment_group,
@@ -318,17 +307,9 @@ def custom_export(players):
             player.treatment_condition,
             player.api_agent_count,
             player.rl_agent_count,
-            player.field_maybe_none('pattern_recognition') or '',
-            player.field_maybe_none('noticed_pattern_round') or '',
-            noticed_round_label(player),
-            player.field_maybe_none('pattern_description') or '',
-            player.field_maybe_none('reference_previous_capacity') or '',
-            player.field_maybe_none('predict_next_capacity') or '',
-            player.field_maybe_none('adjust_after_high_cost') or '',
-            player.field_maybe_none('expect_capacity_persistence') or '',
-            player.field_maybe_none('agent_choice_influence') or '',
-            player.field_maybe_none('agent_predictability_effect') or '',
         ]
+        answers = [player.field_maybe_none(field_name) or '' for field_name in ANSWER_FIELDS]
+        yield metadata + answers
 
 
-page_sequence = [PatternRecognition, StrategySurvey, SurveyComplete]
+page_sequence = [UnderstandingAndStrategy, DecisionExperience, SurveyComplete]

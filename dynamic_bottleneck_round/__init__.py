@@ -171,7 +171,9 @@ def service_batch_wait_minutes(
     inherited_wait = max(0, float(first_service_start_minute) - float(departure_minute))
     service_window = float(capacity_window_minutes)
     batch_service_duration = numeric_load / numeric_capacity * service_window
-    return inherited_wait + max(0, batch_service_duration - service_window)
+    # The entire batch's bottleneck passage is additional to free-flow travel;
+    # no service window is absorbed into the fixed driving time.
+    return inherited_wait + batch_service_duration
 
 
 def capacity_reveal_description(config: StochasticCapacityConfig) -> str:

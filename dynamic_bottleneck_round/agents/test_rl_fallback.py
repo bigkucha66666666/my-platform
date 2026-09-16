@@ -2,6 +2,7 @@ import json
 import unittest
 
 from dynamic_bottleneck_round.agents.rl_fallback import (
+    _estimated_cost,
     choose_rl_departure,
     initial_rl_state,
     observe_rl_outcome,
@@ -11,6 +12,26 @@ from dynamic_bottleneck_round.agents.rl_fallback import (
 
 
 class DynamicRLFallbackPolicyTests(unittest.TestCase):
+    def test_estimated_cost_counts_full_bottleneck_service_duration(self):
+        cost = _estimated_cost(
+            selected_slot=1,
+            capacity=2,
+            available_slots=({'slot': 1, 'departure_minute': 474},),
+            previous_counts={1: 5},
+            cost_parameters={
+                'queue_cost_per_minute': 2,
+                'early_cost_per_minute': 1,
+                'late_cost_per_minute': 3,
+                'preferred_arrival_minute': 480,
+                'free_flow_travel_minutes': 6,
+                'capacity_window_minutes': 1,
+            },
+            toll_by_slot={},
+            reward_by_slot={},
+        )
+        # 6 / 2 = 3 extra minutes, arrival 08:03: queue 6 + late 9.
+        self.assertEqual(cost, 15)
+
     def setUp(self):
         self.capacity_states = (
             {'capacity': 1, 'probability': 1 / 3},

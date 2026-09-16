@@ -286,7 +286,7 @@ def _estimated_cost(
             raise ValueError('RL capacity must be positive.')
         inherited_wait = max(0.0, first_service_start - departure_minute)
         service_duration = load / numeric_capacity * service_window
-        queue_delay = inherited_wait + max(0.0, service_duration - service_window)
+        queue_delay = inherited_wait + service_duration
         if slot == selected_slot:
             arrival = departure_minute + free_flow + queue_delay
             early = max(0.0, preferred_arrival - arrival)

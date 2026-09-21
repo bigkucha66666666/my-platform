@@ -12,3 +12,4 @@ class PlayerBot(Bot):
             {'access_password': expected_password},
         )
         expect(self.participant.vars.get('access_granted'), '==', True)
+        expect(bool(self.participant.vars.get('access_granted_at_ts')), '==', True)

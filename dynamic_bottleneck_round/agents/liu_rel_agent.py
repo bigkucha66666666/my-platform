@@ -1,4 +1,4 @@
-"""Pure uniform-capacity-conditioned Liu-REL departure-choice mechanics."""
+"""Pure truncated-normal-capacity-conditioned Liu-REL mechanics."""
 
 from __future__ import annotations
 
@@ -8,11 +8,15 @@ import math
 import random
 from typing import Iterable, Mapping, Sequence
 
+from ..stochastic_capacity import StochasticCapacityConfig
 
-LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_uniform_capacity_v1'
+
+LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_truncated_normal_capacity_v2'
 INFORMATION_CONDITIONS = {'I0', 'I1'}
 PHI_FLOOR = 1e-9
-CAPACITY_KERNEL_BANDWIDTH = (4.00 - 1.33) / math.sqrt(12)
+CAPACITY_KERNEL_BANDWIDTH = (
+    StochasticCapacityConfig().truncated_standard_deviation
+)
 
 
 class LiuRELAlgorithmError(ValueError):

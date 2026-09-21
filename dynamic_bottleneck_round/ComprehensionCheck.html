@@ -441,7 +441,7 @@
                 <p class="scenario-label">本组规则</p>
                 <div class="scenario-grid">
                     <div class="scenario-chip"><b>组内关系</b><span>同组同轮面对同一服务率</span></div>
-                    <div class="scenario-chip"><b>可能范围</b><span>1.33–4.00 主体 / 分钟</span></div>
+                    <div class="scenario-chip"><b>可能范围</b><span>1.33–4.00 人/分钟（有界截断正态分布）</span></div>
                     <div class="scenario-chip"><b>你的条件</b><span>{{ capacity_reveal_description }}</span></div>
                     <div class="scenario-chip"><b>判断时点</b><span>提交本轮出发时间之前</span></div>
                 </div>
@@ -449,7 +449,7 @@
             <div class="answer-options">
                 <label class="answer-option">
                     <input type="radio" name="comprehension_q4" value="a">
-                    <span>同组同轮服务率相同；决策前只知服务率的均匀分布范围，提交后才看到本轮精确值</span>
+                    <span>同组同轮服务率相同；决策前只知有界截断正态分布、范围和中心值，提交后才看到本轮精确值</span>
                 </label>
                 <label class="answer-option">
                     <input type="radio" name="comprehension_q4" value="b">

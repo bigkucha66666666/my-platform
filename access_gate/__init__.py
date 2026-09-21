@@ -1,3 +1,5 @@
+import time
+
 from otree.api import *
 from .strict_room_labels import install_strict_room_label_lookup
 
@@ -49,7 +51,9 @@ class AccessGate(Page):
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
-        player.participant.vars['access_granted'] = True
+        participant_vars = player.participant.vars
+        participant_vars['access_granted'] = True
+        participant_vars.setdefault('access_granted_at_ts', time.time())
 
 
 page_sequence = [AccessGate]

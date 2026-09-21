@@ -5,6 +5,14 @@
 <div class="dynamic-report">
   <div class="report-meta">
     <div>Session Code：<strong>{{ session_code }}</strong></div>
+    <div>实验模式：<strong>{{ if pilot_mode_enabled }}预实验（自定义人数）{{ else }}正式/预览配置{{ endif }}</strong></div>
+    <div class="agent-summary">
+      <span>服务率分布：<strong>截断正态（{{ capacity_metadata.distribution }}）</strong></span>
+      <span>基础正态参数：<strong>μ={{ capacity_metadata.mu }}，σ={{ capacity_metadata.sigma }}</strong></span>
+      <span>截断范围：<strong>{{ capacity_metadata.min }}–{{ capacity_metadata.max }} 人/分钟</strong></span>
+      <span>截断后理论均值：<strong>{{ capacity_metadata.truncated_mean }}</strong></span>
+      <span>截断后理论标准差：<strong>{{ capacity_metadata.truncated_sd }}</strong></span>
+    </div>
     <div class="agent-summary">
       <span>Agent 模式：<strong>{{ agent_summary.api_agent_mode }}</strong></span>
       <span>DeepSeek Agent 轮次记录：<strong>{{ agent_summary.api_agent_record_count }}</strong></span>
@@ -15,9 +23,14 @@
       <span>LLM 受限记忆：<strong>{{ if agent_summary.limited_memory_enabled }}开启（最多 {{ agent_summary.limited_memory_max_chars }} 字）{{ else }}关闭{{ endif }}</strong></span>
     </div>
   </div>
+  {{ if planned_groups }}
+  <section class="report-card"><h4>创建时计划构成（非实际到场数）</h4><table class="report-table"><thead><tr><th>组</th><th>处理条件</th><th>计划 Human</th><th>计划 LLM</th><th>计划 RL</th><th>计划总主体</th></tr></thead><tbody>
+    {{ for group in planned_groups }}<tr><td>{{ group.label }}</td><td>{{ group.treatment_condition }}</td><td>{{ group.human }}</td><td>{{ group.api }}</td><td>{{ group.rl }}</td><td>{{ group.total }}</td></tr>{{ endfor }}
+  </tbody></table></section>
+  {{ endif }}
   <div class="report-grid">
-    <section class="report-card"><h4>各轮小组结果</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>服务率</th><th>等级</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>DeepSeek Agent</th><th>独立 RL 参与者</th><th>API 回退</th><th>RL 备用接管</th><th>出发时间分布</th></tr></thead><tbody>
-      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.capacity_level }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.api_agent_count }}</td><td>{{ row.independent_rl_agent_count }}</td><td>{{ row.agent_fallback_count }}</td><td>{{ row.rl_fallback_count }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
+    <section class="report-card"><h4>各轮小组结果（实际记录）</h4><table class="report-table"><thead><tr><th>轮次</th><th>组</th><th>计划 Human</th><th>本轮实际进入 Human</th><th>Human 手动选择</th><th>Human 自动补选</th><th>Human 尚无选择</th><th>服务率（人/分钟）</th><th>等级</th><th>收费窗口</th><th>收费额</th><th>平均收费</th><th>平均排队</th><th>平均成本</th><th>DeepSeek Agent 决策记录</th><th>独立 RL 决策记录</th><th>API 回退</th><th>RL 备用接管</th><th>出发时间分布</th></tr></thead><tbody>
+      {{ for row in round_rows }}<tr><td>{{ row.round_number }}</td><td>{{ row.group_id }}</td><td>{{ row.planned_group_human_count }}</td><td>{{ row.entered_human_count }}</td><td>{{ row.manual_human_count }}</td><td>{{ row.automatic_human_count }}</td><td>{{ row.no_choice_human_count }}</td><td>{{ row.dynamic_capacity }}</td><td>{{ row.capacity_level }}</td><td>{{ row.coarse_toll_time_window_spec }}</td><td>{{ row.coarse_toll_points }}</td><td>{{ row.average_toll }}</td><td>{{ row.average_queue_delay }}</td><td>{{ row.average_cost }}</td><td>{{ row.api_agent_count }}</td><td>{{ row.independent_rl_agent_count }}</td><td>{{ row.agent_fallback_count }}</td><td>{{ row.rl_fallback_count }}</td><td>{{ row.departure_distribution }}</td></tr>{{ endfor }}
     </tbody></table></section>
     <section class="report-card"><h4>服务率等级出现次数</h4><table class="report-table"><thead><tr><th>等级</th><th>出现次数</th></tr></thead><tbody>
       {{ for row in state_rows }}<tr><td>{{ row.state }}</td><td>{{ row.count }}</td></tr>{{ endfor }}

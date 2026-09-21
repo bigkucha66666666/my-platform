@@ -117,10 +117,11 @@ class AdminAgentCountTemplateTests(unittest.TestCase):
         self.assertIn("sourceFor(configName, fieldName)?.closest('tr')?.setAttribute('hidden', 'hidden')", template)
         self.assertIn("const replacedAgentFields = new Set([", template)
 
-    def test_template_uses_native_numeric_validation_message(self):
+    def test_single_agent_count_uses_native_numeric_validation_message(self):
         template = self.template_path.read_text(encoding='utf-8')
 
-        self.assertNotIn('setCustomValidity', template)
+        self.assertNotIn('singleCountInput.setCustomValidity', template)
+        self.assertIn('activeCountInput.checkValidity()', template)
 
 
 if __name__ == '__main__':

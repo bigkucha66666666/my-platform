@@ -316,14 +316,27 @@
                         你已完成 {{ payoff_rounds }} 轮{{ experiment_label }}。请核对下方奖励信息，并保留兑换编号用于后续核验。
                     </p>
                 </div>
-                <div class="payment-status">结算完成</div>
+                <div class="payment-status">
+                    {{ if is_dynamic_cash and not cash_settlement_ready }}待人工核验{{ else }}结算完成{{ endif }}
+                </div>
             </div>
 
             <div class="payment-total">
                 <div class="payment-total-main">
-                    <span class="payment-total-label">最终累计奖励</span>
-                    <p class="payment-total-value">{{ total_payoff }}</p>
-                    <span class="payment-total-unit">{{ experiment_label }} 积分</span>
+                    {{ if is_dynamic_cash }}
+                        <span class="payment-total-label">最终实验报酬</span>
+                        {{ if cash_settlement_ready }}
+                            <p class="payment-total-value">¥{{ cash_total_label }}</p>
+                            <span class="payment-total-unit">人民币 · 基础 ¥{{ cash_base_label }} + 绩效 ¥{{ cash_bonus_label }}</span>
+                        {{ else }}
+                            <p class="payment-total-value">待核验</p>
+                            <span class="payment-total-unit">正式轮次成本记录未齐，请凭兑换编号联系管理员确认金额。</span>
+                        {{ endif }}
+                    {{ else }}
+                        <span class="payment-total-label">最终累计奖励</span>
+                        <p class="payment-total-value">{{ total_payoff }}</p>
+                        <span class="payment-total-unit">{{ experiment_label }} 积分</span>
+                    {{ endif }}
                 </div>
 
                 <div class="payment-code-card">
@@ -346,10 +359,18 @@
                         <p class="payment-summary-value">{{ experiment_label }}</p>
                     </div>
                     <div class="payment-summary-item">
-                        <span class="payment-summary-key">奖励来源</span>
-                        <p class="payment-summary-value">{{ payoff_source_label }}</p>
+                        {{ if is_dynamic_cash and cash_settlement_ready }}
+                            <span class="payment-summary-key">正式轮次平均成本</span>
+                            <p class="payment-summary-value">{{ formal_mean_cost_label }}</p>
+                        {{ else }}
+                            <span class="payment-summary-key">奖励来源</span>
+                            <p class="payment-summary-value">{{ payoff_source_label }}</p>
+                        {{ endif }}
                     </div>
                 </div>
+                {{ if is_dynamic_cash }}
+                    <p class="text-sub">仅正式 30 轮个人成本用于绩效结算；热身轮不计入。各实验组使用同一规则（{{ payment_rule_version }}），实验积分与人民币报酬分开记录。</p>
+                {{ endif }}
             </div>
 
             <div class="payment-panel">
@@ -388,7 +409,7 @@
 
             <div class="payment-panel">
                 <h3 class="payment-panel-title">核对重点</h3>
-                <p class="text-sub">重点核对两项信息：最终累计奖励和兑换编号。若现场实验要求截图或登记，请以本页显示内容为准。</p>
+                <p class="text-sub">重点核对两项信息：{{ if is_dynamic_cash }}最终实验报酬{{ else }}最终累计奖励{{ endif }}和兑换编号。若现场实验要求截图或登记，请以本页显示内容为准。</p>
             </div>
         </section>
     </div>

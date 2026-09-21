@@ -603,16 +603,20 @@
             <section class="capacity-state-panel" aria-label="随机瓶颈服务率分布">
                 <div class="capacity-state-head">
                     <p class="capacity-state-title">随机瓶颈服务率</p>
-                    <p class="capacity-state-note">每轮服务率从 1.33–4.00 主体/分钟的均匀分布中确定；区间内各等长子区间等概率。</p>
+                    <p class="capacity-state-note">每轮服务率位于 1.33–4.00 人/分钟，中心值为 2.665；中心附近更常见，越接近上下界越少见。</p>
                 </div>
                 <div class="capacity-state-grid">
                     {{ for item in capacity_states }}
                     <div class="capacity-state-item">
-                        <strong>{{ item.label }}容量 · {{ item.range_label }} 主体/分钟</strong>
-                        <span>三个区间各占均匀分布的三分之一</span>
+                        <strong>{{ item.label }}容量 · {{ item.range_label }} 人/分钟</strong>
+                        <span>按有界截断正态分布的三分位区间划分</span>
                     </div>
                     {{ endfor }}
                 </div>
+                <details class="capacity-reveal-copy">
+                    <summary>查看分布参数（非作答必需）</summary>
+                    <p>基础正态尺度参数 σ={{ capacity_sigma }} 人/分钟；范围限定后的理论标准差约为 {{ capacity_truncated_sd }} 人/分钟。理论均值为 {{ capacity_mu }} 人/分钟。</p>
+                </details>
                 <p class="capacity-reveal-copy">{{ capacity_reveal_description }}</p>
             </section>
 

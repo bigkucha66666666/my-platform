@@ -102,6 +102,17 @@ class WarmupRoundPhaseTests(unittest.TestCase):
             self.assertTrue(formal_start.is_displayed(SimpleNamespace(round_number=4)))
             self.assertFalse(formal_start.is_displayed(SimpleNamespace(round_number=5)))
 
+    def test_formal_start_discloses_cash_incentive_before_paid_rounds(self):
+        html = Path('dynamic_bottleneck_round/FormalStart.html').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn('基础报酬 15 元', html)
+        self.assertIn('绩效报酬 0–20 元', html)
+        self.assertIn('正式 30 轮', html)
+        self.assertIn('平均成本为 20', html)
+        self.assertIn('25 元', html)
+        self.assertIn('热身轮不计入', html)
+
     def test_formal_payoff_total_excludes_warmup_rounds(self):
         formal_payoff_total = getattr(dynamic_app, 'formal_payoff_total', None)
         self.assertIsNotNone(formal_payoff_total)
@@ -127,6 +138,40 @@ class WarmupRoundPhaseTests(unittest.TestCase):
             30.375,
             places=12,
         )
+
+    def test_formal_cost_total_excludes_warmup_rounds(self):
+        rounds = [
+            SimpleNamespace(round_number=1, total_cost=99),
+            SimpleNamespace(round_number=3, total_cost=98),
+            SimpleNamespace(round_number=4, total_cost=10),
+            SimpleNamespace(round_number=5, total_cost=20),
+        ]
+        player = SimpleNamespace(in_all_rounds=lambda: rounds)
+
+        self.assertEqual(dynamic_app.formal_cost_total(player), 30)
+
+    def test_decimal_formal_cost_total_avoids_binary_sum_at_cent_boundary(self):
+        rounds = [
+            SimpleNamespace(round_number=number, total_cost=20.11)
+            for number in range(4, 34)
+        ]
+        player = SimpleNamespace(in_all_rounds=lambda: rounds)
+
+        exact_total = dynamic_app.formal_cost_decimal_total(player)
+        self.assertEqual(str(exact_total), '603.30')
+
+    def test_settled_formal_count_rejects_unfinished_earlier_round(self):
+        rounds = [
+            SimpleNamespace(
+                round_number=number,
+                group=SimpleNamespace(results_ready=(number not in (12, 33))),
+            )
+            for number in range(4, 34)
+        ]
+        player = SimpleNamespace(in_all_rounds=lambda: rounds)
+        self.assertEqual(dynamic_app.settled_formal_round_count(player, 33), 29)
+        rounds[8].group.results_ready = True
+        self.assertEqual(dynamic_app.settled_formal_round_count(player, 33), 30)
 
     def test_custom_export_omits_warmup_and_renumbers_formal_rounds(self):
         players = [SimpleNamespace(round_number=value) for value in (1, 3, 4, 5)]
@@ -157,6 +202,32 @@ class WarmupRoundPhaseTests(unittest.TestCase):
 
         self.assertEqual(rows, [])
         self.assertEqual(states, [])
+
+    def test_admin_report_exposes_truncated_normal_distribution_metadata(self):
+        session = SimpleNamespace(
+            code='SESSION01',
+            config={
+                'capacity_distribution': 'truncated_normal',
+                'capacity_mu': 2.665,
+                'capacity_sigma': 0.80,
+                'capacity_min': 1.33,
+                'capacity_max': 4.00,
+            },
+        )
+        subsession = SimpleNamespace(
+            session=session,
+            in_all_rounds=lambda: [],
+        )
+
+        context = dynamic_app.vars_for_admin_report(subsession)
+
+        self.assertEqual(context['capacity_metadata']['distribution'], 'truncated_normal')
+        self.assertEqual(context['capacity_metadata']['mu'], 2.665)
+        self.assertEqual(context['capacity_metadata']['sigma'], 0.80)
+        self.assertAlmostEqual(context['capacity_metadata']['truncated_mean'], 2.665)
+        self.assertAlmostEqual(
+            context['capacity_metadata']['truncated_sd'], 0.6371680565, places=9
+        )
 
 
 class GroupSpecificAgentConfigTests(unittest.TestCase):
@@ -321,6 +392,17 @@ class GroupSpecificAgentConfigTests(unittest.TestCase):
 
 
 class DynamicCapacityQueueTests(unittest.TestCase):
+    def test_truncated_normal_capacity_values_feed_continuous_service_time(self):
+        for capacity in (1.5, 2.665, 3.75):
+            with self.subTest(capacity=capacity):
+                wait = service_batch_wait_minutes(
+                    departure_minute=474,
+                    first_service_start_minute=474,
+                    load=5,
+                    capacity=capacity,
+                )
+                self.assertAlmostEqual(wait, 5 / capacity, places=10)
+
     def test_current_capacity_changes_same_minute_batch_wait(self):
         slow_wait = service_batch_wait_minutes(
             departure_minute=474,
@@ -366,7 +448,7 @@ class DynamicCapacityQueueTests(unittest.TestCase):
 
 
 class DynamicCostExportTests(unittest.TestCase):
-    def test_uniform_capacity_cost_uses_only_queue_early_and_late_components(self):
+    def test_random_capacity_cost_uses_only_queue_early_and_late_components(self):
         calculator = getattr(dynamic_app, 'calculate_cost_components', None)
         self.assertIsNotNone(calculator)
 
@@ -900,7 +982,14 @@ class DynamicPresentationContextTests(unittest.TestCase):
             {'capacity_information_condition': 'I0'}
         )
 
-        self.assertIn('均匀分布', capacity_reveal_description(config))
+        self.assertIn('有界截断正态分布', capacity_reveal_description(config))
+
+    def test_results_uses_people_per_minute_capacity_unit(self):
+        html = Path(dynamic_app.__file__).with_name('Results.html').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn('{{ dynamic_capacity }} 人/分钟', html)
+        self.assertNotIn('主体 / 分钟', html)
 
     def test_queue_example_uses_integer_teaching_values(self):
         config = dynamic_app.parse_stochastic_capacity_config({})
@@ -1043,7 +1132,13 @@ class TemplateContractTests(unittest.TestCase):
             '瓶颈服务率',
         ):
             self.assertIn(text, html)
-        self.assertIn('1.33–4.00 主体/分钟的均匀分布', html)
+        self.assertIn('1.33–4.00 人/分钟', html)
+        self.assertIn('中心值为 2.665', html)
+        self.assertIn('中心附近', html)
+        self.assertIn('基础正态尺度参数', html)
+        self.assertIn('{{ capacity_sigma }}', html)
+        self.assertIn('{{ capacity_truncated_sd }}', html)
+        self.assertNotIn('均匀分布', html)
         self.assertIn('{{ for item in capacity_states }}', html)
         self.assertIn('{{ capacity_reveal_description }}', html)
         self.assertNotIn('目标比例', html)
@@ -1064,7 +1159,8 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn('排队成本', html)
         self.assertIn('早到成本', html)
         self.assertIn('决策前', html)
-        self.assertIn('均匀分布范围', html)
+        self.assertIn('有界截断正态分布', html)
+        self.assertNotIn('均匀分布范围', html)
         self.assertIn('本轮精确服务率和容量等级', html)
         self.assertIn('{{ comprehension_q4_correct }}', html)
         self.assertNotIn('粗收费', html)
@@ -1086,7 +1182,7 @@ class TemplateContractTests(unittest.TestCase):
 
         self.assertIn('{{ if current_capacity_revealed }}', html)
         self.assertIn('本轮瓶颈服务率', html)
-        self.assertIn('{{ actual_capacity_display }} 主体 / 分钟', html)
+        self.assertIn('{{ actual_capacity_display }} 人/分钟', html)
         self.assertIn('通行能力等级：{{ capacity_level_label }}', html)
         self.assertIn('本轮服务率将在提交后公布', html)
         self.assertNotIn('事故', html)
@@ -1178,6 +1274,36 @@ class TemplateContractTests(unittest.TestCase):
 
 
 class SettingsContractTests(unittest.TestCase):
+    def test_dynamic_cash_config_is_frozen_and_uses_cny(self):
+        import settings
+
+        configs = {config['name']: config for config in settings.SESSION_CONFIGS}
+        formal = configs['dynamic_bottleneck_round_prod']
+        self.assertEqual(settings.REAL_WORLD_CURRENCY_CODE, 'CNY')
+        self.assertEqual(formal['cash_payment_rule'], 'dynamic_cost_v1')
+        self.assertEqual(formal['participation_fee'], 15)
+        self.assertEqual(formal['real_world_currency_per_point'], 0.01)
+        self.assertNotIn('cash_payment_rule', configs['dynamic_bottleneck_round_demo'])
+
+    def test_dynamic_cash_config_rejects_admin_rate_or_fee_override(self):
+        config = {
+            'name': 'dynamic_bottleneck_round_prod',
+            'cash_payment_rule': 'dynamic_cost_v1',
+            'participation_fee': 15,
+            'real_world_currency_per_point': 0.01,
+        }
+        session = SimpleNamespace(config=config)
+        dynamic_app.validate_cash_payment_config(session)
+        for changes in (
+            {'participation_fee': 20},
+            {'real_world_currency_per_point': 1},
+            {'cash_payment_rule': 'unknown'},
+        ):
+            with self.subTest(changes=changes):
+                changed = SimpleNamespace(config={**config, **changes})
+                with self.assertRaisesRegex(ValueError, '报酬|结算'):
+                    dynamic_app.validate_cash_payment_config(changed)
+
     def test_dynamic_configs_no_longer_expose_rejected_markov_or_toll_rules(self):
         import settings
 
@@ -1207,7 +1333,9 @@ class SettingsContractTests(unittest.TestCase):
             'session_code', 'participant_code', 'group_id', 'round_number',
             'treatment_condition', 'actor_composition', 'information_condition',
             'dynamic_capacity', 'capacity_level', 'capacity_distribution',
-            'capacity_min', 'capacity_max', 'capacity_sequence_id',
+            'capacity_mu', 'capacity_sigma', 'capacity_truncated_mean',
+            'capacity_truncated_sd', 'capacity_min', 'capacity_max',
+            'capacity_sequence_id',
             'capacity_sequence_seed', 'departure_slot', 'departure_minute',
             'formal_round_number', 'actual_capacity',
             'capacity_revealed_before_decision', 'departure_time',
@@ -1221,15 +1349,17 @@ class SettingsContractTests(unittest.TestCase):
         self.assertTrue(required.issubset(set(EXPORT_HEADERS)))
 
 
-class UniformCapacityExperimentContractTests(unittest.TestCase):
-    def test_dynamic_settings_use_uniform_capacity_contract(self):
+class TruncatedNormalCapacityExperimentContractTests(unittest.TestCase):
+    def test_dynamic_settings_use_truncated_normal_capacity_contract(self):
         import settings
 
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         formal_names = ('dynamic_bottleneck_round_prod',)
         demo = configs['dynamic_bottleneck_round_demo']
         for config in [configs[name] for name in formal_names] + [demo]:
-            self.assertEqual(config['capacity_distribution'], 'uniform')
+            self.assertEqual(config['capacity_distribution'], 'truncated_normal')
+            self.assertEqual(config['capacity_mu'], 2.665)
+            self.assertEqual(config['capacity_sigma'], 0.80)
             self.assertEqual(config['capacity_min'], 1.33)
             self.assertEqual(config['capacity_max'], 4.00)
             self.assertEqual(config['capacity_sequence_seed'], 2026091101)
@@ -1301,7 +1431,7 @@ class UniformCapacityExperimentContractTests(unittest.TestCase):
                 'capacity_information_condition': (
                     'I1' if treatment.endswith('I1') else 'I0'
                 ),
-                'capacity_distribution': 'uniform',
+                'capacity_distribution': 'truncated_normal',
                 'capacity_min': 1.33,
                 'capacity_max': 4.00,
                 'capacity_sequence_seed': 2026091101,
@@ -1502,13 +1632,100 @@ class UniformCapacityExperimentContractTests(unittest.TestCase):
         self.assertEqual(session.config['participant_label_assignment'], '')
 
 
+class PilotCompositionTests(unittest.TestCase):
+    SPEC = 'G01:H-I0,human=12,api=0,rl=0;G02:HA-I1,human=8,api=10,rl=10'
+
+    @staticmethod
+    def session(spec=SPEC, **extra):
+        return SimpleNamespace(config={
+            'name': 'dynamic_bottleneck_round_prod',
+            'pilot_mode_enabled': 1,
+            'pilot_group_spec': spec,
+            'group_treatment_spec': 'G01:H-I0',
+            **extra,
+        }, vars={})
+
+    def test_parser_preserves_treatments_and_custom_counts(self):
+        parsed = dynamic_app.parse_pilot_group_spec(self.SPEC)
+        self.assertEqual([(row['human'], row['api'], row['rl']) for row in parsed.values()],
+                         [(12, 0, 0), (8, 10, 10)])
+        self.assertEqual(parsed['G02']['information_condition'], 'I1')
+
+    def test_parser_rejects_invalid_compositions_and_syntax(self):
+        invalid = (
+            'G01:H-I0,human=12,api=1,rl=0',
+            'G01:HA-I0,human=12,api=0,rl=0',
+            'G01:H-I0,human=0,api=0,rl=0',
+            'G01:HA-I0,human=30,api=1,rl=0',
+            'G01:HA-I0,human=1,api=11,rl=0',
+            'G01:H-I0,human=1.0,api=0,rl=0',
+            'G01:H-I0,human=01,api=0,rl=0',
+            'G01:H-I0,human=1,api=0',
+            'G01:H-I0,human=1,api=0,rl=0,extra=1',
+            'G01:H-I0,human=1,api=0,rl=0;G01:H-I1,human=1,api=0,rl=0',
+            'G02:H-I0,human=1,api=0,rl=0',
+        )
+        for spec in invalid:
+            with self.subTest(spec=spec), self.assertRaises(ValueError):
+                dynamic_app.parse_pilot_group_spec(spec)
+
+    def test_pilot_uses_actual_group_counts_and_seats(self):
+        session = self.session()
+        treatments = dynamic_app.configure_formal_treatments(session)
+        matrix = dynamic_app.build_treatment_group_matrix([object() for _ in range(20)], treatments)
+        self.assertEqual([len(group) for group in matrix], [12, 8])
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 1), 0)
+        self.assertEqual(dynamic_app.api_agent_count_per_group(session, 2), 10)
+        self.assertEqual(dynamic_app.rl_agent_count_per_group(session, 2), 10)
+        self.assertEqual(dynamic_app.validate_formal_actor_composition(session, matrix),
+                         {'G01': 'H', 'G02': 'HA'})
+
+    def test_pilot_rejects_preview_conflict(self):
+        with self.assertRaisesRegex(ValueError, '预实验.*预览'):
+            dynamic_app.configure_formal_treatments(
+                self.session(flow_preview_enabled=1)
+            )
+
+    def test_pilot_room_labels_follow_group_human_counts(self):
+        session = self.session(
+            participant_label_file='_rooms/econ101.txt',
+            participant_label_assignment='sequential',
+        )
+        participants = []
+        for _ in range(20):
+            participant = SimpleNamespace(vars={}, label=None)
+            participant.set_label = lambda value, p=participant: setattr(p, 'label', value)
+            participants.append(participant)
+        players = [SimpleNamespace(participant=participant) for participant in participants]
+
+        matrix, labels = dynamic_app.prepare_formal_group_matrix(session, players)
+
+        self.assertEqual([len(group) for group in matrix], [12, 8])
+        self.assertEqual(labels['G01'], [f'P{n:03d}' for n in range(1, 13)])
+        self.assertEqual(labels['G02'], [f'P{n:03d}' for n in range(13, 21)])
+        self.assertEqual(players[12].participant.vars['expected_room_label'], 'P013')
+
+    def test_pilot_room_rejects_more_humans_than_label_file(self):
+        spec = ';'.join(
+            f'G{n:02d}:H-I0,human=30,api=0,rl=0' for n in range(1, 5)
+        )
+        session = self.session(
+            spec,
+            participant_label_file='_rooms/econ101.txt',
+            participant_label_assignment='sequential',
+        )
+        players = [SimpleNamespace(participant=SimpleNamespace(vars={})) for _ in range(120)]
+        with self.assertRaisesRegex(ValueError, 'Room 标签数量不足'):
+            dynamic_app.prepare_formal_group_matrix(session, players)
+
+
 class DynamicCapacityLifecycleTests(unittest.TestCase):
     @staticmethod
     def make_session(name='dynamic_bottleneck_round_demo', preset='auto'):
         return SimpleNamespace(
             config={
                 'name': name,
-                'capacity_distribution': 'uniform',
+                'capacity_distribution': 'truncated_normal',
                 'capacity_min': 1.33,
                 'capacity_max': 4.00,
                 'capacity_sequence_seed': 2026091101,
@@ -1582,10 +1799,12 @@ class DynamicCapacityLifecycleTests(unittest.TestCase):
                 'capacity_level': 'low',
                 'sequence_id': 'auto',
                 'sequence_seed': 2026091101,
-                'distribution': 'uniform',
+                'distribution': 'truncated_normal',
+                'capacity_mu': 2.665,
+                'capacity_sigma': 0.80,
                 'capacity_min': 1.33,
                 'capacity_max': 4.0,
-                'stratum_index': 1,
+                'quantile_stratum_index': 1,
             }
         ] * 30
         session.vars[dynamic_app.CAPACITY_SEQUENCE_SESSION_VAR] = formal_records
@@ -1676,13 +1895,13 @@ class DynamicCapacityLifecycleTests(unittest.TestCase):
             self.assertEqual(str(column.type), 'FLOAT')
 
 
-class UniformCapacityLifecycleContractTests(unittest.TestCase):
+class TruncatedNormalCapacityLifecycleContractTests(unittest.TestCase):
     @staticmethod
     def make_session(name='dynamic_bottleneck_round_demo', sequence_id='auto'):
         return SimpleNamespace(
             config={
                 'name': name,
-                'capacity_distribution': 'uniform',
+                'capacity_distribution': 'truncated_normal',
                 'capacity_min': 1.33,
                 'capacity_max': 4.00,
                 'capacity_sequence_seed': 2026091101,
@@ -1702,7 +1921,7 @@ class UniformCapacityLifecycleContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '正式.*S01-S05'):
             dynamic_app.capacity_sequence_for_session(session)
 
-    def test_named_sequence_loads_frozen_uniform_records(self):
+    def test_named_sequence_loads_frozen_truncated_normal_records(self):
         session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
 
         records = dynamic_app.capacity_sequence_for_session(session)
@@ -1715,6 +1934,22 @@ class UniformCapacityLifecycleContractTests(unittest.TestCase):
             all(record['actual_capacity'] == round(record['actual_capacity'], 2)
                 for record in records)
         )
+
+    def test_all_fixed_sequences_match_between_separate_i0_i1_sessions(self):
+        for index in range(1, 6):
+            sequence_id = f'S{index:02d}'
+            with self.subTest(sequence_id=sequence_id):
+                sessions = [
+                    self.make_session('dynamic_bottleneck_round_prod', sequence_id)
+                    for _ in range(2)
+                ]
+                for session, condition in zip(sessions, ('I0', 'I1')):
+                    session.config['capacity_sequence_seed'] = 2026091100 + index
+                    session.config['capacity_information_condition'] = condition
+                i0_records = dynamic_app.capacity_sequence_for_session(sessions[0])
+                i1_records = dynamic_app.capacity_sequence_for_session(sessions[1])
+                self.assertEqual(i0_records, i1_records)
+                self.assertEqual(len(i0_records), C.FORMAL_ROUNDS)
 
     def test_initialization_stores_one_session_sequence_not_player_copies(self):
         session = self.make_session()
@@ -1795,6 +2030,69 @@ class UniformCapacityLifecycleContractTests(unittest.TestCase):
         self.assertFalse(player_i0.capacity_revealed_before_decision)
         self.assertTrue(player_i1.capacity_revealed_before_decision)
 
+    def test_i0_and_i1_match_each_formal_round_without_i0_predecision_reveal(self):
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+        session.config.update({
+            'group_treatment_spec': 'G01:H-I0;G02:H-I1',
+            'api_agent_mode': 'off',
+            'api_agent_count_per_group': 0,
+            'rl_agent_enabled': '0',
+            'rl_agent_count_per_group': 0,
+        })
+        dynamic_app.configure_formal_treatments(session)
+        records = dynamic_app.capacity_sequence_for_session(session)
+        session.vars[dynamic_app.CAPACITY_SEQUENCE_SESSION_VAR] = records
+        player_i0, player_i1 = self.make_player(), self.make_player()
+        group_i0 = SimpleNamespace(
+            id_in_subsession=1, session=session,
+            get_players=lambda: [player_i0],
+        )
+        group_i1 = SimpleNamespace(
+            id_in_subsession=2, session=session,
+            get_players=lambda: [player_i1],
+        )
+
+        for formal_round, record in enumerate(records, start=1):
+            with self.subTest(formal_round=formal_round):
+                raw_round = C.WARMUP_ROUNDS + formal_round
+                group_i0.round_number = raw_round
+                group_i1.round_number = raw_round
+                dynamic_app.apply_round_capacity(group_i0)
+                dynamic_app.apply_round_capacity(group_i1)
+                self.assertEqual(group_i0.dynamic_capacity, record['actual_capacity'])
+                self.assertEqual(group_i0.dynamic_capacity, group_i1.dynamic_capacity)
+                self.assertEqual(group_i0.capacity_level, group_i1.capacity_level)
+                self.assertFalse(player_i0.capacity_revealed_before_decision)
+                self.assertTrue(player_i1.capacity_revealed_before_decision)
+                i0_public = dynamic_app.public_capacity_context_for_group(group_i0)
+                i1_public = dynamic_app.public_capacity_context_for_group(group_i1)
+                self.assertNotIn('actual_capacity', i0_public)
+                self.assertNotIn('capacity_level', i0_public)
+                self.assertEqual(i1_public['actual_capacity'], record['actual_capacity'])
+                self.assertEqual(i1_public['capacity_level'], record['capacity_level'])
+
+    def test_v2_session_cache_is_not_read_by_new_capacity_mechanism(self):
+        session = self.make_session('dynamic_bottleneck_round_prod', 'S01')
+        session.config['group_treatment_spec'] = 'G01:H-I1'
+        legacy_key = 'dynamic_bottleneck_round_capacity_sequence_v2'
+        session.vars[legacy_key] = [{'actual_capacity': 4.0}] * C.FORMAL_ROUNDS
+        player = self.make_player()
+        group = SimpleNamespace(
+            id_in_subsession=1,
+            round_number=C.WARMUP_ROUNDS + 1,
+            session=session,
+            get_players=lambda: [player],
+        )
+
+        dynamic_app.apply_round_capacity(group)
+
+        expected = dynamic_app.capacity_sequence_for_session(session)[0]
+        self.assertEqual(group.dynamic_capacity, expected['actual_capacity'])
+        self.assertEqual(
+            session.vars[dynamic_app.CAPACITY_SEQUENCE_SESSION_VAR][0], expected
+        )
+        self.assertEqual(session.vars[legacy_key], [{'actual_capacity': 4.0}] * C.FORMAL_ROUNDS)
+
 
 class DynamicContinuousQueueTests(unittest.TestCase):
     def test_float_capacity_uses_continuous_batch_duration(self):
@@ -1855,7 +2153,7 @@ class DynamicContinuousQueueTests(unittest.TestCase):
         self.assertNotEqual(components['total_cost'], 0.67)
 
 
-class DynamicUniformCapacityCostTests(unittest.TestCase):
+class DynamicRandomCapacityCostTests(unittest.TestCase):
     def test_cost_uses_only_queue_early_and_late_components(self):
         components = dynamic_app.calculate_cost_components(
             queue_delay=2,
@@ -1908,7 +2206,7 @@ class DynamicUniformCapacityCostTests(unittest.TestCase):
         )
 
 
-class DynamicUniformCapacityExportTests(unittest.TestCase):
+class DynamicTruncatedNormalCapacityExportTests(unittest.TestCase):
     @staticmethod
     def make_player_and_group():
         session = SimpleNamespace(code='SESSION01', config={}, vars={})
@@ -1919,7 +2217,7 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
             round_number=C.WARMUP_ROUNDS + 1,
             dynamic_capacity=1.50123456789,
             capacity_level='low',
-            capacity_distribution='uniform',
+            capacity_distribution='truncated_normal',
             capacity_min=1.33,
             capacity_max=4.00,
             information_condition='I1',
@@ -1965,7 +2263,13 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
 
         self.assertEqual(snapshot['actual_capacity'], player.dynamic_capacity)
         self.assertEqual(snapshot['capacity_level'], 'low')
-        self.assertEqual(snapshot['capacity_distribution'], 'uniform')
+        self.assertEqual(snapshot['capacity_distribution'], 'truncated_normal')
+        self.assertEqual(snapshot['capacity_mu'], 2.665)
+        self.assertEqual(snapshot['capacity_sigma'], 0.80)
+        self.assertAlmostEqual(snapshot['capacity_truncated_mean'], 2.665)
+        self.assertAlmostEqual(
+            snapshot['capacity_truncated_sd'], 0.6371680565, places=9
+        )
         self.assertEqual(snapshot['information_condition'], 'I1')
         self.assertNotIn('capacity_sequence_id', snapshot)
         self.assertNotIn('capacity_sequence_seed', snapshot)
@@ -1974,7 +2278,7 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
         self.assertNotIn('actor_type', serialized)
         self.assertNotIn('agent_id', serialized)
 
-    def test_export_schema_uses_uniform_capacity_fields_not_legacy_fields(self):
+    def test_export_schema_uses_truncated_normal_capacity_fields_not_legacy_fields(self):
         required = {
             'treatment_condition',
             'actor_composition',
@@ -1983,6 +2287,10 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
             'dynamic_capacity',
             'capacity_level',
             'capacity_distribution',
+            'capacity_mu',
+            'capacity_sigma',
+            'capacity_truncated_mean',
+            'capacity_truncated_sd',
             'capacity_min',
             'capacity_max',
             'capacity_sequence_id',
@@ -2039,6 +2347,42 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
         self.assertEqual(exported['payoff'], 131.358025)
         self.assertEqual(exported['comprehension_score'], 3)
         self.assertEqual(exported['comprehension_attempts'], 2)
+        self.assertEqual(exported['capacity_mu'], 2.665)
+        self.assertEqual(exported['capacity_sigma'], 0.80)
+        self.assertAlmostEqual(exported['capacity_truncated_mean'], 2.665)
+        self.assertAlmostEqual(
+            exported['capacity_truncated_sd'], 0.6371680565, places=9
+        )
+
+    def test_human_export_keeps_unanswered_round_with_null_time_labels(self):
+        class NullStrictPlayer(SimpleNamespace):
+            def __getattribute__(self, name):
+                value = super().__getattribute__(name)
+                if name in {
+                    'departure_time_label', 'arrival_time_label', 'decision_source',
+                    'dropout_event', 'recovery_reason',
+                } and value is None:
+                    raise TypeError(f'{name} is null')
+                return value
+
+        base, group = self.make_player_and_group()
+        player = NullStrictPlayer(**vars(base))
+        player.departure_slot = None
+        player.departure_minute = None
+        player.departure_time_label = None
+        player.arrival_time_label = None
+        player.decision_source = None
+        player.dropout_event = None
+        player.recovery_reason = None
+        player.field_maybe_none = lambda field_name: vars(player).get(field_name)
+        player.group = group
+
+        exported = dict(zip(EXPORT_HEADERS, dynamic_app.export_row_for_player(player)))
+
+        self.assertEqual(exported['departure_time'], '')
+        self.assertEqual(exported['arrival_time'], '')
+        self.assertEqual(exported['departure_slot'], '')
+        self.assertEqual(exported['decision_source'], '')
 
     def test_custom_export_marks_formal_flow_preview_rows(self):
         player, _group = self.make_player_and_group()
@@ -2046,6 +2390,7 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
             {
                 'name': 'dynamic_bottleneck_round_prod',
                 'flow_preview_enabled': 1,
+                'group_treatment_spec': 'G01:H-I0',
             }
         )
 
@@ -2055,6 +2400,116 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
         ))
 
         self.assertIs(exported['flow_preview_enabled'], True)
+        self.assertEqual(exported['planned_group_human_count'], '')
+
+    def test_pilot_export_separates_planned_composition_and_human_entry(self):
+        player, _group = self.make_player_and_group()
+        player.session.config.update({
+            'name': 'dynamic_bottleneck_round_prod',
+            'pilot_mode_enabled': 1,
+            'pilot_group_spec': 'G01:HA-I1,human=1,api=1,rl=1',
+        })
+        dynamic_app.configure_formal_treatments(player.session)
+        player.participant.label = 'P001'
+        player.participant.vars['access_granted'] = True
+        player.participant.vars['access_granted_at_ts'] = 50
+        player.group.decision_deadline_ts = 100
+        human = dict(zip(EXPORT_HEADERS, dynamic_app.export_row_for_player(player)))
+        agent = dict(zip(EXPORT_HEADERS, dynamic_app.export_row_for_agent_record(
+            {'group_id': 1, 'actor_type': 'rl', 'agent_id': 'rl-1'}, player
+        )))
+        for row in (human, agent):
+            self.assertIs(row['pilot_mode_enabled'], True)
+            self.assertEqual([row[f'planned_group_{key}_count']
+                              for key in ('human', 'api', 'rl', 'total')], [1, 1, 1, 3])
+        self.assertEqual(human['participant_label'], 'P001')
+        self.assertIs(human['access_granted'], True)
+        self.assertEqual(agent['participant_label'], '')
+        self.assertEqual(agent['access_granted'], '')
+
+    def test_pilot_admin_report_keeps_missing_and_auto_choices_distinct(self):
+        player, group = self.make_player_and_group()
+        player.session.config.update({
+            'name': 'dynamic_bottleneck_round_prod',
+            'pilot_mode_enabled': 1,
+            'pilot_group_spec': 'G01:HA-I1,human=3,api=1,rl=1',
+        })
+        dynamic_app.configure_formal_treatments(player.session)
+        player.decision_source = 'manual'
+        player.coarse_toll_charge = 0
+        player.coarse_toll_time_window_spec = ''
+        player.coarse_toll_points = 0
+        player.participant.vars['access_granted'] = True
+        player.participant.vars['access_granted_at_ts'] = 50
+        group.decision_deadline_ts = 100
+        auto = SimpleNamespace(**vars(player))
+        auto.participant = SimpleNamespace(vars={
+            'access_granted': True,
+            'access_granted_at_ts': 50,
+        })
+        auto.decision_source = 'timeout_auto'
+        auto.field_maybe_none = lambda field_name: getattr(auto, field_name, None)
+        missing = SimpleNamespace(**vars(player))
+        missing.participant = SimpleNamespace(vars={})
+        missing.decision_source = ''
+        missing.departure_slot = None
+        missing.departure_minute = None
+        missing.field_maybe_none = lambda field_name: getattr(missing, field_name, None)
+        group.get_players = lambda: [player, auto, missing]
+        with patch.object(dynamic_app, 'active_virtual_decisions_for_group', return_value=[
+            {'actor_type': dynamic_app.API_AGENT_TYPE_DEEPSEEK, 'departure_minute': 466},
+            {'actor_type': dynamic_app.RL_AGENT_TYPE, 'departure_minute': 466},
+        ]):
+            rows, _states, _summary = dynamic_app.build_admin_report_rows(
+                [player, auto, missing]
+            )
+        row = rows[0]
+        self.assertEqual(row['planned_group_human_count'], 3)
+        self.assertEqual(row['entered_human_count'], 2)
+        self.assertEqual(row['manual_human_count'], 1)
+        self.assertEqual(row['automatic_human_count'], 1)
+        self.assertEqual(row['no_choice_human_count'], 1)
+        self.assertEqual(row['api_agent_count'], 1)
+        self.assertEqual(row['independent_rl_agent_count'], 1)
+
+    def test_admin_report_entry_count_is_scoped_to_each_round(self):
+        player, _group = self.make_player_and_group()
+        player.participant.vars['access_granted'] = True
+        player.participant.vars['access_granted_at_ts'] = 200
+        player.group.decision_deadline_ts = 100
+        player.coarse_toll_charge = 0
+        player.coarse_toll_time_window_spec = ''
+        player.coarse_toll_points = 0
+
+        with patch.object(
+            dynamic_app,
+            'active_virtual_decisions_for_group',
+            return_value=[],
+        ):
+            rows, _states, _summary = dynamic_app.build_admin_report_rows([player])
+
+        self.assertEqual(rows[0]['entered_human_count'], 0)
+
+    def test_admin_report_handles_choice_without_decision_source(self):
+        class NullStrictPlayer(SimpleNamespace):
+            def __getattribute__(self, name):
+                value = super().__getattribute__(name)
+                if name == 'decision_source' and value is None:
+                    raise TypeError('decision_source is null')
+                return value
+
+        base, group = self.make_player_and_group()
+        player = NullStrictPlayer(**vars(base))
+        player.group = group
+        player.decision_source = None
+        player.coarse_toll_charge = 0
+        player.coarse_toll_time_window_spec = ''
+        player.coarse_toll_points = 0
+        player.field_maybe_none = lambda field_name: vars(player).get(field_name)
+        with patch.object(dynamic_app, 'active_virtual_decisions_for_group', return_value=[]):
+            rows, _states, _summary = dynamic_app.build_admin_report_rows([player])
+        self.assertEqual(rows[0]['manual_human_count'], 0)
+        self.assertEqual(rows[0]['automatic_human_count'], 0)
 
     def test_agent_export_uses_agent_batch_load_and_six_decimal_capacity(self):
         player, _group = self.make_player_and_group()
@@ -2093,6 +2548,12 @@ class DynamicUniformCapacityExportTests(unittest.TestCase):
         self.assertEqual(exported['total_cost'], 21.419752)
         self.assertEqual(exported['comprehension_score'], '')
         self.assertEqual(exported['comprehension_attempts'], '')
+        self.assertEqual(exported['capacity_mu'], 2.665)
+        self.assertEqual(exported['capacity_sigma'], 0.80)
+        self.assertAlmostEqual(exported['capacity_truncated_mean'], 2.665)
+        self.assertAlmostEqual(
+            exported['capacity_truncated_sd'], 0.6371680565, places=9
+        )
 
 
 class DynamicCapacityPresentationBackendTests(unittest.TestCase):
@@ -2107,7 +2568,7 @@ class DynamicCapacityPresentationBackendTests(unittest.TestCase):
             capacity_sequence_seed=2026091101,
             session=SimpleNamespace(
                 config={
-                    'capacity_distribution': 'uniform',
+                    'capacity_distribution': 'truncated_normal',
                     'capacity_min': 1.33,
                     'capacity_max': 4.0,
                     'capacity_information_condition': information_condition,
@@ -2162,8 +2623,12 @@ class DynamicCapacityPresentationBackendTests(unittest.TestCase):
         self.assertEqual([row['state'] for row in rows], ['low', 'medium', 'high'])
         self.assertEqual([row['label'] for row in rows], ['低', '中', '高'])
         self.assertTrue(all(row['probability'] == 1 / 3 for row in rows))
-        self.assertEqual(rows[0]['range_label'], '1.33–2.21')
-        self.assertEqual(rows[-1]['range_label'], '3.11–4.00')
+        self.assertEqual(rows[0]['range_label'], '1.33–2.35')
+        self.assertEqual(rows[1]['range_label'], '2.36–2.97')
+        self.assertEqual(rows[-1]['range_label'], '2.98–4.00')
+        self.assertAlmostEqual(rows[0]['capacity'], 1.9463110575, places=9)
+        self.assertAlmostEqual(rows[1]['capacity'], 2.665, places=9)
+        self.assertAlmostEqual(rows[2]['capacity'], 3.3836889425, places=9)
 
     def test_information_descriptions_match_i0_i1(self):
         descriptions = {
@@ -2175,7 +2640,7 @@ class DynamicCapacityPresentationBackendTests(unittest.TestCase):
             for condition in ('I0', 'I1')
         }
 
-        self.assertIn('均匀分布', descriptions['I0'])
+        self.assertIn('有界截断正态分布', descriptions['I0'])
         self.assertIn('精确服务率', descriptions['I1'])
 
     def test_warmup_capacity_sequence_is_predeclared(self):
@@ -2205,10 +2670,12 @@ class DynamicLegacyBackendRemovalTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
 
-    def test_uniform_bank_contains_no_legacy_sequence_schema(self):
+    def test_truncated_normal_bank_contains_no_legacy_sequence_schema(self):
         bank_text = Path(
             dynamic_app.__file__
-        ).with_name('uniform_capacity_sequence_bank.json').read_text(encoding='utf-8')
+        ).with_name('truncated_normal_capacity_sequence_bank.json').read_text(
+            encoding='utf-8'
+        )
 
         self.assertNotIn('manual_sequence_spec', bank_text)
         self.assertNotIn('phased_markov', bank_text)
@@ -2224,7 +2691,7 @@ class PlayerBot(Bot):
             expect('开始前最后提醒', 'in', self.html)
             expect('同一轮内保持不变', 'in', self.html)
             expect('固定行驶成本', 'in', self.html)
-            expect('均匀分布', 'in', self.html)
+            expect('中心值', 'in', self.html)
             yield Submission(Introduction, check_html=False)
             expect('同一小组、同一轮', 'in', self.html)
             capacity_config = dynamic_app.capacity_config_for_player(self.player)
@@ -2271,7 +2738,7 @@ class PlayerBot(Bot):
         if phase['is_warmup']:
             expect('本轮瓶颈服务率', 'in', self.html)
         elif capacity_config.information_condition == 'I1':
-            expect('本轮精确服务率', 'in', self.html)
+            expect('本轮瓶颈服务率', 'in', self.html)
             expect(f'{self.player.dynamic_capacity:.2f}', 'in', self.html)
 
         if self.case == 'same_time':
@@ -2318,7 +2785,7 @@ class PlayerBot(Bot):
         )
         expect('上一轮服务率', 'in', self.html)
         expect('本轮真实瓶颈服务率', 'in', self.html)
-        expect(f'{self.player.dynamic_capacity:.2f} 主体 / 分钟', 'in', self.html)
+        expect(f'{self.player.dynamic_capacity:.2f} 人/分钟', 'in', self.html)
         expect('本轮成本与用时', 'in', self.html)
         expect('所有参与者的成本分布', 'in', self.html)
         expect('粗收费', 'in', self.html)
@@ -2372,11 +2839,8 @@ class PlayerBot(Bot):
                     'liu_rel_uniform_initial',
                     'liu_rel_uniform_sparse',
                     'liu_rel_softmax_i0',
-                    'liu_rel_softmax_i1',
+                    'liu_rel_softmax_i1_capacity_kernel',
                     'liu_rel_softmax_i1_backoff_i0',
-                    'liu_rel_softmax_i2_kernel',
-                    'liu_rel_softmax_i2_backoff_i1',
-                    'liu_rel_softmax_i2_backoff_i0',
                     'rl_fallback_lowest_schedule_cost',
                 })
                 rl_states = self.group.get_players()[0].participant.vars.get(
@@ -2456,6 +2920,26 @@ class PlayerBot(Bot):
                     for round_player in self.player.in_all_rounds()
                     if not dynamic_app.is_warmup_round(round_player.round_number)
                 ),
+            )
+            formal_costs = [
+                round_player.total_cost
+                for round_player in self.player.in_all_rounds()
+                if not dynamic_app.is_warmup_round(round_player.round_number)
+            ]
+            expect(
+                self.participant.vars['dynamic_bottleneck_round_total_cost'],
+                '==',
+                sum(formal_costs),
+            )
+            expect(
+                self.participant.vars['dynamic_bottleneck_round_settled_formal_rounds'],
+                '==',
+                C.FORMAL_ROUNDS,
+            )
+            expect(
+                'dynamic_bottleneck_round_total_cost_decimal',
+                'in',
+                self.participant.vars,
             )
 
 

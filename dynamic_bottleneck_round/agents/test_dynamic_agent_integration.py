@@ -45,7 +45,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
             self.assertIn(str(config['rl_fallback_enabled']).lower(), {'0', 'false', 'off'})
             self.assertEqual(
                 config['rl_agent_policy_version'],
-                'dynamic_liu_rel_uniform_capacity_v1',
+                'dynamic_liu_rel_truncated_normal_capacity_v2',
             )
             self.assertEqual(config['rel_lambda'], 0.25)
             self.assertEqual(config['rel_eta'], 14.7445)
@@ -118,7 +118,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
         valid = {
             'name': 'dynamic_bottleneck_round_demo',
             'rl_agent_enabled': '1',
-            'rel_policy_version': 'dynamic_liu_rel_uniform_capacity_v1',
+            'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
             'rel_random_seed': 2026090901,
@@ -144,7 +144,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
                 'name': 'dynamic_bottleneck_round_prod',
                 'group_treatment_spec': 'G01:HA-I0',
                 'rl_agent_enabled': '1',
-                'rel_policy_version': 'dynamic_liu_rel_uniform_capacity_v1',
+                'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
                 'rel_lambda': 0.25,
                 'rel_eta': 14.7445,
                 'rel_random_seed': 2026090901,
@@ -164,7 +164,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
         base = {
             'name': 'dynamic_bottleneck_round_demo',
             'rl_agent_enabled': '1',
-            'rel_policy_version': 'dynamic_liu_rel_uniform_capacity_v1',
+            'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
             'rel_random_seed': 2026090901,
@@ -381,10 +381,14 @@ class DynamicAgentInformationParityTests(unittest.TestCase):
     PUBLIC_FIELDS = {
         'information_condition',
         'capacity_distribution',
+        'capacity_mu',
+        'capacity_sigma',
         'capacity_min',
         'capacity_max',
         'expected_capacity',
         'capacity_standard_deviation',
+        'capacity_truncated_mean',
+        'capacity_truncated_sd',
         'current_capacity_revealed',
         'actual_capacity',
         'capacity_level',
@@ -395,7 +399,9 @@ class DynamicAgentInformationParityTests(unittest.TestCase):
         session = SimpleNamespace(
             config={
                 'name': 'dynamic_bottleneck_round_demo',
-                'capacity_distribution': 'uniform',
+                'capacity_distribution': 'truncated_normal',
+                'capacity_mu': 2.665,
+                'capacity_sigma': 0.80,
                 'capacity_min': 1.33,
                 'capacity_max': 4.00,
                 'capacity_sequence_seed': 2026091101,
@@ -1280,12 +1286,12 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                 'rl_agent_enabled': '1',
                 'rl_agent_count_per_group': 2,
                 'capacity_information_condition': 'I0',
-                'capacity_distribution': 'uniform',
+                'capacity_distribution': 'truncated_normal',
                 'capacity_min': 1.33,
                 'capacity_max': 4.00,
                 'capacity_sequence_seed': 2026091101,
                 'reward_treatment_enabled': 0,
-                'rel_policy_version': 'dynamic_liu_rel_uniform_capacity_v1',
+                'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
                 'rel_lambda': 0.25,
                 'rel_eta': 14.7445,
                 'rel_random_seed': 2026090901,
@@ -1379,7 +1385,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             )
         )
         audit = json.loads(first[0]['context_json'])
-        self.assertEqual(audit['policy_version'], 'dynamic_liu_rel_uniform_capacity_v1')
+        self.assertEqual(audit['policy_version'], 'dynamic_liu_rel_truncated_normal_capacity_v2')
         self.assertIn('capacity_kernel_bandwidth', audit)
         self.assertEqual(audit['information_condition'], 'I0')
         self.assertIn('choice_probabilities', audit)
@@ -1451,7 +1457,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                     'departure_slot': 1,
                     'decision_source': 'liu_rel_uniform_initial',
                     'reason': 'test',
-                    'policy_version': 'dynamic_liu_rel_uniform_capacity_v1',
+                    'policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
                     'rounds_observed': 0,
                     'information_condition': condition,
                     'context_level': 'initial',
@@ -1462,7 +1468,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                     'effective_observation_count': 0.0,
                     'rel_lambda': 0.25,
                     'rel_eta': 14.7445,
-                    'capacity_kernel_bandwidth': 0.770762,
+                    'capacity_kernel_bandwidth': 0.6371680565,
                     'random_seed_fingerprint': 'abcdef123456',
                 }
 
@@ -1514,7 +1520,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'actor_type': 'rl_agent',
             'agent_id': 'G01_RL_01',
             'agent_type': 'rl_agent',
-            'policy_version': 'dynamic_liu_rel_uniform_capacity_v1',
+            'policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
             'persona_id': 'balanced_v1',
             'persona_label': 'balanced',
             'decision_source': 'rl_policy',
@@ -1530,7 +1536,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         self.assertEqual(
             row[app.EXPORT_HEADERS.index('rl_policy_version')],
-            'dynamic_liu_rel_uniform_capacity_v1',
+            'dynamic_liu_rel_truncated_normal_capacity_v2',
         )
 
     def test_group_result_lock_rejects_overlapping_generation(self):
@@ -1632,6 +1638,27 @@ class DynamicAgentDecisionTests(unittest.TestCase):
 
 
 class DynamicAgentAdminTemplateTests(unittest.TestCase):
+    def test_formal_create_page_has_isolated_pilot_builder(self):
+        html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
+            encoding='utf-8'
+        )
+        for value in (
+            'pilot-mode-enabled', 'pilot-group-count', 'pilot-group-rows',
+            'pilot-group-totals', 'pilot_mode_enabled', 'pilot_group_spec',
+            'syncPilotSpec()', 'pilotGroupInputIsValid()',
+        ):
+            with self.subTest(value=value):
+                self.assertIn(value, html)
+
+    def test_pilot_inline_group_total_updates_when_counts_change(self):
+        html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(
+            encoding='utf-8'
+        )
+        sync = html.split('function syncPilotSpec()', 1)[1].split(
+            'function renderPilotRows()', 1
+        )[0]
+        self.assertIn("row.querySelector('.pilot-group-row__sum').textContent", sync)
+
     def test_shared_create_session_form_includes_dynamic_controls(self):
         html = Path('_templates/otree/includes/CreateSessionForm.html').read_text(
             encoding='utf-8'
@@ -1756,10 +1783,27 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             '_templates/otree/includes/DynamicSessionControls.html'
         ).read_text(encoding='utf-8')
 
-        self.assertIn('仅知均匀分布', html)
+        self.assertIn('仅知截断正态分布', html)
+        self.assertIn('I0 · 决策前仅知截断正态分布、范围和中心值', html)
         self.assertIn('本轮精确服务率已知', html)
+        self.assertNotIn('均匀分布', html)
         self.assertNotIn('事故未知', html)
         self.assertNotIn('事故已知', html)
+
+    def test_create_session_page_freezes_truncated_normal_capacity_parameters(self):
+        html = Path(
+            '_templates/otree/includes/DynamicSessionControls.html'
+        ).read_text(encoding='utf-8')
+
+        for field_name in (
+            'capacity_distribution', 'capacity_mu', 'capacity_sigma',
+            'capacity_min', 'capacity_max',
+        ):
+            with self.subTest(field_name=field_name):
+                self.assertIn(f"setSource('{field_name}'", html)
+        self.assertIn("setSource('capacity_distribution', 'truncated_normal')", html)
+        self.assertIn("setSource('capacity_mu', 2.665)", html)
+        self.assertIn("setSource('capacity_sigma', 0.80)", html)
 
     def test_admin_report_separates_deepseek_rl_and_fallback_metrics(self):
         html = Path('dynamic_bottleneck_round/admin_report.html').read_text(
@@ -1770,6 +1814,16 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
         self.assertIn('独立 RL 参与者', html)
         self.assertIn('RL 备用接管', html)
         self.assertIn('independent_rl_agent_count', html)
+        self.assertIn('capacity_metadata.mu', html)
+        self.assertIn('capacity_metadata.sigma', html)
+        self.assertIn('capacity_metadata.truncated_mean', html)
+        self.assertIn('capacity_metadata.truncated_sd', html)
+        self.assertIn('pilot_mode_enabled', html)
+        self.assertIn('planned_groups', html)
+        self.assertIn('本轮实际进入 Human', html)
+        self.assertIn('Human 手动选择', html)
+        self.assertIn('Human 自动补选', html)
+        self.assertIn('Human 尚无选择', html)
 
 
 if __name__ == '__main__':

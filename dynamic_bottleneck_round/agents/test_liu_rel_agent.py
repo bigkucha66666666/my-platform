@@ -354,7 +354,7 @@ class LiuRELChoiceTests(unittest.TestCase):
 
         self.assertEqual(choice['decision_source'], 'liu_rel_softmax_i0')
         self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
-        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_uniform_capacity_v1')
+        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_truncated_normal_capacity_v2')
         self.assertEqual(choice['context_level'], 'i0_all')
         self.assertEqual(len(choice['propensities']), 16)
         self.assertEqual(len(choice['choice_probabilities']), 16)

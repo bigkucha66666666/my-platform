@@ -50,7 +50,7 @@ class IndependentRLAgentPolicyTests(unittest.TestCase):
 
         self.assertEqual(choice['decision_source'], 'liu_rel_uniform_initial')
         self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
-        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_uniform_capacity_v1')
+        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_truncated_normal_capacity_v2')
         self.assertEqual(len(choice['choice_probabilities']), 16)
         self.assertIn('capacity_kernel_bandwidth', choice)
 

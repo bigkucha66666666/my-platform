@@ -58,7 +58,9 @@ DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED = str(
 DYNAMIC_BOTTLENECK_RL_AGENT_COUNT = str(
     environ.get('DYNAMIC_BOTTLENECK_RL_AGENT_COUNT_PER_GROUP', '1') or '1'
 ).strip()
-DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = 'dynamic_liu_rel_uniform_capacity_v1'
+DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = (
+    'dynamic_liu_rel_truncated_normal_capacity_v2'
+)
 DYNAMIC_BOTTLENECK_REL_LAMBDA = environ.get(
     'DYNAMIC_BOTTLENECK_REL_LAMBDA',
     0.25,
@@ -120,7 +122,11 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     grouping_enabled=0,
     manual_grouping_spec='',
     flow_preview_enabled=0,
-    capacity_distribution='uniform',
+    pilot_mode_enabled=0,
+    pilot_group_spec='',
+    capacity_distribution='truncated_normal',
+    capacity_mu=2.665,
+    capacity_sigma=0.80,
     capacity_min=1.33,
     capacity_max=4.00,
     capacity_sequence_seed=2026091101,
@@ -255,6 +261,10 @@ SESSION_CONFIGS = [
         participant_password=PROD_PARTICIPANT_PASSWORD,
         participant_label_file='_rooms/econ101.txt',
         participant_label_assignment='sequential',
+        cash_payment_rule='dynamic_cost_v1',
+        participation_fee=15.00,
+        real_world_currency_per_point=0.01,
+        payoff_source_label='正式 30 轮个人成本（热身轮不计入）',
         group_treatment_spec='G01:H-I0;G02:HA-I0',
         capacity_information_condition='I0',
         api_agent_mode='off',
@@ -272,7 +282,8 @@ SESSION_CONFIGS = [
         app_sequence=['dynamic_bottleneck_round', 'dynamic_bottleneck_survey'],
         doc=(
             "用于 3 轮练习 + 30 轮随机服务率动态瓶颈正式实验的流程走查。\n"
-            "默认按固定种子生成可复现的分层均匀序列；可切换 S01-S05 固定序列。"
+            "默认按固定种子生成可复现的截断正态 CDF 等概率分层序列；"
+            "可切换 S01-S05 固定序列。"
         ),
         api_agent_mode='off',
         api_agent_count_per_group=0,
@@ -315,7 +326,7 @@ SESSION_FIELDS = []
 LANGUAGE_CODE = 'zh-hans'
 
 # e.g. EUR, GBP, CNY, JPY
-REAL_WORLD_CURRENCY_CODE = 'USD'
+REAL_WORLD_CURRENCY_CODE = 'CNY'
 USE_POINTS = True
 
 ROOMS = [

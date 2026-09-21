@@ -362,7 +362,7 @@
   <section class="capacity-panel is-known">
     <div class="capacity-copy">
       <p class="capacity-kicker">本轮瓶颈服务率</p>
-      <p class="capacity-value">{{ actual_capacity_display }} 主体 / 分钟</p>
+      <p class="capacity-value">{{ actual_capacity_display }} 人/分钟</p>
       <p class="capacity-note">通行能力等级：{{ capacity_level_label }}。同组所有主体本轮使用相同服务率。</p>
     </div>
     <div class="capacity-road-scene" aria-hidden="true">
@@ -382,7 +382,7 @@
     <div class="capacity-copy">
       <p class="capacity-kicker">本轮服务率将在提交后公布</p>
       <p class="capacity-note">请根据已经公布的历史结果作出选择。</p>
-      <div class="state-strip"><span class="state-chip">均匀分布 U({{ capacity_min }}, {{ capacity_max }})</span></div>
+      <div class="state-strip"><span class="state-chip">有界截断正态分布 · {{ capacity_min }}–{{ capacity_max }} 人/分钟 · 中心值 2.665</span></div>
     </div>
     <div class="capacity-road-scene" aria-hidden="true">
       <span class="road-dash"></span>

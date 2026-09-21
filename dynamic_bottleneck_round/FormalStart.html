@@ -10,7 +10,10 @@
 <section class="formal-notice">
   <p class="formal-kicker">FORMAL EXPERIMENT</p>
   <h2 class="formal-title">热身已结束</h2>
-  <p class="formal-copy">下一页开始进入正式实验。正式实验共 30 轮，每轮服务率从 {{ capacity_min }}–{{ capacity_max }} 主体/分钟的均匀分布中确定，后续选择和结果将进入正式数据。</p>
+  <p class="formal-copy">下一页开始进入正式实验。正式实验共 30 轮，每轮服务率位于 {{ capacity_min }}–{{ capacity_max }} 人/分钟，中心值为 {{ capacity_mu }}；中心附近更常见，越接近上下界越少见。后续选择和结果将进入正式数据。</p>
+  {{ if cash_payment_enabled }}
+    <p class="formal-copy">完成后可获得基础报酬 15 元，另有绩效报酬 0–20 元。绩效只依据你自己的正式 30 轮平均成本：平均成本为 20 时，合计为 25 元；平均成本每降低 2 点，合计增加 1 元，每提高 2 点则减少 1 元，最终合计最低 15 元、最高 35 元。热身轮不计入。</p>
+  {{ endif }}
   <p class="formal-reminder">{{ capacity_reveal_description }} 请根据每轮可见信息独立作决策，并留意历史结果中的变化。</p>
   <button class="otree-btn-next btn btn-primary">进入正式实验</button>
 </section>

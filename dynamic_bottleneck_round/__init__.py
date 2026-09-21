@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from decimal import Decimal
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -7,6 +8,7 @@ from math import ceil, isfinite
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 from threading import Lock
 import time
@@ -22,9 +24,11 @@ from .stochastic_capacity import (
     StochasticCapacityConfigError,
     capacity_level,
     generate_stratified_capacity_sequence,
-    load_uniform_capacity_sequence_bank,
+    load_stochastic_capacity_sequence_bank,
     parse_stochastic_capacity_config,
     stochastic_capacity_public_context,
+    truncated_normal_interval_mean,
+    truncated_normal_quantile,
 )
 from .room_label_assignment import (
     build_sequential_label_plan,
@@ -73,8 +77,12 @@ DECISION_SOURCE_SUSPENDED_AUTO = 'suspended_auto'
 AUTO_CHOICE_LAST_MANUAL = 'last_manual_choice'
 AUTO_CHOICE_NEUTRAL_BASELINE = 'neutral_baseline'
 
-CAPACITY_SEQUENCE_SESSION_VAR = 'dynamic_bottleneck_round_capacity_sequence_v2'
+CAPACITY_SEQUENCE_SESSION_VAR = 'dynamic_bottleneck_round_capacity_sequence_v3'
 TOTAL_PAYOFF_VAR = 'dynamic_bottleneck_round_total_payoff'
+TOTAL_COST_VAR = 'dynamic_bottleneck_round_total_cost'
+TOTAL_COST_DECIMAL_VAR = 'dynamic_bottleneck_round_total_cost_decimal'
+MEAN_COST_VAR = 'dynamic_bottleneck_round_mean_cost'
+SETTLED_FORMAL_ROUNDS_VAR = 'dynamic_bottleneck_round_settled_formal_rounds'
 COMPREHENSION_SEEN_VAR = 'dynamic_bottleneck_round_comprehension_seen'
 COMPREHENSION_SCORE_VAR = 'dynamic_bottleneck_round_comprehension_score'
 COMPREHENSION_ATTEMPTS_VAR = 'dynamic_bottleneck_round_comprehension_attempts'
@@ -179,7 +187,10 @@ def service_batch_wait_minutes(
 def capacity_reveal_description(config: StochasticCapacityConfig) -> str:
     if config.information_condition == INFO_I1:
         return '选择前公布本轮精确服务率及容量等级。'
-    return '选择前仅提供服务率的均匀分布范围，本轮服务率在选择后公布。'
+    return (
+        '选择前仅提供服务率的有界截断正态分布、范围和中心值，'
+        '本轮精确服务率在选择后公布。'
+    )
 
 
 def comprehension_queue_example(config: StochasticCapacityConfig):
@@ -308,6 +319,63 @@ def formal_payoff_total(player):
     )
 
 
+def formal_cost_total(player):
+    return sum(
+        float(round_player.total_cost)
+        for round_player in player.in_all_rounds()
+        if not is_warmup_round(round_player.round_number)
+    )
+
+
+def formal_cost_decimal_total(player):
+    return sum(
+        (
+            Decimal(str(round_player.total_cost))
+            for round_player in player.in_all_rounds()
+            if not is_warmup_round(round_player.round_number)
+        ),
+        Decimal('0'),
+    )
+
+
+def settled_formal_round_count(player, current_round_number):
+    return sum(
+        1
+        for round_player in player.in_all_rounds()
+        if not is_warmup_round(round_player.round_number)
+        and (
+            round_player.round_number == current_round_number
+            or round_player.group.results_ready
+        )
+    )
+
+
+def settle_formal_totals(player, current_round_number):
+    """Persist final aggregates on the participant being saved by this request."""
+
+    participant_vars = player.participant.vars
+    settled_count = settled_formal_round_count(player, current_round_number)
+    participant_vars[SETTLED_FORMAL_ROUNDS_VAR] = settled_count
+    if settled_count == C.FORMAL_ROUNDS:
+        exact_cost = formal_cost_decimal_total(player)
+        participant_vars[TOTAL_PAYOFF_VAR] = formal_payoff_total(player)
+        participant_vars[TOTAL_COST_VAR] = formal_cost_total(player)
+        participant_vars[TOTAL_COST_DECIMAL_VAR] = str(exact_cost)
+        participant_vars[MEAN_COST_VAR] = float(exact_cost / C.FORMAL_ROUNDS)
+    else:
+        for field_name in (
+            TOTAL_PAYOFF_VAR,
+            TOTAL_COST_VAR,
+            TOTAL_COST_DECIMAL_VAR,
+            MEAN_COST_VAR,
+        ):
+            participant_vars.pop(field_name, None)
+    changed = getattr(participant_vars, 'changed', None)
+    if callable(changed):
+        changed()
+    return settled_count
+
+
 WARMUP_CAPACITIES = (1.33, 2.67, 4.00)
 
 
@@ -407,12 +475,24 @@ EXPORT_HEADERS = [
     'actor_composition',
     'information_condition',
     'flow_preview_enabled',
+    'pilot_mode_enabled',
+    'planned_group_human_count',
+    'planned_group_api_count',
+    'planned_group_rl_count',
+    'planned_group_total_count',
+    'participant_label',
+    'access_granted',
+    'access_granted_at_ts',
     'comprehension_score',
     'comprehension_attempts',
     'dynamic_capacity',
     'actual_capacity',
     'capacity_level',
     'capacity_distribution',
+    'capacity_mu',
+    'capacity_sigma',
+    'capacity_truncated_mean',
+    'capacity_truncated_sd',
     'capacity_min',
     'capacity_max',
     'capacity_sequence_id',
@@ -516,6 +596,48 @@ def is_flow_preview_session(session) -> bool:
     )
 
 
+def is_pilot_session(session) -> bool:
+    return is_formal_session(session) and config_flag(
+        session.config.get('pilot_mode_enabled', 0)
+    )
+
+
+def parse_pilot_group_spec(spec):
+    """Parse the explicit pilot group plan without changing formal definitions."""
+    entries = str(spec or '').strip().split(';')
+    if not entries or not entries[0]:
+        raise ValueError('pilot_group_spec 必须至少配置 G01 一个实验组。')
+    parsed = {}
+    pattern = re.compile(
+        r'(G[0-9]{2,}):(H-I[01]|HA-I[01]),'
+        r'human=(0|[1-9][0-9]*),api=(0|[1-9][0-9]*),rl=(0|[1-9][0-9]*)'
+    )
+    for index, raw_entry in enumerate(entries, start=1):
+        match = pattern.fullmatch(raw_entry.strip())
+        if match is None:
+            raise ValueError('pilot_group_spec 格式应为 G01:HA-I0,human=8,api=10,rl=10。')
+        label, condition, human_raw, api_raw, rl_raw = match.groups()
+        if label != f'G{index:02d}':
+            raise ValueError('pilot_group_spec 组号必须从 G01 开始连续配置。')
+        human, api, rl = map(int, (human_raw, api_raw, rl_raw))
+        if not 1 <= human <= 30 or not 0 <= api <= 10 or not 0 <= rl <= 10:
+            raise ValueError('预实验每组须有 1–30 Human、0–10 LLM、0–10 RL。')
+        if human + api + rl > 30:
+            raise ValueError('预实验每组总主体数不能超过 30。')
+        if condition.startswith('HA-') and api + rl == 0:
+            raise ValueError('预实验 HA 组至少需要一名 Agent。')
+        if condition.startswith('H-') and api + rl:
+            raise ValueError('预实验 H 组不能配置 Agent。')
+        parsed[label] = {
+            'treatment_condition': condition,
+            **TREATMENT_DEFINITIONS[condition],
+            'human': human,
+            'api': api,
+            'rl': rl,
+        }
+    return parsed
+
+
 def parse_group_treatment_spec(spec):
     parsed = {}
     entries = [
@@ -555,9 +677,14 @@ def parse_group_treatment_spec(spec):
 def configure_formal_treatments(session):
     name = session.config.get('name')
     if name == 'dynamic_bottleneck_round_prod':
-        parsed = parse_group_treatment_spec(
-            session.config.get('group_treatment_spec', '')
-        )
+        if is_pilot_session(session) and is_flow_preview_session(session):
+            raise ValueError('预实验与手动流程预览不能同时启用。')
+        if is_pilot_session(session):
+            parsed = parse_pilot_group_spec(session.config.get('pilot_group_spec', ''))
+        else:
+            parsed = parse_group_treatment_spec(
+                session.config.get('group_treatment_spec', '')
+            )
     else:
         session.vars.pop(GROUP_TREATMENTS_SESSION_VAR, None)
         return {}
@@ -576,9 +703,10 @@ def configure_formal_treatments(session):
         'api_agent_mode': (
             API_AGENT_MODE_ACTIVE if has_api else API_AGENT_MODE_OFF
         ),
-        'api_agent_count_per_group': 10 if has_api else 0,
+        'api_agent_count_per_group': max((row['api'] for row in parsed.values()), default=0),
         'rl_agent_enabled': '1' if has_rl else '0',
-        'rl_agent_count_per_group': 10 if has_rl else 0,
+        'rl_agent_count_per_group': max((row['rl'] for row in parsed.values()), default=0),
+        'group_agent_spec': '' if is_pilot_session(session) else session.config.get('group_agent_spec', ''),
     }
     return parsed
 
@@ -940,10 +1068,10 @@ def validate_formal_actor_composition(session, matrix):
             expected['rl'],
         )
         if actual != required:
-            raise ValueError(
-                '随机服务率正式实验每组主体构成只能是 '
-                '30 Human，或 10 Human + 10 LLM + 10 RL。'
-            )
+            if is_pilot_session(session):
+                raise ValueError(f'预实验 {label} 的实际主体构成与计划不一致。')
+            raise ValueError('随机服务率正式实验每组主体构成只能是 '
+                             '30 Human，或 10 Human + 10 LLM + 10 RL。')
         validated[label] = expected['actor_composition']
     if len(validated) == 1:
         return next(iter(validated.values()))
@@ -966,6 +1094,10 @@ def capacity_record_for_group(group):
             getattr(group, 'capacity_sequence_seed', config.seed) or config.seed
         ),
         'distribution': config.distribution,
+        'capacity_mu': config.capacity_mu,
+        'capacity_sigma': config.capacity_sigma,
+        'capacity_truncated_mean': config.truncated_mean,
+        'capacity_truncated_sd': config.truncated_standard_deviation,
         'capacity_min': config.capacity_min,
         'capacity_max': config.capacity_max,
     }
@@ -1040,7 +1172,7 @@ def static_departure_schedule():
     ) * C.DEPARTURE_CHOICE_STEP_MINUTES
     return {
         'enabled': True,
-        'source': 'fixed_uniform_capacity_design',
+        'source': 'fixed_truncated_normal_capacity_design',
         'players_count': 20,
         'capacity_basis': 4.0,
         'required_occupied_slots': C.NUM_DEPARTURE_SLOTS,
@@ -1295,7 +1427,7 @@ def capacity_sequence_for_session(session):
             sequence_id='auto',
         )
     sequence_id = raw_preset.upper()
-    bank = load_uniform_capacity_sequence_bank()
+    bank = load_stochastic_capacity_sequence_bank()
     if sequence_id not in bank:
         raise ValueError(
             f'未知随机服务率序列 {sequence_id}；请选择 S01-S05 或 demo auto。'
@@ -1328,6 +1460,10 @@ def _warmup_capacity_record(group, config):
         'sequence_id': 'warmup',
         'sequence_seed': config.seed,
         'distribution': config.distribution,
+        'capacity_mu': config.capacity_mu,
+        'capacity_sigma': config.capacity_sigma,
+        'capacity_truncated_mean': config.truncated_mean,
+        'capacity_truncated_sd': config.truncated_standard_deviation,
         'capacity_min': config.capacity_min,
         'capacity_max': config.capacity_max,
     }
@@ -1426,9 +1562,29 @@ def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=
     }
 
 
+def validate_cash_payment_config(session):
+    if not is_formal_session(session):
+        return
+    config = session.config
+    try:
+        participation_fee = float(config.get('participation_fee'))
+        cash_per_point = float(config.get('real_world_currency_per_point'))
+    except (TypeError, ValueError) as exc:
+        raise ValueError('动态场景报酬配置必须使用 15 元基础报酬与每积分 0.01 元。') from exc
+    if (
+        config.get('cash_payment_rule') != 'dynamic_cost_v1'
+        or not isfinite(participation_fee)
+        or not isfinite(cash_per_point)
+        or abs(participation_fee - 15) > 1e-9
+        or abs(cash_per_point - 0.01) > 1e-9
+    ):
+        raise ValueError('动态场景结算规则已固定：基础 15 元、每积分 0.01 元。')
+
+
 def creating_session(subsession):
     config = parse_stochastic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
+        validate_cash_payment_config(subsession.session)
         players = subsession.get_players()
         if is_formal_session(subsession.session):
             matrix, _label_plan = prepare_formal_group_matrix(
@@ -1923,7 +2079,7 @@ def _set_results_locked(group):
 
     if group.round_number == C.NUM_ROUNDS:
         for player in players:
-            player.participant.vars[TOTAL_PAYOFF_VAR] = formal_payoff_total(player)
+            settle_formal_totals(player, group.round_number)
     group.results_ready = True
     return True
 
@@ -1947,26 +2103,34 @@ def access_allowed(player):
 
 
 def capacity_state_rows(config):
+    lower_tertile = truncated_normal_quantile(1 / 3, config)
+    upper_tertile = truncated_normal_quantile(2 / 3, config)
     return [
         {
             'state': 'low',
             'label': '低',
-            'range_label': '1.33–2.21',
-            'capacity': (1.33 + 2.22) / 2,
+            'range_label': '1.33–2.35',
+            'capacity': truncated_normal_interval_mean(
+                config.capacity_min, lower_tertile, config
+            ),
             'probability': 1 / 3,
         },
         {
             'state': 'medium',
             'label': '中',
-            'range_label': '2.22–3.10',
-            'capacity': (2.22 + 3.11) / 2,
+            'range_label': '2.36–2.97',
+            'capacity': truncated_normal_interval_mean(
+                lower_tertile, upper_tertile, config
+            ),
             'probability': 1 / 3,
         },
         {
             'state': 'high',
             'label': '高',
-            'range_label': '3.11–4.00',
-            'capacity': (3.11 + 4.00) / 2,
+            'range_label': '2.98–4.00',
+            'capacity': truncated_normal_interval_mean(
+                upper_tertile, config.capacity_max, config
+            ),
             'probability': 1 / 3,
         },
     ]
@@ -2405,6 +2569,10 @@ def prepare_independent_rl_decisions_for_group(group):
                 'dynamic_capacity': float(group.dynamic_capacity),
                 'capacity_level': capacity_record['capacity_level'],
                 'capacity_distribution': capacity_record['distribution'],
+                'capacity_mu': capacity_record['capacity_mu'],
+                'capacity_sigma': capacity_record['capacity_sigma'],
+                'capacity_truncated_mean': capacity_record['capacity_truncated_mean'],
+                'capacity_truncated_sd': capacity_record['capacity_truncated_sd'],
                 'capacity_min': capacity_record['capacity_min'],
                 'capacity_max': capacity_record['capacity_max'],
                 'capacity_reveal_timing': information_condition,
@@ -2701,6 +2869,10 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
                 'dynamic_capacity': float(group.dynamic_capacity),
                 'capacity_level': capacity_record['capacity_level'],
                 'capacity_distribution': capacity_record['distribution'],
+                'capacity_mu': capacity_record['capacity_mu'],
+                'capacity_sigma': capacity_record['capacity_sigma'],
+                'capacity_truncated_mean': capacity_record['capacity_truncated_mean'],
+                'capacity_truncated_sd': capacity_record['capacity_truncated_sd'],
                 'capacity_min': capacity_record['capacity_min'],
                 'capacity_max': capacity_record['capacity_max'],
                 'capacity_reveal_timing': information_condition,
@@ -2928,6 +3100,10 @@ def public_feedback_snapshot_for_group(group, *, virtual_records=None):
         'dynamic_capacity': capacity_record['actual_capacity'],
         'capacity_level': capacity_record['capacity_level'],
         'capacity_distribution': capacity_record['distribution'],
+        'capacity_mu': capacity_record['capacity_mu'],
+        'capacity_sigma': capacity_record['capacity_sigma'],
+        'capacity_truncated_mean': capacity_record['capacity_truncated_mean'],
+        'capacity_truncated_sd': capacity_record['capacity_truncated_sd'],
         'capacity_min': capacity_record['capacity_min'],
         'capacity_max': capacity_record['capacity_max'],
         'information_condition': information_condition,
@@ -3030,9 +3206,14 @@ def result_current_round_cost_snapshot(player):
 
 
 def capacity_export_metadata(player):
+    session = getattr(player, 'session', None)
+    session_config = getattr(session, 'config', {}) or {}
+    participant = getattr(player, 'participant', None)
+    participant_vars = getattr(participant, 'vars', {}) or {}
+    config = parse_stochastic_capacity_config(session_config)
     actor_composition = str(
         getattr(player, 'actor_composition', '')
-        or player.participant.vars.get('dynamic_bottleneck_treatment_group', '')
+        or participant_vars.get('dynamic_bottleneck_treatment_group', '')
         or 'H'
     )
     information_condition = str(
@@ -3047,6 +3228,10 @@ def capacity_export_metadata(player):
         'capacity_distribution': str(
             getattr(player, 'capacity_distribution', CAPACITY_DISTRIBUTION)
         ),
+        'capacity_mu': config.capacity_mu,
+        'capacity_sigma': config.capacity_sigma,
+        'capacity_truncated_mean': config.truncated_mean,
+        'capacity_truncated_sd': config.truncated_standard_deviation,
         'capacity_min': round(float(getattr(player, 'capacity_min', 1.33)), 2),
         'capacity_max': round(float(getattr(player, 'capacity_max', 4.00)), 2),
         'capacity_sequence_id': str(getattr(player, 'capacity_sequence_id', '')),
@@ -3060,9 +3245,44 @@ def export_float(value):
     return round(float(value or 0), 6)
 
 
+def planned_group_composition(session, group_id):
+    if is_flow_preview_session(session):
+        return dict.fromkeys(('human', 'api', 'rl', 'total'), '')
+    label = _canonical_group_label(group_id)
+    stored = getattr(session, 'vars', {}).get(GROUP_TREATMENTS_SESSION_VAR, {})
+    if not isinstance(stored, dict) or label not in stored:
+        if is_pilot_session(session) and session.config.get('pilot_group_spec'):
+            stored = parse_pilot_group_spec(session.config['pilot_group_spec'])
+        elif is_formal_session(session) and session.config.get('group_treatment_spec'):
+            stored = parse_group_treatment_spec(session.config['group_treatment_spec'])
+    treatment = stored.get(label, {}) if isinstance(stored, dict) else {}
+    if not treatment:
+        return dict.fromkeys(('human', 'api', 'rl', 'total'), '')
+    human, api, rl = (int(treatment[key]) for key in ('human', 'api', 'rl'))
+    return {'human': human, 'api': api, 'rl': rl, 'total': human + api + rl}
+
+
+def participant_entered_round(player):
+    participant_vars = player.participant.vars
+    if not bool(participant_vars.get('access_granted', False)):
+        return False
+    entered_at = participant_vars.get('access_granted_at_ts')
+    if entered_at is None:
+        return bool(getattr(player, 'round_start_ready', False))
+    try:
+        entered_at = float(entered_at)
+        decision_deadline = float(
+            getattr(player.group, 'decision_deadline_ts', 0) or 0
+        )
+    except (TypeError, ValueError):
+        return False
+    return decision_deadline > 0 and entered_at <= decision_deadline
+
+
 def export_row_for_player(player):
     schedule = departure_schedule_for_player(player)
     dropout_audit = dropout_audit_for_player_round(player)
+    planned = planned_group_composition(player.session, player.group.id_in_subsession)
     values = {
         **capacity_export_metadata(player),
         'session_code': player.session.code,
@@ -3071,6 +3291,16 @@ def export_row_for_player(player):
         'round_number': formal_round_number(player.round_number),
         'formal_round_number': formal_round_number(player.round_number),
         'flow_preview_enabled': is_flow_preview_session(player.session),
+        'pilot_mode_enabled': is_pilot_session(player.session),
+        'planned_group_human_count': planned['human'],
+        'planned_group_api_count': planned['api'],
+        'planned_group_rl_count': planned['rl'],
+        'planned_group_total_count': planned['total'],
+        'participant_label': getattr(player.participant, 'label', '') or '',
+        'access_granted': participant_entered_round(player),
+        'access_granted_at_ts': player.participant.vars.get(
+            'access_granted_at_ts', ''
+        ),
         'actual_capacity': round(float(player.dynamic_capacity), 6),
         'capacity_revealed_before_decision': bool(
             getattr(player, 'capacity_revealed_before_decision', False)
@@ -3081,13 +3311,13 @@ def export_row_for_player(player):
         'departure_schedule_last_time': schedule.get('last_departure_time', ''),
         'departure_slot': player.field_maybe_none('departure_slot') or '',
         'departure_minute': player.field_maybe_none('departure_minute') or '',
-        'departure_time': getattr(player, 'departure_time_label', ''),
+        'departure_time': player.field_maybe_none('departure_time_label') or '',
         'queue_delay_minutes': export_float(
             getattr(player, 'queue_delay_minutes', 0)
         ),
         'queue_delay': export_float(getattr(player, 'queue_delay_minutes', 0)),
         'arrival_minute': export_float(getattr(player, 'arrival_minute', 0)),
-        'arrival_time': getattr(player, 'arrival_time_label', ''),
+        'arrival_time': player.field_maybe_none('arrival_time_label') or '',
         'early_minutes': export_float(getattr(player, 'early_minutes', 0)),
         'schedule_early': export_float(getattr(player, 'early_minutes', 0)),
         'late_minutes': export_float(getattr(player, 'late_minutes', 0)),
@@ -3097,11 +3327,11 @@ def export_row_for_player(player):
         'payoff': export_float(
             getattr(player, 'payoff_unrounded', getattr(player, 'payoff', 0))
         ),
-        'decision_source': getattr(player, 'decision_source', ''),
+        'decision_source': player.field_maybe_none('decision_source') or '',
         'timeout_happened': bool(getattr(player, 'timeout_happened', False)),
-        'dropout_event': getattr(player, 'dropout_event', ''),
+        'dropout_event': player.field_maybe_none('dropout_event') or '',
         'recovered_this_round': bool(getattr(player, 'recovered_this_round', False)),
-        'recovery_reason': getattr(player, 'recovery_reason', ''),
+        'recovery_reason': player.field_maybe_none('recovery_reason') or '',
         'historical_dropout': bool(participant_var(player, 'is_dropout', False)),
         'dropout_active_at_export': participant_dropout_active(player),
         'dropout_reason_at_export': participant_dropout_reason(player),
@@ -3156,8 +3386,12 @@ def agent_decisions_for_players(players):
 
 def export_row_for_agent_record(record, reference_player):
     row = export_row_for_player(reference_player)
+    reference_capacity_metadata = capacity_export_metadata(reference_player)
     values = {
         'participant_code': '',
+        'participant_label': '',
+        'access_granted': '',
+        'access_granted_at_ts': '',
         'comprehension_score': '',
         'comprehension_attempts': '',
         'group_id': record.get('group_id', reference_player.group.id_in_subsession),
@@ -3180,6 +3414,20 @@ def export_row_for_agent_record(record, reference_player):
         'capacity_distribution': record.get(
             'capacity_distribution',
             getattr(reference_player, 'capacity_distribution', CAPACITY_DISTRIBUTION),
+        ),
+        'capacity_mu': record.get(
+            'capacity_mu', reference_capacity_metadata['capacity_mu']
+        ),
+        'capacity_sigma': record.get(
+            'capacity_sigma', reference_capacity_metadata['capacity_sigma']
+        ),
+        'capacity_truncated_mean': record.get(
+            'capacity_truncated_mean',
+            reference_capacity_metadata['capacity_truncated_mean'],
+        ),
+        'capacity_truncated_sd': record.get(
+            'capacity_truncated_sd',
+            reference_capacity_metadata['capacity_truncated_sd'],
         ),
         'capacity_min': record.get(
             'capacity_min', getattr(reference_player, 'capacity_min', 1.33)
@@ -3276,6 +3524,7 @@ def build_admin_report_rows(players):
     round_rows = []
     for (round_number, group_id), group_players in sorted(groups.items()):
         representative = group_players[0]
+        planned = planned_group_composition(representative.session, group_id)
         state_counts[representative.capacity_level] = (
             state_counts.get(representative.capacity_level, 0) + 1
         )
@@ -3344,6 +3593,27 @@ def build_admin_report_rows(players):
             {
                 'round_number': formal_round_number(round_number),
                 'group_id': group_id,
+                'pilot_mode_enabled': is_pilot_session(representative.session),
+                'planned_group_human_count': planned['human'],
+                'planned_group_api_count': planned['api'],
+                'planned_group_rl_count': planned['rl'],
+                'planned_group_total_count': planned['total'],
+                'entered_human_count': sum(
+                    participant_entered_round(player)
+                    for player in group_players
+                ),
+                'manual_human_count': sum(
+                    player.field_maybe_none('decision_source') == DECISION_SOURCE_MANUAL
+                    for player in completed
+                ),
+                'automatic_human_count': sum(
+                    player.field_maybe_none('decision_source') in {
+                        DECISION_SOURCE_TIMEOUT_AUTO,
+                        DECISION_SOURCE_DISCONNECT_AUTO,
+                        DECISION_SOURCE_SUSPENDED_AUTO,
+                    } for player in completed
+                ),
+                'no_choice_human_count': len(group_players) - len(completed),
                 'dynamic_capacity': representative.dynamic_capacity,
                 'capacity_level': representative.capacity_level,
                 'average_queue_delay': number_display(average_queue),
@@ -3398,10 +3668,34 @@ def vars_for_admin_report(subsession):
     for round_subsession in subsession.in_all_rounds():
         players.extend(round_subsession.get_players())
     round_rows, state_rows, agent_summary = build_admin_report_rows(players)
+    capacity_config = parse_stochastic_capacity_config(subsession.session.config)
+    stored = getattr(subsession.session, 'vars', {}).get(GROUP_TREATMENTS_SESSION_VAR, {})
+    if not stored and is_pilot_session(subsession.session):
+        stored = parse_pilot_group_spec(subsession.session.config.get('pilot_group_spec', ''))
+    planned_groups = [
+        {
+            'label': label,
+            'treatment_condition': treatment['treatment_condition'],
+            **planned_group_composition(subsession.session, label),
+        }
+        for label, treatment in (stored or {}).items()
+        if not is_flow_preview_session(subsession.session)
+    ]
     return {
         'round_rows': round_rows,
         'state_rows': state_rows,
         'agent_summary': agent_summary,
+        'pilot_mode_enabled': is_pilot_session(subsession.session),
+        'planned_groups': planned_groups,
+        'capacity_metadata': {
+            'distribution': capacity_config.distribution,
+            'mu': capacity_config.capacity_mu,
+            'sigma': capacity_config.capacity_sigma,
+            'min': capacity_config.capacity_min,
+            'max': capacity_config.capacity_max,
+            'truncated_mean': capacity_config.truncated_mean,
+            'truncated_sd': capacity_config.truncated_standard_deviation,
+        },
         'export_headers': EXPORT_HEADERS,
         'session_code': subsession.session.code,
     }
@@ -3418,6 +3712,9 @@ class Introduction(Page):
         schedule = departure_schedule_for_player(player)
         return {
             'capacity_states': capacity_state_rows(config),
+            'capacity_mu': number_display(config.capacity_mu),
+            'capacity_sigma': f'{config.capacity_sigma:.2f}',
+            'capacity_truncated_sd': f'{config.truncated_standard_deviation:.6f}',
             'total_rounds': C.FORMAL_ROUNDS,
             'warmup_rounds': C.WARMUP_ROUNDS,
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
@@ -3565,7 +3862,9 @@ class FormalStart(Page):
             'formal_rounds': C.FORMAL_ROUNDS,
             'capacity_min': f'{config.capacity_min:.2f}',
             'capacity_max': f'{config.capacity_max:.2f}',
+            'capacity_mu': number_display(config.capacity_mu),
             'capacity_reveal_description': capacity_reveal_description(config),
+            'cash_payment_enabled': bool(player.session.config.get('cash_payment_rule')),
         }
 
 
@@ -3788,6 +4087,11 @@ class Results(Page):
             'cost_snapshot_axis_max_label': snapshot['axis_max_label'],
             'auto_advance_seconds': Results.get_timeout_seconds(player),
         }
+
+    @staticmethod
+    def before_next_page(player, timeout_happened):
+        if player.round_number == C.NUM_ROUNDS and player.group.results_ready:
+            settle_formal_totals(player, player.round_number)
 
 
 def custom_export(players):

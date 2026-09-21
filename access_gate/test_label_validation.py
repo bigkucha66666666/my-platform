@@ -1,5 +1,6 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from . import AccessGate
 from .strict_room_labels import (
@@ -23,6 +24,15 @@ def make_player(*, actual_label, expected_label=None, password='gate'):
 
 
 class AccessGateLabelValidationTests(unittest.TestCase):
+    @patch('access_gate.time.time', return_value=123.5)
+    def test_successful_entry_records_a_timestamp(self, _time):
+        player = make_player(actual_label='P001', expected_label='P001')
+
+        AccessGate.before_next_page(player, timeout_happened=False)
+
+        self.assertIs(player.participant.vars['access_granted'], True)
+        self.assertEqual(player.participant.vars['access_granted_at_ts'], 123.5)
+
     def test_rejects_label_that_differs_from_expected_room_label(self):
         player = make_player(actual_label='P040', expected_label='P001')
 

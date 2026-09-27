@@ -59,7 +59,7 @@ DYNAMIC_BOTTLENECK_RL_AGENT_COUNT = str(
     environ.get('DYNAMIC_BOTTLENECK_RL_AGENT_COUNT_PER_GROUP', '1') or '1'
 ).strip()
 DYNAMIC_BOTTLENECK_RL_AGENT_POLICY_VERSION = (
-    'dynamic_liu_rel_truncated_normal_capacity_v2'
+    'dynamic_liu_rel_independent_market_pretrained_v3'
 )
 DYNAMIC_BOTTLENECK_REL_LAMBDA = environ.get(
     'DYNAMIC_BOTTLENECK_REL_LAMBDA',
@@ -330,6 +330,18 @@ REAL_WORLD_CURRENCY_CODE = 'CNY'
 USE_POINTS = True
 
 ROOMS = [
+    dict(
+        name='prod_room_i0',
+        display_name='正式房间 · I0（H + HA，40 名真人）',
+        participant_label_file='_rooms/econ101.txt',
+        use_secure_urls=False,
+    ),
+    dict(
+        name='prod_room_i1',
+        display_name='正式房间 · I1（H + HA，40 名真人）',
+        participant_label_file='_rooms/econ101.txt',
+        use_secure_urls=False,
+    ),
     dict(
         name='prod_room',
         display_name='正式房间(标签登录,P001-P100)',

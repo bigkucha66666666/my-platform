@@ -340,6 +340,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  function defaultPresetForRoom(roomName) {
+    return roomName === 'prod_room_i1' ? 'PAIR-I1' : 'PAIR-I0';
+  }
+  const roomName = document.querySelector('[name="room_name"]')?.value || '';
+  const roomDefaultPreset = defaultPresetForRoom(roomName);
+  const isConditionRoom = ['prod_room_i0', 'prod_room_i1'].includes(roomName);
+  let roomPresetApplied = false;
   const activeAgentConfigs = new Set([
     'single_bottleneck_prod_agent_active',
     'single_bottleneck_demo_agent_active',
@@ -905,6 +912,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     applyingPreset = false;
   }
+  function applyRoomDefaultPreset() {
+    if (!isConditionRoom || roomPresetApplied || currentConfig !== formalScenarioConfig) return;
+    applyPreset(roomDefaultPreset);
+    roomPresetApplied = true;
+  }
   function switchToCustomAgentConfiguration() {
     if (applyingPreset || !dynamicAgentConfigs.has(currentConfig)) return;
     setSource('group_agent_spec', '');
@@ -922,6 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
     summary.hidden = true;
     markPresetSelected('');
     syncVisibleControls();
+    applyRoomDefaultPreset();
   });
   singleCountInput.addEventListener('input', storeVisibleControls);
   dynamicEnabled.addEventListener('change', () => {
@@ -968,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setSource('pilot_mode_enabled', 0);
       setSource('pilot_group_spec', '');
       pilotFields.hidden = true;
-      applyPreset('PAIR-I0');
+      applyPreset(roomDefaultPreset);
     }
   });
   pilotGroupCount.addEventListener('input', renderPilotRows);
@@ -976,7 +989,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (flowPreviewEnabled.checked) {
       syncFlowPreview();
     } else {
-      applyPreset('PAIR-I0');
+      applyPreset(roomDefaultPreset);
     }
   });
   flowPreviewParticipantCount.addEventListener('input', syncFlowPreview);
@@ -1011,5 +1024,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   currentConfig = dropdown.value;
   syncVisibleControls();
+  applyRoomDefaultPreset();
 });
 </script>

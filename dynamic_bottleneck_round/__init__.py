@@ -48,6 +48,15 @@ from .agents.independent_rl_agent import (
     observe_independent_rl_outcome,
     valid_or_initial_independent_rl_state,
 )
+from .agents.liu_rel_pretraining import (
+    BANK_ID as PRETRAINING_BANK_ID,
+    BANK_SHA256 as PRETRAINING_BANK_SHA256,
+    REL_ETA as PRETRAINING_REL_ETA,
+    REL_LAMBDA as PRETRAINING_REL_LAMBDA,
+    REL_RANDOM_SEED as PRETRAINING_REL_RANDOM_SEED,
+    load_pretraining_profile,
+    validate_pretraining_bank,
+)
 from .agents.personas import (
     get_or_create_api_agent_persona,
     get_or_create_rl_agent_persona,
@@ -61,6 +70,7 @@ from .agents.rl_fallback import (
     public_feedback_observation,
     valid_or_initial_state,
 )
+from .agents import prefetch_coordinator
 
 
 doc = """
@@ -152,6 +162,7 @@ INDEPENDENT_RL_STATE_PARTICIPANT_VAR = (
 )
 PUBLIC_FEEDBACK_PARTICIPANT_VAR = 'dynamic_bottleneck_round_public_feedback_v1'
 API_AGENT_DECISIONS_PENDING = object()
+API_AGENT_PREFETCH_ABANDONED = object()
 _API_AGENT_PREFETCH_EXECUTOR = ThreadPoolExecutor(
     max_workers=8,
     thread_name_prefix='dynamic-bottleneck-agent',
@@ -983,6 +994,13 @@ def validate_liu_rel_session_config(session) -> dict:
         raise ValueError('rel_random_seed 必须是整数。') from exc
     if str(raw_seed).strip() != str(random_seed):
         raise ValueError('rel_random_seed 必须是整数。')
+    for name, actual, frozen in (
+        ('rel_lambda', rel_lambda, PRETRAINING_REL_LAMBDA),
+        ('rel_eta', rel_eta, PRETRAINING_REL_ETA),
+        ('rel_random_seed', random_seed, PRETRAINING_REL_RANDOM_SEED),
+    ):
+        if actual != frozen:
+            raise ValueError(f'{name} 必须与冻结预训练经验库的参数一致：{frozen}。')
 
     raw_uniform_rounds = config.get('rel_initial_uniform_rounds')
     if isinstance(raw_uniform_rounds, bool):
@@ -1009,6 +1027,8 @@ def validate_liu_rel_session_config(session) -> dict:
         and not parameters_frozen
     ):
         raise ValueError('RL 正式实验启动前必须冻结 Liu-REL 参数。')
+    if rl_agent_enabled(session):
+        validate_pretraining_bank()
 
     validated = {
         'rel_policy_version': policy_version,
@@ -2427,6 +2447,20 @@ def independent_rl_records_for_group(group):
     ]
 
 
+def pretrained_independent_rl_state(states, agent_id, seat_index):
+    raw_state = states.get(agent_id)
+    frozen_state = load_pretraining_profile(seat_index)
+    if raw_state is None:
+        return frozen_state
+    state = valid_or_initial_independent_rl_state(raw_state)
+    if (
+        state['pretraining_bank_id'] != PRETRAINING_BANK_ID
+        or state['pretraining_experiences'] != frozen_state['pretraining_experiences']
+    ):
+        raise ValueError(f'RL {agent_id} 缺少有效的冻结预训练经验；不能静默冷启动。')
+    return state
+
+
 def prepare_independent_rl_decisions_for_group(group):
     if not rl_agent_enabled(group.session):
         return []
@@ -2468,11 +2502,7 @@ def prepare_independent_rl_decisions_for_group(group):
             agent_id,
             persona,
         )
-        capacity_states = choice_set.capacity_context.get('capacity_states', [])
-        state = valid_or_initial_independent_rl_state(
-            states.get(agent_id),
-            capacity_states,
-        )
+        state = pretrained_independent_rl_state(states, agent_id, index)
         try:
             policy_kwargs = {
                 'state': state,
@@ -2550,6 +2580,9 @@ def prepare_independent_rl_decisions_for_group(group):
                 '',
             ),
             'rounds_observed': int(choice.get('rounds_observed', 0)),
+            'pretraining_count': int(choice.get('pretraining_count', 0)),
+            'pretraining_bank_id': choice.get('pretraining_bank_id'),
+            'pretraining_bank_sha256': PRETRAINING_BANK_SHA256,
         }
         if information_condition == INFO_I1 and not warmup:
             choice_audit['current_actual_capacity'] = float(
@@ -2632,10 +2665,11 @@ def update_independent_rl_states(group, records):
         if record.get('actor_type') != RL_AGENT_TYPE:
             continue
         agent_id = str(record['agent_id'])
-        state = valid_or_initial_independent_rl_state(
-            states.get(agent_id),
-            None,
-        )
+        try:
+            seat_index = int(agent_id.rsplit('_RL_', 1)[1])
+        except (IndexError, ValueError) as exc:
+            raise ValueError(f'无法识别 RL 席位：{agent_id}') from exc
+        state = pretrained_independent_rl_state(states, agent_id, seat_index)
         previous_count = len(state.get('experiences', []))
         updated = observe_independent_rl_outcome(
             state,
@@ -2928,6 +2962,21 @@ def _fallback_choices_for_prefetch_error(prepared_agents, exc):
     ]
 
 
+def _publish_api_agent_prefetch(key, task, future):
+    try:
+        try:
+            choices = future.result()
+            payload = {'status': 'ok', 'choices': [asdict(choice) for choice in choices]}
+        except Exception as exc:
+            payload = {'status': 'error', 'reason': str(exc)}
+        prefetch_coordinator.publish_result(key, payload, task['claim'])
+    except Exception as exc:
+        # Every process must use the same local fallback when publication fails.
+        task['publish_error'] = str(exc)
+    finally:
+        task['publish_complete'] = True
+
+
 def start_api_agent_prefetch(group):
     if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
         return None
@@ -2935,25 +2984,60 @@ def start_api_agent_prefetch(group):
         return None
 
     key = api_agent_prefetch_key(group)
+    if prefetch_coordinator.read_result(key) is not None:
+        return None
     with _API_AGENT_PREFETCH_LOCK:
         current = _API_AGENT_PREFETCH_TASKS.get(key)
         if current:
             return current['future']
 
-        config, prepared_agents = prepare_api_agent_requests_for_group(group)
-        if not prepared_agents:
+        try:
+            claim = prefetch_coordinator.try_claim(key)
+        except OSError:
+            return API_AGENT_PREFETCH_ABANDONED
+        if claim is None:
+            return API_AGENT_DECISIONS_PENDING
+        if prefetch_coordinator.read_result(key) is not None:
+            prefetch_coordinator.release_claim(claim)
             return None
-        rl_candidates = prepare_rl_candidates_for_agents(group, prepared_agents)
-        future = _API_AGENT_PREFETCH_EXECUTOR.submit(
-            choose_api_agent_departures,
-            config,
-            [choice_set for _, choice_set in prepared_agents],
-        )
-        _API_AGENT_PREFETCH_TASKS[key] = {
+        try:
+            already_started = prefetch_coordinator.was_started(claim)
+        except OSError:
+            prefetch_coordinator.release_claim(claim)
+            return API_AGENT_PREFETCH_ABANDONED
+        if already_started:
+            prefetch_coordinator.release_claim(claim)
+            return API_AGENT_PREFETCH_ABANDONED
+        try:
+            config, prepared_agents = prepare_api_agent_requests_for_group(group)
+            if not prepared_agents:
+                prefetch_coordinator.release_claim(claim)
+                return None
+            rl_candidates = prepare_rl_candidates_for_agents(group, prepared_agents)
+            try:
+                prefetch_coordinator.mark_started(claim)
+            except OSError:
+                prefetch_coordinator.release_claim(claim)
+                return API_AGENT_PREFETCH_ABANDONED
+            future = _API_AGENT_PREFETCH_EXECUTOR.submit(
+                choose_api_agent_departures,
+                config,
+                [choice_set for _, choice_set in prepared_agents],
+            )
+        except Exception:
+            prefetch_coordinator.release_claim(claim)
+            raise
+        task = {
             'future': future,
             'prepared_agents': prepared_agents,
             'rl_candidates': rl_candidates,
+            'claim': claim,
+            'publish_complete': False,
         }
+        _API_AGENT_PREFETCH_TASKS[key] = task
+        future.add_done_callback(
+            lambda completed: _publish_api_agent_prefetch(key, task, completed)
+        )
         return future
 
 
@@ -2964,23 +3048,50 @@ def collect_api_agent_prefetch(group):
     if existing:
         return existing
 
-    future = start_api_agent_prefetch(group)
-    if future is None:
-        return []
+    start_state = start_api_agent_prefetch(group)
     key = api_agent_prefetch_key(group)
     with _API_AGENT_PREFETCH_LOCK:
         task = _API_AGENT_PREFETCH_TASKS.get(key)
-    if not task or not future.done():
+    payload = prefetch_coordinator.read_result(key)
+    if payload is None and start_state is not API_AGENT_PREFETCH_ABANDONED and (
+        not task or (
+            'claim' in task and not task.get('publish_complete')
+        ) or not task['future'].done()
+    ):
         return API_AGENT_DECISIONS_PENDING
 
-    try:
-        choices = future.result()
-    except Exception as exc:
+    if task:
+        prepared_agents = task['prepared_agents']
+        rl_candidates = task.get('rl_candidates', {})
+    else:
+        _config, prepared_agents = prepare_api_agent_requests_for_group(group)
+        rl_candidates = prepare_rl_candidates_for_agents(group, prepared_agents)
+    if payload is None and (
+        start_state is API_AGENT_PREFETCH_ABANDONED
+        or (task is not None and 'claim' in task)
+    ):
         choices = _fallback_choices_for_prefetch_error(
-            task['prepared_agents'],
-            exc,
+            prepared_agents, 'Shared Agent request was not published.'
         )
-    rl_candidates = task.get('rl_candidates', {})
+    elif payload is None:
+        try:
+            choices = task['future'].result()
+        except Exception as exc:
+            choices = _fallback_choices_for_prefetch_error(prepared_agents, exc)
+    elif payload.get('status') == 'ok':
+        try:
+            choices = [AgentChoice(**item) for item in payload['choices']]
+            if len(choices) != len(prepared_agents) or any(
+                choice.departure_slot not in choice_set.valid_slots()
+                for (_agent_id, choice_set), choice in zip(prepared_agents, choices)
+            ):
+                raise ValueError('Shared Agent choice count or slot is invalid.')
+        except (KeyError, TypeError, ValueError) as exc:
+            choices = _fallback_choices_for_prefetch_error(prepared_agents, exc)
+    else:
+        choices = _fallback_choices_for_prefetch_error(
+            prepared_agents, payload.get('reason', 'Shared Agent request failed.'),
+        )
     if rl_candidates:
         choices = [
             apply_rl_fallback_to_choice(
@@ -2988,17 +3099,17 @@ def collect_api_agent_prefetch(group):
                 choice_set,
                 rl_candidates.get(agent_id),
             )
-            for (agent_id, choice_set), choice in zip(task['prepared_agents'], choices)
+            for (agent_id, choice_set), choice in zip(prepared_agents, choices)
         ]
     records = build_api_agent_records_for_group(
         group,
-        task['prepared_agents'],
+        prepared_agents,
         choices,
     )
     save_agent_decisions_for_group(group, records)
     save_api_agent_memory_updates(group, records)
     with _API_AGENT_PREFETCH_LOCK:
-        if _API_AGENT_PREFETCH_TASKS.get(key) is task:
+        if task is not None and _API_AGENT_PREFETCH_TASKS.get(key) is task:
             _API_AGENT_PREFETCH_TASKS.pop(key, None)
     return deepcopy(records)
 
@@ -3012,17 +3123,22 @@ def create_api_agent_decisions_for_group(group):
         return existing
 
     future = start_api_agent_prefetch(group)
-    if future is None:
-        return []
-    try:
-        future.result()
-    except Exception:
-        # The collector converts worker failures to the configured local fallback.
-        pass
-    records = collect_api_agent_prefetch(group)
-    if records is API_AGENT_DECISIONS_PENDING:
-        return []
-    return records
+    if hasattr(future, 'result'):
+        try:
+            future.result()
+        except Exception:
+            # The collector converts worker failures to the configured local fallback.
+            pass
+    deadline = time.monotonic() + max(
+        1, config_int(group.session.config.get('api_agent_timeout_seconds', 12), 12) + 5
+    )
+    while True:
+        records = collect_api_agent_prefetch(group)
+        if records is not API_AGENT_DECISIONS_PENDING:
+            return records
+        if time.monotonic() >= deadline:
+            return []
+        time.sleep(0.05)
 
 
 def result_cost_components(player):

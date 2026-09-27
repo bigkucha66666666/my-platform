@@ -11,7 +11,7 @@ from typing import Iterable, Mapping, Sequence
 from ..stochastic_capacity import StochasticCapacityConfig
 
 
-LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_truncated_normal_capacity_v2'
+LIU_REL_POLICY_VERSION = 'dynamic_liu_rel_independent_market_pretrained_v3'
 INFORMATION_CONDITIONS = {'I0', 'I1'}
 PHI_FLOOR = 1e-9
 CAPACITY_KERNEL_BANDWIDTH = (
@@ -28,6 +28,8 @@ def initial_liu_rel_state() -> dict:
         'policy_version': LIU_REL_POLICY_VERSION,
         'rounds_observed': 0,
         'experiences': [],
+        'pretraining_experiences': [],
+        'pretraining_bank_id': None,
         'last_departure_slot': None,
         'last_choice_probability': None,
         'last_context_level': None,
@@ -43,6 +45,11 @@ def valid_or_initial_liu_rel_state(state) -> dict:
         return initial_liu_rel_state()
     experiences = state.get('experiences')
     if not isinstance(experiences, list):
+        return initial_liu_rel_state()
+    pretraining = state.get('pretraining_experiences')
+    if not isinstance(pretraining, list):
+        return initial_liu_rel_state()
+    if pretraining and not isinstance(state.get('pretraining_bank_id'), str):
         return initial_liu_rel_state()
     required = {
         'rounds_observed',
@@ -76,6 +83,19 @@ def valid_or_initial_liu_rel_state(state) -> dict:
             if round_number in seen_rounds:
                 return initial_liu_rel_state()
             seen_rounds.add(round_number)
+            _positive_int(item.get('departure_slot'), 'departure_slot')
+            _finite_float(item.get('total_cost'), 'total_cost')
+            _positive_float(item.get('actual_capacity'), 'actual_capacity')
+        seen_training_rounds = set()
+        for item in pretraining:
+            if not isinstance(item, dict):
+                return initial_liu_rel_state()
+            training_round = _positive_int(
+                item.get('training_round_number'), 'training_round_number'
+            )
+            if training_round in seen_training_rounds:
+                return initial_liu_rel_state()
+            seen_training_rounds.add(training_round)
             _positive_int(item.get('departure_slot'), 'departure_slot')
             _finite_float(item.get('total_cost'), 'total_cost')
             _positive_float(item.get('actual_capacity'), 'actual_capacity')
@@ -340,13 +360,16 @@ def choose_liu_rel_departure(
     if warmup:
         decision_source = 'liu_rel_uniform_warmup'
         probabilities = uniform
-    elif decision_round <= 2:
+    elif decision_round <= 2 and not current['pretraining_experiences']:
         _positive_int(decision_round, 'formal_round_number')
         decision_source = 'liu_rel_uniform_initial'
         probabilities = uniform
     else:
+        all_experiences = [
+            *current['pretraining_experiences'], *current['experiences']
+        ]
         selection = select_information_conditioned_experiences(
-            current['experiences'],
+            all_experiences,
             information_condition=information_condition,
             current_actual_capacity=current_actual_capacity,
             capacity_kernel_bandwidth=capacity_kernel_bandwidth,
@@ -366,7 +389,7 @@ def choose_liu_rel_departure(
             propensities = interpolate_propensities(legal_slots, statistics)
             historical_costs = [
                 _finite_float(item.get('total_cost'), 'historical total_cost')
-                for item in current['experiences']
+                for item in all_experiences
             ]
             phi = sum(historical_costs) / len(historical_costs)
             probabilities = liu_rel_choice_probabilities(
@@ -384,6 +407,8 @@ def choose_liu_rel_departure(
         'reason': 'Uniform-capacity-conditioned Liu-REL probability sample.',
         'policy_version': LIU_REL_POLICY_VERSION,
         'rounds_observed': int(current['rounds_observed']),
+        'pretraining_count': len(current['pretraining_experiences']),
+        'pretraining_bank_id': current['pretraining_bank_id'],
         'information_condition': str(information_condition).upper(),
         'context_level': context_level,
         'propensities': _string_keyed(propensities),

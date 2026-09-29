@@ -14,6 +14,7 @@
     gap: 16px;
     color: var(--ink);
   }
+  .decision-shell[hidden] { display: none !important; }
 
   .capacity-panel,
   .picker-card {
@@ -357,7 +358,13 @@
   }
 </style>
 
-<div class="decision-shell">
+{{ if room_release_shell }}
+<section id="room-release-gate" data-condition="{{ information_condition }}" data-shell-token="{{ room_release_shell_token }}" role="status" aria-live="polite" style="padding:24px;border:1px solid #c8d8dc;border-radius:12px;background:#f7fbfa;color:#173f49">
+  <h3 style="margin:0 0 10px">决策页面已加载，等待本房间统一放行</h3>
+  <p id="room-release-message" style="margin:0">请保持页面打开。此时尚未开始 60 秒决策计时。</p>
+</section>
+{{ endif }}
+<div class="decision-shell" id="decision-content" {{ if room_release_shell }}hidden{{ endif }}>
   {{ if current_capacity_revealed }}
   <section class="capacity-panel is-known">
     <div class="capacity-copy">
@@ -415,7 +422,7 @@
     </div>
     <p class="picker-summary" id="selected-toll">{{ coarse_toll_description }}</p>
   </section>
-  <button class="otree-btn-next btn btn-primary">提交本轮选择</button>
+  <button class="otree-btn-next btn btn-primary" id="decision-submit">提交本轮选择</button>
 </div>
 
 <script id="choice-preview-data" type="application/json">{{ choice_preview_json|safe }}</script>
@@ -435,4 +442,8 @@
     select(index,true);
   })();
 </script>
+{{ if room_release_shell }}
+<script src="{{ static 'dynamic_bottleneck_round/room_release.js' }}"></script>
+<script>DynamicBottleneckRelease.start();</script>
+{{ endif }}
 {{ endblock }}

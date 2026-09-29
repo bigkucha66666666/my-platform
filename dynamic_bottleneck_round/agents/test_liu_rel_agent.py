@@ -35,6 +35,8 @@ class LiuRELStateTests(unittest.TestCase):
                 'policy_version': LIU_REL_POLICY_VERSION,
                 'rounds_observed': 0,
                 'experiences': [],
+                'pretraining_experiences': [],
+                'pretraining_bank_id': None,
                 'last_departure_slot': None,
                 'last_choice_probability': None,
                 'last_context_level': None,
@@ -49,6 +51,24 @@ class LiuRELStateTests(unittest.TestCase):
         stale['experiences'] = [experience(1, 4, 10, 4)]
 
         self.assertEqual(valid_or_initial_liu_rel_state(stale), initial_liu_rel_state())
+
+    def test_pretraining_history_is_separate_from_formal_round_count(self):
+        state = initial_liu_rel_state()
+        state['pretraining_bank_id'] = 'independent_market_v1'
+        state['pretraining_experiences'] = [
+            {'training_round_number': 1, 'departure_slot': 4,
+             'total_cost': 10, 'actual_capacity': 2.5},
+            {'training_round_number': 2, 'departure_slot': 12,
+             'total_cost': 15, 'actual_capacity': 3.5},
+        ]
+        checked = valid_or_initial_liu_rel_state(state)
+        self.assertEqual(checked['rounds_observed'], 0)
+        updated = append_liu_rel_experience(
+            checked, formal_round_number=1, departure_slot=5,
+            total_cost=12, actual_capacity=2.8,
+        )
+        self.assertEqual(updated['rounds_observed'], 1)
+        self.assertEqual(len(updated['pretraining_experiences']), 2)
 
     def test_malformed_experience_reinitializes_state(self):
         damaged = initial_liu_rel_state()
@@ -273,6 +293,28 @@ class LiuRELChoiceTests(unittest.TestCase):
                 self.assertEqual(choice['decision_source'], 'liu_rel_uniform_initial')
                 self.assertEqual(set(choice['choice_probabilities'].values()), {1 / 16})
 
+    def test_pretrained_formal_round_one_uses_history_and_i0_blinds_current_rate(self):
+        state = initial_liu_rel_state()
+        state['pretraining_bank_id'] = 'independent_market_v1'
+        state['pretraining_experiences'] = [
+            {'training_round_number': 1, 'departure_slot': 4,
+             'total_cost': 10, 'actual_capacity': 1.5},
+            {'training_round_number': 2, 'departure_slot': 12,
+             'total_cost': 20, 'actual_capacity': 3.5},
+        ]
+        first = choose_liu_rel_departure(
+            state=state, formal_round_number=1, current_actual_capacity=1.33,
+            **self.base,
+        )
+        second = choose_liu_rel_departure(
+            state=state, formal_round_number=1, current_actual_capacity=4.0,
+            **self.base,
+        )
+        self.assertEqual(first['decision_source'], 'liu_rel_softmax_i0')
+        self.assertEqual(first['choice_probabilities'], second['choice_probabilities'])
+        self.assertEqual(first['rounds_observed'], 0)
+        self.assertEqual(first['pretraining_count'], 2)
+
     def test_same_stable_identity_repeats_choice(self):
         left = choose_liu_rel_departure(
             state=initial_liu_rel_state(),
@@ -354,7 +396,7 @@ class LiuRELChoiceTests(unittest.TestCase):
 
         self.assertEqual(choice['decision_source'], 'liu_rel_softmax_i0')
         self.assertEqual(choice['policy_version'], LIU_REL_POLICY_VERSION)
-        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_truncated_normal_capacity_v2')
+        self.assertEqual(choice['policy_version'], 'dynamic_liu_rel_independent_market_pretrained_v3')
         self.assertEqual(choice['context_level'], 'i0_all')
         self.assertEqual(len(choice['propensities']), 16)
         self.assertEqual(len(choice['choice_probabilities']), 16)

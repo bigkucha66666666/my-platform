@@ -1,4 +1,5 @@
 import json
+import tempfile
 import unittest
 import threading
 from concurrent.futures import Future
@@ -15,6 +16,7 @@ from dynamic_bottleneck_round.agents.deepseek_agent import (
     build_chat_completion_payload,
     choose_agent_departure,
 )
+from dynamic_bottleneck_round.agents import prefetch_coordinator
 
 
 class DynamicAgentConfigTests(unittest.TestCase):
@@ -45,7 +47,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
             self.assertIn(str(config['rl_fallback_enabled']).lower(), {'0', 'false', 'off'})
             self.assertEqual(
                 config['rl_agent_policy_version'],
-                'dynamic_liu_rel_truncated_normal_capacity_v2',
+                'dynamic_liu_rel_independent_market_pretrained_v3',
             )
             self.assertEqual(config['rel_lambda'], 0.25)
             self.assertEqual(config['rel_eta'], 14.7445)
@@ -118,7 +120,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
         valid = {
             'name': 'dynamic_bottleneck_round_demo',
             'rl_agent_enabled': '1',
-            'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
+            'rel_policy_version': 'dynamic_liu_rel_independent_market_pretrained_v3',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
             'rel_random_seed': 2026090901,
@@ -144,7 +146,7 @@ class DynamicAgentConfigTests(unittest.TestCase):
                 'name': 'dynamic_bottleneck_round_prod',
                 'group_treatment_spec': 'G01:HA-I0',
                 'rl_agent_enabled': '1',
-                'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
+                'rel_policy_version': 'dynamic_liu_rel_independent_market_pretrained_v3',
                 'rel_lambda': 0.25,
                 'rel_eta': 14.7445,
                 'rel_random_seed': 2026090901,
@@ -160,11 +162,49 @@ class DynamicAgentConfigTests(unittest.TestCase):
         validated = app.validate_liu_rel_session_config(session)
         self.assertTrue(validated['rel_parameters_frozen'])
 
+    def test_pretrained_policy_rejects_parameters_other_than_frozen_bank(self):
+        base = {
+            'name': 'dynamic_bottleneck_round_prod',
+            'group_treatment_spec': 'G01:HA-I0',
+            'rl_agent_enabled': '1',
+            'rel_policy_version': app.INDEPENDENT_RL_POLICY_VERSION,
+            'rel_lambda': 0.25,
+            'rel_eta': 14.7445,
+            'rel_random_seed': 2026090901,
+            'rel_initial_uniform_rounds': 2,
+            'rel_parameters_frozen': '1',
+        }
+        for field, value in (
+            ('rel_lambda', 0.30),
+            ('rel_eta', 12.0),
+            ('rel_random_seed', 2026090902),
+        ):
+            with self.subTest(field=field):
+                session = SimpleNamespace(config={**base, field: value})
+                with self.assertRaisesRegex(ValueError, field):
+                    app.validate_liu_rel_session_config(session)
+
+    def test_enabled_rl_validates_frozen_bank_with_session_parameters(self):
+        session = SimpleNamespace(config={
+            'name': 'dynamic_bottleneck_round_prod',
+            'group_treatment_spec': 'G01:HA-I0',
+            'rl_agent_enabled': '1',
+            'rel_policy_version': app.INDEPENDENT_RL_POLICY_VERSION,
+            'rel_lambda': 0.25,
+            'rel_eta': 14.7445,
+            'rel_random_seed': 2026090901,
+            'rel_initial_uniform_rounds': 2,
+            'rel_parameters_frozen': '1',
+        })
+        with patch.object(app, 'validate_pretraining_bank') as verify:
+            app.validate_liu_rel_session_config(session)
+        verify.assert_called_once_with()
+
     def test_liu_rel_frozen_flag_accepts_only_zero_or_one(self):
         base = {
             'name': 'dynamic_bottleneck_round_demo',
             'rl_agent_enabled': '1',
-            'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
+            'rel_policy_version': 'dynamic_liu_rel_independent_market_pretrained_v3',
             'rel_lambda': 0.25,
             'rel_eta': 14.7445,
             'rel_random_seed': 2026090901,
@@ -537,11 +577,19 @@ class DynamicAgentInformationParityTests(unittest.TestCase):
 
 
 class DynamicAgentDecisionTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        cache_patch = patch.object(prefetch_coordinator, 'CACHE_ROOT', Path(directory.name))
+        cache_patch.start()
+        self.addCleanup(cache_patch.stop)
+
     @staticmethod
     def make_prefetch_group():
         return SimpleNamespace(
             session=SimpleNamespace(
                 code='SESSION_PREFETCH',
+                vars={},
                 config={
                     'api_agent_mode': 'active',
                     'api_agent_count_per_group': 1,
@@ -857,6 +905,8 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         prepared = [('G01_API_01', SimpleNamespace(agent_id='G01_API_01'))]
 
         with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(prefetch_coordinator, 'CACHE_ROOT', Path(directory)),
             patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}),
             patch.object(app, '_API_AGENT_PREFETCH_EXECUTOR', executor),
             patch.object(
@@ -868,11 +918,228 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         ):
             first = app.start_api_agent_prefetch(group)
             second = app.start_api_agent_prefetch(group)
+            future.set_result([AgentChoice(
+                departure_slot=1,
+                decision_source='deepseek_api',
+                fallback_used=False,
+            )])
 
         self.assertIs(first, future)
         self.assertIs(second, future)
         self.assertEqual(prepare.call_count, 1)
         self.assertEqual(executor.submit.call_count, 1)
+
+    def test_prefetch_from_another_process_reuses_published_choice(self):
+        group = self.make_prefetch_group()
+        future = Future()
+        executor = Mock()
+        executor.submit.return_value = future
+        choice_set = AgentChoiceSet(
+            round_number=2,
+            total_rounds=30,
+            available_slots=({'slot': 2, 'departure_minute': 475},),
+            cost_parameters={},
+            capacity_context={},
+            agent_id='G01_API_01',
+        )
+        prepared = [('G01_API_01', choice_set)]
+        choice = AgentChoice(
+            departure_slot=2,
+            decision_source='deepseek_api',
+            fallback_used=False,
+        )
+        records = [{'agent_id': 'G01_API_01', 'departure_slot': 2}]
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(prefetch_coordinator, 'CACHE_ROOT', Path(directory)),
+            patch.object(app, '_API_AGENT_PREFETCH_EXECUTOR', executor),
+            patch.object(app, 'prepare_api_agent_requests_for_group', return_value=('config', prepared)),
+            patch.object(app, 'active_agent_decisions_for_group', return_value=[]),
+            patch.object(app, 'build_api_agent_records_for_group', return_value=records) as build,
+            patch.object(app, 'save_agent_decisions_for_group') as save,
+        ):
+            with patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}):
+                self.assertIs(app.start_api_agent_prefetch(group), future)
+
+                with patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}):
+                    self.assertIs(app.collect_api_agent_prefetch(group), app.API_AGENT_DECISIONS_PENDING)
+                    self.assertEqual(executor.submit.call_count, 1)
+
+                    future.set_result([choice])
+                    self.assertEqual(app.collect_api_agent_prefetch(group), records)
+
+            self.assertEqual(executor.submit.call_count, 1)
+            build.assert_called_once_with(group, prepared, [choice])
+            save.assert_called_once_with(group, records)
+
+    def test_prefetch_failure_is_shared_as_local_fallback(self):
+        group = self.make_prefetch_group()
+        future = Future()
+        executor = Mock()
+        executor.submit.return_value = future
+        choice_set = AgentChoiceSet(
+            round_number=2,
+            total_rounds=30,
+            available_slots=({'slot': 2, 'departure_minute': 475},),
+            cost_parameters={},
+            capacity_context={},
+            agent_id='G01_API_01',
+        )
+        prepared = [('G01_API_01', choice_set)]
+
+        with (
+            patch.object(app, '_API_AGENT_PREFETCH_EXECUTOR', executor),
+            patch.object(app, 'prepare_api_agent_requests_for_group', return_value=('config', prepared)),
+            patch.object(app, 'active_agent_decisions_for_group', return_value=[]),
+            patch.object(app, 'fallback_lowest_schedule_cost', return_value=2),
+            patch.object(app, 'build_api_agent_records_for_group', return_value=[]) as build,
+            patch.object(app, 'save_agent_decisions_for_group'),
+        ):
+            with patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}):
+                app.start_api_agent_prefetch(group)
+                future.set_exception(RuntimeError('API unavailable'))
+                with patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}):
+                    self.assertEqual(app.collect_api_agent_prefetch(group), [])
+
+        self.assertEqual(executor.submit.call_count, 1)
+        choices = build.call_args.args[2]
+        self.assertEqual(len(choices), 1)
+        self.assertEqual(choices[0].decision_source, 'fallback_lowest_schedule_cost')
+        self.assertTrue(choices[0].fallback_used)
+        self.assertIn('API unavailable', choices[0].reason)
+
+    def test_abandoned_prefetch_uses_fallback_without_new_api_call(self):
+        group = self.make_prefetch_group()
+        key = app.api_agent_prefetch_key(group)
+        claim = prefetch_coordinator.try_claim(key)
+        prefetch_coordinator.mark_started(claim)
+        prefetch_coordinator.release_claim(claim)
+        executor = Mock()
+        executor.submit.return_value = Future()
+        choice_set = AgentChoiceSet(
+            round_number=2, total_rounds=30,
+            available_slots=({'slot': 2, 'departure_minute': 475},),
+            cost_parameters={}, capacity_context={}, agent_id='G01_API_01',
+        )
+        prepared = [('G01_API_01', choice_set)]
+
+        with (
+            patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}),
+            patch.object(app, '_API_AGENT_PREFETCH_EXECUTOR', executor),
+            patch.object(app, 'prepare_api_agent_requests_for_group', return_value=('config', prepared)),
+            patch.object(app, 'active_agent_decisions_for_group', return_value=[]),
+            patch.object(app, 'fallback_lowest_schedule_cost', return_value=2),
+            patch.object(app, 'build_api_agent_records_for_group', return_value=[]) as build,
+            patch.object(app, 'save_agent_decisions_for_group'),
+        ):
+            self.assertEqual(app.collect_api_agent_prefetch(group), [])
+
+        executor.submit.assert_not_called()
+        choice = build.call_args.args[2][0]
+        self.assertEqual(choice.decision_source, 'fallback_lowest_schedule_cost')
+        self.assertTrue(choice.fallback_used)
+
+    def test_unavailable_shared_cache_uses_fallback_without_api_call(self):
+        group = self.make_prefetch_group()
+        executor = Mock()
+        choice_set = AgentChoiceSet(
+            round_number=2, total_rounds=30,
+            available_slots=({'slot': 2, 'departure_minute': 475},),
+            cost_parameters={}, capacity_context={}, agent_id='G01_API_01',
+        )
+        prepared = [('G01_API_01', choice_set)]
+
+        with (
+            patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}),
+            patch.object(app, '_API_AGENT_PREFETCH_EXECUTOR', executor),
+            patch.object(prefetch_coordinator, 'try_claim', side_effect=PermissionError('denied')),
+            patch.object(app, 'prepare_api_agent_requests_for_group', return_value=('config', prepared)),
+            patch.object(app, 'active_agent_decisions_for_group', return_value=[]),
+            patch.object(app, 'fallback_lowest_schedule_cost', return_value=2),
+            patch.object(app, 'build_api_agent_records_for_group', return_value=[]) as build,
+            patch.object(app, 'save_agent_decisions_for_group'),
+        ):
+            self.assertEqual(app.collect_api_agent_prefetch(group), [])
+
+        executor.submit.assert_not_called()
+        self.assertTrue(build.call_args.args[2][0].fallback_used)
+
+    def test_unpublished_success_uses_same_fallback_on_owner_and_peer(self):
+        group = self.make_prefetch_group()
+        future = Future()
+        executor = Mock()
+        executor.submit.return_value = future
+        choice_set = AgentChoiceSet(
+            round_number=2, total_rounds=30,
+            available_slots=({'slot': 2, 'departure_minute': 475},),
+            cost_parameters={}, capacity_context={}, agent_id='G01_API_01',
+        )
+        prepared = [('G01_API_01', choice_set)]
+        recorded_choices = []
+
+        def capture_records(_group, _prepared, choices):
+            recorded_choices.append(choices)
+            return []
+
+        with (
+            patch.object(app, '_API_AGENT_PREFETCH_EXECUTOR', executor),
+            patch.object(app, 'prepare_api_agent_requests_for_group', return_value=('config', prepared)),
+            patch.object(app, 'active_agent_decisions_for_group', return_value=[]),
+            patch.object(app, 'fallback_lowest_schedule_cost', return_value=2),
+            patch.object(app, 'build_api_agent_records_for_group', side_effect=capture_records),
+            patch.object(app, 'save_agent_decisions_for_group'),
+        ):
+            with patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}):
+                app.start_api_agent_prefetch(group)
+                with patch.object(prefetch_coordinator.os, 'replace', side_effect=OSError('disk full')):
+                    future.set_result([AgentChoice(
+                        departure_slot=2, decision_source='deepseek_api', fallback_used=False,
+                    )])
+                self.assertEqual(app.collect_api_agent_prefetch(group), [])
+
+            with patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}):
+                self.assertEqual(app.collect_api_agent_prefetch(group), [])
+
+        self.assertEqual(executor.submit.call_count, 1)
+        self.assertEqual(len(recorded_choices), 2)
+        self.assertTrue(all(choices[0].fallback_used for choices in recorded_choices))
+
+    def test_synchronous_wrapper_waits_for_other_process_result(self):
+        group = self.make_prefetch_group()
+        key = app.api_agent_prefetch_key(group)
+        claim = prefetch_coordinator.try_claim(key)
+        prefetch_coordinator.mark_started(claim)
+        choice_set = AgentChoiceSet(
+            round_number=2, total_rounds=30,
+            available_slots=({'slot': 2, 'departure_minute': 475},),
+            cost_parameters={}, capacity_context={}, agent_id='G01_API_01',
+        )
+        prepared = [('G01_API_01', choice_set)]
+        choice = AgentChoice(
+            departure_slot=2, decision_source='deepseek_api', fallback_used=False,
+        )
+        timer = threading.Timer(
+            0.05,
+            lambda: prefetch_coordinator.publish_result(
+                key, {'status': 'ok', 'choices': [choice.__dict__]}, claim,
+            ),
+        )
+        timer.start()
+        try:
+            with (
+                patch.object(app, '_API_AGENT_PREFETCH_TASKS', {}),
+                patch.object(app, 'prepare_api_agent_requests_for_group', return_value=('config', prepared)),
+                patch.object(app, 'active_agent_decisions_for_group', return_value=[]),
+                patch.object(app, 'build_api_agent_records_for_group', return_value=[{'departure_slot': 2}]),
+                patch.object(app, 'save_agent_decisions_for_group'),
+            ):
+                result = app.create_api_agent_decisions_for_group(group)
+        finally:
+            timer.join(timeout=1)
+            prefetch_coordinator.release_claim(claim)
+
+        self.assertEqual(result, [{'departure_slot': 2}])
 
     def test_collect_returns_pending_without_waiting_for_api(self):
         group = self.make_prefetch_group()
@@ -1291,7 +1558,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                 'capacity_max': 4.00,
                 'capacity_sequence_seed': 2026091101,
                 'reward_treatment_enabled': 0,
-                'rel_policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
+                'rel_policy_version': 'dynamic_liu_rel_independent_market_pretrained_v3',
                 'rel_lambda': 0.25,
                 'rel_eta': 14.7445,
                 'rel_random_seed': 2026090901,
@@ -1373,7 +1640,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         self.assertTrue(
             all(
-                record['decision_source'] == 'liu_rel_uniform_initial'
+                record['decision_source'] == 'liu_rel_softmax_i0'
                 for record in first
             )
         )
@@ -1385,7 +1652,10 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             )
         )
         audit = json.loads(first[0]['context_json'])
-        self.assertEqual(audit['policy_version'], 'dynamic_liu_rel_truncated_normal_capacity_v2')
+        self.assertEqual(audit['policy_version'], app.INDEPENDENT_RL_POLICY_VERSION)
+        self.assertEqual(audit['pretraining_count'], 256)
+        self.assertEqual(audit['rounds_observed'], 0)
+        self.assertEqual(len(audit['pretraining_bank_sha256']), 64)
         self.assertIn('capacity_kernel_bandwidth', audit)
         self.assertEqual(audit['information_condition'], 'I0')
         self.assertIn('choice_probabilities', audit)
@@ -1415,10 +1685,20 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         states = participant.vars[app.INDEPENDENT_RL_STATE_PARTICIPANT_VAR]
         self.assertEqual(states['G01_RL_01']['rounds_observed'], 1)
         self.assertEqual(states['G01_RL_02']['rounds_observed'], 1)
+        self.assertEqual(len(states['G01_RL_01']['pretraining_experiences']), 256)
+        self.assertEqual(len(states['G01_RL_02']['pretraining_experiences']), 256)
         self.assertNotEqual(
             states['G01_RL_01']['experiences'][0]['total_cost'],
             states['G01_RL_02']['experiences'][0]['total_cost'],
         )
+
+    def test_pretrained_state_rejects_modified_initial_experience(self):
+        state = app.load_pretraining_profile(1)
+        state['pretraining_experiences'][0]['total_cost'] += 1
+        with self.assertRaisesRegex(ValueError, '冻结预训练经验'):
+            app.pretrained_independent_rl_state(
+                {'G01_RL_01': state}, 'G01_RL_01', 1,
+            )
 
     def test_independent_rl_learning_uses_public_feedback_snapshot(self):
         group, participant = self.make_independent_rl_group()
@@ -1457,7 +1737,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
                     'departure_slot': 1,
                     'decision_source': 'liu_rel_uniform_initial',
                     'reason': 'test',
-                    'policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
+                    'policy_version': 'dynamic_liu_rel_independent_market_pretrained_v3',
                     'rounds_observed': 0,
                     'information_condition': condition,
                     'context_level': 'initial',
@@ -1520,7 +1800,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
             'actor_type': 'rl_agent',
             'agent_id': 'G01_RL_01',
             'agent_type': 'rl_agent',
-            'policy_version': 'dynamic_liu_rel_truncated_normal_capacity_v2',
+            'policy_version': 'dynamic_liu_rel_independent_market_pretrained_v3',
             'persona_id': 'balanced_v1',
             'persona_label': 'balanced',
             'decision_source': 'rl_policy',
@@ -1536,7 +1816,7 @@ class DynamicAgentDecisionTests(unittest.TestCase):
         )
         self.assertEqual(
             row[app.EXPORT_HEADERS.index('rl_policy_version')],
-            'dynamic_liu_rel_truncated_normal_capacity_v2',
+            'dynamic_liu_rel_independent_market_pretrained_v3',
         )
 
     def test_group_result_lock_rejects_overlapping_generation(self):

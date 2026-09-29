@@ -1218,7 +1218,8 @@ class TemplateContractTests(unittest.TestCase):
             'data-ready="{{ if round_started }}1{{ else }}0{{ endif }}"',
             html,
         )
-        self.assertIn("panel.dataset.ready === '1'", html)
+        polling = Path('_static/dynamic_bottleneck_round/sync_poll.js').read_text()
+        self.assertIn("panel.dataset.ready === '1'", polling)
 
     def test_warmup_transition_templates_have_explicit_start_and_end_messages(self):
         warmup_path = self.app_dir / 'WarmupStart.html'
@@ -1242,12 +1243,13 @@ class TemplateContractTests(unittest.TestCase):
         html = self.template_text('ResultsSync.html')
 
         self.assertIn('data-poll="{{ poll_interval_ms }}"', html)
-        self.assertIn('Number(panel.dataset.poll)||1500', html)
+        polling = Path('_static/dynamic_bottleneck_round/sync_poll.js').read_text()
+        self.assertIn('Number(panel.dataset.poll) || 1500', polling)
         self.assertIn(
             'data-ready="{{ if results_ready }}1{{ else }}0{{ endif }}"',
             html,
         )
-        self.assertIn("panel.dataset.ready==='1'", html)
+        self.assertIn("panel.dataset.ready === '1'", polling)
 
     def test_results_is_cost_centered_with_combined_group_chart(self):
         html = self.template_text('Results.html')

@@ -74,6 +74,18 @@ class FormalRoomLabelIntegrationTests(unittest.TestCase):
         self.assertIn(player_by_label['P040'], matrix[1])
         self.assertIn(player_by_label['P001'], matrix[0])
 
+    def test_two_sessions_reuse_label_ranges_without_sharing_participants(self):
+        i0_players = make_players(40)
+        i1_players = make_players(40)
+        i0_plan = assign_formal_room_labels(i0_players, self.treatments, self.config)
+        i1_plan = assign_formal_room_labels(i1_players, self.treatments, self.config)
+        self.assertEqual(i0_plan, i1_plan)
+        self.assertEqual(i0_plan['G01'], self.labels[:30])
+        self.assertEqual(i0_plan['G02'], self.labels[30:40])
+        self.assertIsNot(i0_players[0].participant, i1_players[0].participant)
+        i0_players[0].participant.vars['access_granted'] = True
+        self.assertNotIn('access_granted', i1_players[0].participant.vars)
+
     def test_rejects_nonsequential_assignment_mode(self):
         config = {**self.config, 'participant_label_assignment': 'arrival'}
 

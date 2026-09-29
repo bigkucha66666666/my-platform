@@ -5,6 +5,13 @@
   .sync-panel{position:relative;overflow:hidden;padding:28px;border:1px solid #c8d8dc;border-radius:8px;background:linear-gradient(135deg,#eef7f5,#fbfdfc);color:#172b3a}
   .sync-panel::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:#267b86}.sync-kicker{margin:0 0 8px;color:#267b86;font-size:12px;font-weight:900;letter-spacing:.1em}.sync-title{margin:0;font-size:25px}.sync-copy{margin:10px 0 18px;color:#60727b;line-height:1.7}.sync-track{height:7px;overflow:hidden;background:#dce8e8}.sync-track span{display:block;width:36%;height:100%;background:#267b86;animation:syncMove 1.4s ease-in-out infinite alternate}@keyframes syncMove{to{transform:translateX(178%)}}
 </style>
+{{ if technical_anomaly }}
+<div class="sync-panel" role="alert">
+  <p class="sync-kicker">TECHNICAL EXCEPTION</p>
+  <h3 class="sync-title">本轮出现技术异常</h3>
+  <p class="sync-copy">系统未将本轮标记为有效行为数据。请保持页面并联系实验管理员处理。</p>
+</div>
+{{ else }}
 <div class="sync-panel" id="sync-panel" data-ready="{{ if results_ready }}1{{ else }}0{{ endif }}" data-poll="{{ poll_interval_ms }}" data-delay="{{ auto_continue_delay_ms }}">
   <p class="sync-kicker">ROUND PROCESSING</p>
   <h3 class="sync-title">正在准备本轮结果</h3>
@@ -12,12 +19,7 @@
   <div class="sync-track"><span></span></div>
 </div>
 <button class="otree-btn-next btn btn-primary" id="sync-next" hidden>查看本轮结果</button>
-<script>
-  (function(){
-    const panel=document.getElementById('sync-panel');
-    const ready=panel.dataset.ready==='1';
-    if(ready){setTimeout(function(){document.getElementById('sync-next').click();},Number(panel.dataset.delay)||200);return;}
-    setTimeout(function(){window.location.reload();},Number(panel.dataset.poll)||1500);
-  })();
-</script>
+<script src="{{ static 'dynamic_bottleneck_round/sync_poll.js' }}"></script>
+<script>DynamicBottleneckSync.start('sync-panel', 'sync-next');</script>
+{{ endif }}
 {{ endblock }}

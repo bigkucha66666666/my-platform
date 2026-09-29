@@ -33,19 +33,6 @@
 
 <button class="otree-btn-next btn btn-primary" id="round-start-next" hidden>进入本轮决策</button>
 
-<script>
-  (function () {
-    const panel = document.getElementById('round-start-sync');
-    const ready = panel.dataset.ready === '1';
-    if (ready) {
-      window.setTimeout(function () {
-        document.getElementById('round-start-next').click();
-      }, Number(panel.dataset.delay) || 200);
-      return;
-    }
-    window.setTimeout(function () {
-      window.location.reload();
-    }, Number(panel.dataset.poll) || 1500);
-  })();
-</script>
+<script src="{{ static 'dynamic_bottleneck_round/sync_poll.js' }}"></script>
+<script>DynamicBottleneckSync.start('round-start-sync', 'round-start-next');</script>
 {{ endblock }}

@@ -71,6 +71,30 @@ from .agents.rl_fallback import (
     valid_or_initial_state,
 )
 from .agents import prefetch_coordinator
+from .room_release import (
+    admission_kind,
+    acknowledge_shell,
+    expire_preparation,
+    make_round_state,
+    mark_shell_rendered,
+    release_if_ready,
+)
+from .decision_ingress import (
+    completed_shell_response_ts,
+    completed_decision_response_ts,
+    completed_decision_posts_overrun,
+    completed_participant_requests_crossing,
+    failed_participant_requests,
+    finish_shell_ack,
+    current_decision_shell_token,
+    ingress_middleware_active,
+    page_ingress_ts,
+    pending_decision_posts,
+    pending_participant_requests,
+    pending_shell_acks,
+    request_ingress_ts,
+    shell_ack_ingress_ts,
+)
 
 
 doc = """
@@ -83,6 +107,10 @@ DECISION_SOURCE_MANUAL = 'manual'
 DECISION_SOURCE_TIMEOUT_AUTO = 'timeout_auto'
 DECISION_SOURCE_DISCONNECT_AUTO = 'disconnect_auto'
 DECISION_SOURCE_SUSPENDED_AUTO = 'suspended_auto'
+ROOM_RELEASE_PROTOCOL_VAR = 'dynamic_bottleneck_room_release_protocol_v1'
+ROOM_RELEASE_DRAIN_VAR = 'dynamic_bottleneck_room_release_drain_seconds_v1'
+ROOM_RELEASE_ROUND_PREFIX = 'dynamic_bottleneck_room_release_round_v1:'
+ROOM_RELEASE_BOOT_ID = os.urandom(8).hex()
 
 AUTO_CHOICE_LAST_MANUAL = 'last_manual_choice'
 AUTO_CHOICE_NEUTRAL_BASELINE = 'neutral_baseline'
@@ -528,6 +556,22 @@ EXPORT_HEADERS = [
     'total_cost',
     'payoff',
     'decision_source',
+    'room_release_protocol',
+    'room_release_phase',
+    'room_release_technical_anomaly',
+    'room_release_exclude_behavior',
+    'room_release_prepare_started_ts',
+    'room_release_prepare_deadline_ts',
+    'room_release_shell_get_ingress_ts',
+    'room_release_shell_render_started_ts',
+    'room_release_shell_response_completed_ts',
+    'room_release_ack_ts',
+    'room_release_release_ts',
+    'room_release_deadline_ts',
+    'room_release_operative_ts',
+    'room_release_post_ingress_ts',
+    'room_release_post_processing_ts',
+    'room_release_post_response_completed_ts',
     'timeout_happened',
     'dropout_event',
     'recovered_this_round',
@@ -1604,6 +1648,24 @@ def validate_cash_payment_config(session):
 def creating_session(subsession):
     config = parse_stochastic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
+        # Existing Sessions have no marker and continue the legacy timing path.
+        if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') == '1':
+            if not ingress_middleware_active():
+                raise ValueError(
+                    '统一放行需要 project_prodserver.py / project_asgi.py '
+                    '启动入口；当前 oTree 启动方式未安装锁前时间戳中间件。'
+                )
+            try:
+                drain_seconds = float(os.environ['DYNAMIC_ROOM_RELEASE_DRAIN_SECONDS'])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    '启用统一放行前，必须依据并发实测配置 '
+                    'DYNAMIC_ROOM_RELEASE_DRAIN_SECONDS。'
+                ) from exc
+            if not isfinite(drain_seconds) or not 0 < drain_seconds <= 120:
+                raise ValueError('决策请求清空期必须在 0–120 秒之间。')
+            subsession.session.vars[ROOM_RELEASE_PROTOCOL_VAR] = 1
+            subsession.session.vars[ROOM_RELEASE_DRAIN_VAR] = drain_seconds
         validate_cash_payment_config(subsession.session)
         players = subsession.get_players()
         if is_formal_session(subsession.session):
@@ -1707,6 +1769,162 @@ def maybe_start_round(group, now_ts=None):
     group.decision_deadline_ts = effective_start_ts + C.DECISION_TIMEOUT_SECONDS
     fill_suspended_choices(group)
     return True
+
+
+def room_release_enabled(session):
+    if session is None:
+        return False
+    # Reading Session.vars marks its SQLAlchemy field dirty; avoid a write on
+    # every legacy page merely to check whether this opt-in marker exists.
+    stored = getattr(session, '_vars', None)
+    if stored is None:
+        stored = getattr(session, 'vars', {})
+    return stored.get(ROOM_RELEASE_PROTOCOL_VAR) == 1
+
+
+def room_release_state(player, *, now_ts=None):
+    key = f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}'
+    state = player.session.vars.get(key)
+    if state is None:
+        now_ts = time.time() if now_ts is None else float(now_ts)
+        expected_codes = [
+            round_player.participant.code
+            for round_player in player.subsession.get_players()
+            if not participant_dropout_suspended(round_player)
+        ]
+        state = make_round_state(
+            round_number=player.round_number,
+            now_ts=now_ts,
+            expected_codes=expected_codes,
+        )
+        state['drain_limit_seconds'] = player.session.vars.get(
+            ROOM_RELEASE_DRAIN_VAR
+        )
+        state['decision_page_index'] = getattr(
+            player.participant, '_index_in_pages', None
+        )
+        state['process_boot_id'] = ROOM_RELEASE_BOOT_ID
+        player.session.vars[key] = state
+    elif (
+        state.get('process_boot_id')
+        and state['process_boot_id'] != ROOM_RELEASE_BOOT_ID
+        and not getattr(player.group, 'results_ready', False)
+    ):
+        state['technical_anomaly'] = 'worker_restarted_during_round'
+        state['phase'] = 'TECHNICAL_ANOMALY'
+        player.session.vars[key] = state
+    return state
+
+
+def room_release_snapshot(player, *, kind='status', now_ts=None,
+                          shell_token=None):
+    """Idempotent, Session-wide release snapshot for one human participant."""
+    now_ts = time.time() if now_ts is None else float(now_ts)
+    state = room_release_state(player, now_ts=now_ts)
+    code = player.participant.code
+    if kind == 'render':
+        mark_shell_rendered(
+            state, code, now_ts=now_ts,
+            ingress_ts=page_ingress_ts() or now_ts,
+        )
+    elif kind == 'ack':
+        accepted = acknowledge_shell(
+            state, code, now_ts=shell_ack_ingress_ts() or now_ts
+        )
+        token_key = (
+            f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:shell_token'
+        )
+        if (accepted and token_key not in player.participant.vars
+                and isinstance(shell_token, str)
+                and re.fullmatch(r'[0-9a-f]{24}', shell_token)):
+            player.participant.vars[token_key] = shell_token
+    shell_completed_key = (
+        f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:shell_response_completed_ts'
+    )
+    stored_shell_token = player.participant.vars.get(
+        f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:shell_token'
+    )
+    if shell_completed_key not in player.participant.vars and stored_shell_token:
+        completed_ts = completed_shell_response_ts(
+            code, page_index=state.get('decision_page_index'),
+            shell_token=stored_shell_token,
+        )
+        if completed_ts is not None:
+            player.participant.vars[shell_completed_key] = completed_ts
+    if not state['technical_anomaly'] and state['release_ts'] is None:
+        if any(
+            failed_participant_requests(
+                expected_code,
+                # The first GET can fail after creating this state in a
+                # transaction that oTree then rolls back.  Match this page
+                # index instead of a possibly re-created start timestamp.
+                page_index=state.get('decision_page_index'),
+                before_ts=now_ts + 0.000001,
+            )
+            for expected_code in state['expected_codes']
+        ):
+            state['technical_anomaly'] = 'participant_page_http_failure'
+            state['phase'] = 'TECHNICAL_ANOMALY'
+        elif (
+            state.get('drain_limit_seconds') is not None
+            and now_ts > state['prepare_deadline_ts'] + float(state['drain_limit_seconds'])
+        ):
+            state['technical_anomaly'] = 'shell_ack_queue_overrun'
+            state['phase'] = 'TECHNICAL_ANOMALY'
+        elif not release_if_ready(state, now_ts=now_ts):
+            pending_codes = [
+                expected_code for expected_code in state['expected_codes']
+                if (
+                    pending_participant_requests(
+                        expected_code,
+                        before_ts=state['prepare_deadline_ts'],
+                    )
+                    or pending_shell_acks(
+                        expected_code,
+                        page_index=state.get('decision_page_index'),
+                        deadline_ts=state['prepare_deadline_ts'],
+                    )
+                )
+            ]
+            missing = set(state['expected_codes']) - set(state['ack_ts_by_code'])
+            if now_ts >= state['prepare_deadline_ts'] and any(
+                completed_participant_requests_crossing(
+                    missing_code,
+                    after_ts=state['prepare_started_ts'],
+                    deadline_ts=state['prepare_deadline_ts'],
+                )
+                for missing_code in missing
+            ):
+                state['technical_anomaly'] = 'participant_page_crossed_prepare_deadline'
+                state['phase'] = 'TECHNICAL_ANOMALY'
+            else:
+                expire_preparation(
+                    state, now_ts=now_ts, pending_codes=pending_codes,
+                    drain_limit_seconds=state.get('drain_limit_seconds'),
+                )
+    if state['release_ts'] is not None:
+        if state['phase'] == 'ARMED' and now_ts >= state['release_ts']:
+            state['phase'] = 'RELEASED'
+        if state['phase'] == 'RELEASED' and now_ts >= state['deadline_ts']:
+            state['phase'] = 'CLOSED'
+        for group in player.subsession.get_groups():
+            if group.round_started:
+                continue
+            group.round_started = True
+            group.round_started_at_ts = state['release_ts']
+            group.decision_deadline_ts = state['deadline_ts']
+            fill_suspended_choices(group)
+    # Session.vars is a mutable SQLAlchemy field; accessing it marks it dirty.
+    player.session.vars[f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}'] = state
+    return {
+        'phase': state['phase'],
+        'acknowledged': code in state['ack_ts_by_code'],
+        'prepare_deadline_ts': state['prepare_deadline_ts'],
+        'release_ts': state['release_ts'],
+        'deadline_ts': state['deadline_ts'],
+        'technical_anomaly': state['technical_anomaly'],
+        'server_now_ts': now_ts,
+    }
 
 
 def mark_round_ready(player, now_ts=None):
@@ -2105,9 +2323,86 @@ def _set_results_locked(group):
 
 
 def maybe_prepare_results(group):
-    if not maybe_start_round(group):
-        return
     if group.results_ready:
+        return
+    if room_release_enabled(getattr(group, 'session', None)):
+        state = group.session.vars.get(
+            f'{ROOM_RELEASE_ROUND_PREFIX}{group.round_number}'
+        )
+        if not state or state['technical_anomaly'] or state['release_ts'] is None:
+            return
+        if (
+            state.get('process_boot_id')
+            and state['process_boot_id'] != ROOM_RELEASE_BOOT_ID
+        ):
+            state['technical_anomaly'] = 'worker_restarted_during_round'
+            state['phase'] = 'TECHNICAL_ANOMALY'
+            group.session.vars[
+                f'{ROOM_RELEASE_ROUND_PREFIX}{group.round_number}'
+            ] = state
+            return
+        now_ts = time.time()
+        if now_ts < state['release_ts']:
+            return
+        if any(
+            failed_participant_requests(
+                player.participant.code,
+                after_ts=state['release_ts'],
+                before_ts=state['deadline_ts'],
+            )
+            for player in group.get_players()
+        ):
+            state['technical_anomaly'] = 'decision_page_http_failure'
+            state['phase'] = 'TECHNICAL_ANOMALY'
+            group.session.vars[
+                f'{ROOM_RELEASE_ROUND_PREFIX}{group.round_number}'
+            ] = state
+            return
+        if now_ts >= state['deadline_ts']:
+            drain_seconds = state.get('drain_limit_seconds')
+            if drain_seconds is not None and any(
+                completed_decision_posts_overrun(
+                    player.participant.code,
+                    page_index=state.get('decision_page_index'),
+                    deadline_ts=state['deadline_ts'],
+                    drain_limit_seconds=drain_seconds,
+                    ingress_ts=player.participant.vars.get(
+                        f'{ROOM_RELEASE_ROUND_PREFIX}{group.round_number}:post_ingress_ts'
+                    ),
+                )
+                for player in group.get_players()
+            ):
+                state['technical_anomaly'] = 'decision_post_queue_overrun'
+                state['phase'] = 'TECHNICAL_ANOMALY'
+                group.session.vars[
+                    f'{ROOM_RELEASE_ROUND_PREFIX}{group.round_number}'
+                ] = state
+                return
+            # An on-time POST may be queued behind another oTree HTTP request.
+            # Do not auto-select/settle until its response has completed.
+            if any(
+                pending_decision_posts(
+                    player.participant.code, deadline_ts=state['deadline_ts']
+                )
+                for player in group.get_players()
+            ):
+                if drain_seconds is None:
+                    state['technical_anomaly'] = 'decision_drain_limit_unconfigured'
+                elif now_ts >= state['deadline_ts'] + float(drain_seconds):
+                    state['technical_anomaly'] = 'decision_post_queue_overrun'
+                if state['technical_anomaly']:
+                    state['phase'] = 'TECHNICAL_ANOMALY'
+                    group.session.vars[
+                        f'{ROOM_RELEASE_ROUND_PREFIX}{group.round_number}'
+                    ] = state
+                return
+        if all_players_have_choice(group):
+            set_results(group)
+        elif now_ts >= state['deadline_ts']:
+            fill_missing_choices(group)
+            set_results(group)
+        return
+    if not maybe_start_round(group):
         return
     if all_players_have_choice(group):
         set_results(group)
@@ -2463,6 +2758,8 @@ def pretrained_independent_rl_state(states, agent_id, seat_index):
 
 def prepare_independent_rl_decisions_for_group(group):
     if not rl_agent_enabled(group.session):
+        return []
+    if rl_agent_count_per_group(group.session, group.id_in_subsession) <= 0:
         return []
     existing = independent_rl_records_for_group(group)
     if existing:
@@ -2980,6 +3277,9 @@ def _publish_api_agent_prefetch(key, task, future):
 def start_api_agent_prefetch(group):
     if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
         return None
+    # Session-wide Agent mode may be active while this is a Human-only group.
+    if api_agent_count_per_group(group.session, group.id_in_subsession) <= 0:
+        return None
     if active_agent_decisions_for_group(group):
         return None
 
@@ -3043,6 +3343,8 @@ def start_api_agent_prefetch(group):
 
 def collect_api_agent_prefetch(group):
     if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
+        return []
+    if api_agent_count_per_group(group.session, group.id_in_subsession) <= 0:
         return []
     existing = active_agent_decisions_for_group(group)
     if existing:
@@ -3118,6 +3420,8 @@ def create_api_agent_decisions_for_group(group):
     """Synchronous compatibility wrapper used by tests and offline tools."""
     if api_agent_mode(group.session) != API_AGENT_MODE_ACTIVE:
         return []
+    if api_agent_count_per_group(group.session, group.id_in_subsession) <= 0:
+        return []
     existing = active_agent_decisions_for_group(group)
     if existing:
         return existing
@@ -3150,11 +3454,28 @@ def result_cost_components(player):
     )
 
 
-def group_departure_distribution(group):
+def group_departure_distribution(group, *, public_snapshot=None):
+    if public_snapshot is None and getattr(group, 'results_ready', False):
+        public_snapshot = current_public_feedback_for_group(group)
+    if public_snapshot is not None:
+        outcomes = public_snapshot['departure_outcomes']
+        maximum = max((row['participant_count'] for row in outcomes), default=0)
+        return [
+            {
+                'slot': row['slot'],
+                'time': row['departure_time'],
+                'count': row['participant_count'],
+                'height_pct': (
+                    round(row['participant_count'] / maximum * 100, 2)
+                    if maximum else 0
+                ),
+            }
+            for row in outcomes
+        ]
     players = group.get_players()
     schedule = departure_schedule_for_player(players[0]) if players else static_departure_schedule()
     counts = {slot: 0 for slot in departure_slots(schedule)}
-    for player in group.get_players():
+    for player in players:
         slot = player_departure_slot(player)
         if slot in counts:
             counts[slot] += 1
@@ -3273,9 +3594,10 @@ def current_public_feedback_for_group(group):
     return deepcopy(snapshot) if isinstance(snapshot, dict) else None
 
 
-def result_current_round_cost_snapshot(player):
+def result_current_round_cost_snapshot(player, *, public_snapshot=None):
     schedule = departure_schedule_for_player(player)
-    public_snapshot = current_public_feedback_for_group(player.group)
+    if public_snapshot is None:
+        public_snapshot = current_public_feedback_for_group(player.group)
     if public_snapshot is None:
         public_snapshot = public_feedback_snapshot_for_group(player.group)
     outcome_by_slot = {
@@ -3378,6 +3700,75 @@ def planned_group_composition(session, group_id):
     return {'human': human, 'api': api, 'rl': rl, 'total': human + api + rl}
 
 
+ROOM_RELEASE_EXPORT_FIELDS = (
+    'room_release_protocol', 'room_release_phase',
+    'room_release_technical_anomaly', 'room_release_exclude_behavior',
+    'room_release_prepare_started_ts', 'room_release_prepare_deadline_ts',
+    'room_release_shell_get_ingress_ts',
+    'room_release_shell_render_started_ts', 'room_release_ack_ts',
+    'room_release_shell_response_completed_ts',
+    'room_release_release_ts', 'room_release_deadline_ts',
+    'room_release_operative_ts', 'room_release_post_ingress_ts',
+    'room_release_post_processing_ts', 'room_release_post_response_completed_ts',
+)
+
+
+def room_release_export_metadata(player):
+    blank = dict.fromkeys(ROOM_RELEASE_EXPORT_FIELDS, '')
+    if not room_release_enabled(getattr(player, 'session', None)):
+        return blank
+    stored = getattr(player.session, '_vars', None)
+    if stored is None:
+        stored = player.session.vars
+    state = stored.get(f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}', {})
+    code = player.participant.code
+    runtime = player.participant.vars
+    return {
+        'room_release_protocol': 1,
+        'room_release_phase': state.get('phase', ''),
+        'room_release_technical_anomaly': state.get('technical_anomaly', ''),
+        'room_release_exclude_behavior': bool(state.get('technical_anomaly')),
+        'room_release_prepare_started_ts': state.get('prepare_started_ts', ''),
+        'room_release_prepare_deadline_ts': state.get('prepare_deadline_ts', ''),
+        'room_release_shell_get_ingress_ts': state.get(
+            'shell_get_ingress_ts_by_code', {}
+        ).get(code, ''),
+        'room_release_shell_render_started_ts': state.get('shell_rendered_ts_by_code', {}).get(code, ''),
+        'room_release_shell_response_completed_ts': runtime.get(
+            f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:shell_response_completed_ts', ''
+        ),
+        'room_release_ack_ts': state.get('ack_ts_by_code', {}).get(code, ''),
+        'room_release_release_ts': state.get('release_ts') or '',
+        'room_release_deadline_ts': state.get('deadline_ts') or '',
+        'room_release_operative_ts': runtime.get(
+            f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:operative_ts', ''
+        ),
+        'room_release_post_ingress_ts': runtime.get(
+            f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_ingress_ts', ''
+        ),
+        'room_release_post_processing_ts': runtime.get(
+            f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_processing_ts', ''
+        ),
+        'room_release_post_response_completed_ts': runtime.get(
+            f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_response_completed_ts', ''
+        ),
+    }
+
+
+def room_release_agent_export_metadata(reference_player):
+    """Carry Session/round validity onto Agent rows, not human-only timing."""
+    metadata = room_release_export_metadata(reference_player)
+    return {
+        name: metadata[name]
+        for name in (
+            'room_release_protocol', 'room_release_phase',
+            'room_release_technical_anomaly', 'room_release_exclude_behavior',
+            'room_release_prepare_started_ts', 'room_release_prepare_deadline_ts',
+            'room_release_release_ts', 'room_release_deadline_ts',
+        )
+    }
+
+
 def participant_entered_round(player):
     participant_vars = player.participant.vars
     if not bool(participant_vars.get('access_granted', False)):
@@ -3401,6 +3792,7 @@ def export_row_for_player(player):
     planned = planned_group_composition(player.session, player.group.id_in_subsession)
     values = {
         **capacity_export_metadata(player),
+        **room_release_export_metadata(player),
         'session_code': player.session.code,
         'participant_code': getattr(player.participant, 'code', ''),
         'group_id': player.group.id_in_subsession,
@@ -3504,6 +3896,8 @@ def export_row_for_agent_record(record, reference_player):
     row = export_row_for_player(reference_player)
     reference_capacity_metadata = capacity_export_metadata(reference_player)
     values = {
+        **dict.fromkeys(ROOM_RELEASE_EXPORT_FIELDS, ''),
+        **room_release_agent_export_metadata(reference_player),
         'participant_code': '',
         'participant_label': '',
         'access_granted': '',
@@ -3989,6 +4383,8 @@ class RoundStartSync(Page):
     def is_displayed(player):
         if not access_allowed(player):
             return False
+        if room_release_enabled(getattr(player, 'session', None)):
+            return False
         mark_round_ready(player)
         return True
 
@@ -3997,15 +4393,14 @@ class RoundStartSync(Page):
         mark_round_ready(player)
         group = player.group
         now_ts = time.time()
-        maybe_start_round(group, now_ts=now_ts)
         if group.round_started:
             start_api_agent_prefetch(group)
             prepare_independent_rl_decisions_for_group(group)
+        waiting_players = round_waiting_players(group)
         ready_count = sum(
             bool(group_player.round_start_ready)
-            for group_player in round_waiting_players(group)
+            for group_player in waiting_players
         )
-        waiting_players = round_waiting_players(group)
         return {
             **round_phase_context(player.round_number),
             'round_started': group.round_started,
@@ -4029,9 +4424,75 @@ class Decision(Page):
     form_fields = ['departure_minute']
 
     @staticmethod
+    def get_form_fields(player):
+        if room_release_enabled(getattr(player, 'session', None)):
+            preexisting = (
+                player.group.results_ready or player_has_departure_choice(player)
+            )
+            player._room_release_choice_preexisting = bool(preexisting)
+            excluded = False
+            if not preexisting:
+                state = room_release_state(player)
+                excluded = player.participant.code in state['excluded_codes']
+        else:
+            preexisting = False
+            excluded = False
+        if preexisting or excluded:
+            # oTree POST does not call is_displayed().  A stale POST must not
+            # populate departure_minute after an auto choice/result exists.
+            return []
+        return ['departure_minute']
+
+    @staticmethod
+    def live_method(player, data):
+        if not room_release_enabled(getattr(player, 'session', None)):
+            return {player.id_in_group: {'legacy': True}}
+        kind = data.get('kind') if isinstance(data, dict) else None
+        if kind not in {'ack', 'status', 'operative'}:
+            return {player.id_in_group: {'technical_anomaly': 'invalid_live_message'}}
+        try:
+            snapshot = room_release_snapshot(
+                player, kind='ack' if kind == 'ack' else 'status',
+                shell_token=data.get('shell_token') if kind == 'ack' else None,
+            )
+        finally:
+            if kind == 'ack':
+                finish_shell_ack()
+        if (
+            kind == 'operative'
+            and snapshot['release_ts'] is not None
+            and snapshot['server_now_ts'] >= snapshot['release_ts']
+        ):
+            player.participant.vars[
+                f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:operative_ts'
+            ] = snapshot['server_now_ts']
+        if (
+            snapshot['release_ts'] is not None
+            and snapshot['server_now_ts'] >= snapshot['release_ts']
+            and not snapshot['technical_anomaly']
+        ):
+            capacity_context = public_capacity_context_for_group(player.group)
+            if (
+                capacity_context.get('current_capacity_revealed')
+                and capacity_context.get('information_condition') == INFO_I1
+            ):
+                snapshot['actual_capacity_display'] = (
+                    f'{capacity_context["actual_capacity"]:.2f}'
+                )
+                snapshot['capacity_level_label'] = capacity_level_label(
+                    capacity_context['capacity_level']
+                )
+        return {player.id_in_group: snapshot}
+
+    @staticmethod
     def is_displayed(player):
         if not access_allowed(player):
             return False
+        if room_release_enabled(getattr(player, 'session', None)):
+            room_release_state(player)
+            return not (
+                player.group.results_ready or player_has_departure_choice(player)
+            )
         if not maybe_start_round(player.group):
             return False
         start_api_agent_prefetch(player.group)
@@ -4043,6 +4504,10 @@ class Decision(Page):
 
     @staticmethod
     def get_timeout_seconds(player):
+        if room_release_enabled(getattr(player, 'session', None)):
+            # A Page timeout is fixed at first render, which is before T.
+            # The shared deadline is enforced by server admission instead.
+            return None
         maybe_prepare_results(player.group)
         if player.participant.vars.get('dropout_active'):
             return C.DROPOUT_TIMEOUT_SECONDS
@@ -4051,6 +4516,21 @@ class Decision(Page):
     @staticmethod
     def vars_for_template(player):
         context = public_capacity_context_for_group(player.group)
+        release_status = None
+        room_shell = room_release_enabled(getattr(player, 'session', None))
+        if room_shell:
+            release_status = room_release_snapshot(player, kind='render')
+            # I1 capacity must not be present anywhere in pre-release HTML,
+            # including oTree's debug context table.
+            if (
+                release_status['release_ts'] is None
+                or release_status['server_now_ts'] < release_status['release_ts']
+                or context.get('information_condition') == INFO_I0
+            ):
+                context = dict(context)
+                context['current_capacity_revealed'] = False
+                context.pop('actual_capacity', None)
+                context.pop('capacity_level', None)
         if context.get('current_capacity_revealed'):
             context['actual_capacity_display'] = f'{context["actual_capacity"]:.2f}'
             context['capacity_level_label'] = capacity_level_label(
@@ -4060,6 +4540,10 @@ class Decision(Page):
         preview = choice_preview(player)
         return {
             **context,
+            'has_live_method': room_shell,
+            'room_release_shell': room_shell,
+            'room_release_status': release_status or {},
+            'room_release_shell_token': current_decision_shell_token() if room_shell else None,
             **round_phase_context(player.round_number),
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'departure_time_min': schedule['first_departure_time'],
@@ -4079,6 +4563,42 @@ class Decision(Page):
 
     @staticmethod
     def error_message(player, values):
+        if room_release_enabled(getattr(player, 'session', None)):
+            if player.group.results_ready or getattr(
+                player, '_room_release_choice_preexisting', False
+            ):
+                return None
+            state = room_release_state(player)
+            ingress_ts = request_ingress_ts()
+            if ingress_ts is not None:
+                player.participant.vars[
+                    f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_ingress_ts'
+                ] = ingress_ts
+                player.participant.vars[
+                    f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_processing_ts'
+                ] = time.time()
+            if ingress_ts is None:
+                state['technical_anomaly'] = 'decision_ingress_not_instrumented'
+                state['phase'] = 'TECHNICAL_ANOMALY'
+                return '服务器决策入口未完成配置，本轮已标记为技术异常。'
+            kind = admission_kind(state, player.participant.code, ingress_ts)
+            if kind in {'early', 'unacknowledged'}:
+                return '本轮尚未放行，请等待统一决策开始。'
+            if kind == 'technical_anomaly':
+                return '本轮出现技术异常，请联系实验管理员。'
+            if kind == 'excluded':
+                # No form fields are populated; before_next_page creates an
+                # explicit non-manual choice using the established rule.
+                return None
+            if kind == 'late':
+                # Let this POST advance; before_next_page records an auto choice.
+                return None
+            if departure_slot_for_minute(
+                values.get('departure_minute'),
+                departure_schedule_for_player(player),
+            ) is None:
+                return '请选择时间范围内、1 分钟精度的有效出发时间。'
+            return None
         if decision_submission_closed(player.group):
             maybe_prepare_results(player.group)
             return '本轮决策时间已结束，系统将使用截止时的有效决策。'
@@ -4090,6 +4610,36 @@ class Decision(Page):
 
     @staticmethod
     def before_next_page(player, timeout_happened):
+        if room_release_enabled(getattr(player, 'session', None)):
+            if player.group.results_ready or getattr(
+                player, '_room_release_choice_preexisting', False
+            ):
+                return
+            state = room_release_state(player)
+            ingress_ts = request_ingress_ts()
+            kind = (
+                admission_kind(state, player.participant.code, ingress_ts)
+                if ingress_ts is not None else 'technical_anomaly'
+            )
+            if kind == 'manual':
+                choice_saved = set_player_departure_choice(
+                    player, player.field_maybe_none('departure_minute'),
+                    DECISION_SOURCE_MANUAL,
+                )
+                if choice_saved:
+                    record_manual_decision(player)
+                player.timeout_happened = False
+            elif kind == 'late':
+                strategy = set_automatic_departure_choice(
+                    player, DECISION_SOURCE_TIMEOUT_AUTO,
+                )
+                mark_timeout(player, strategy)
+            elif kind == 'excluded':
+                strategy = set_automatic_departure_choice(
+                    player, DECISION_SOURCE_DISCONNECT_AUTO,
+                )
+                mark_disconnect(player, strategy)
+            return
         if decision_submission_closed(player.group):
             maybe_prepare_results(player.group)
             return
@@ -4136,13 +4686,52 @@ class ResultsSync(Page):
 
     @staticmethod
     def vars_for_template(player):
-        maybe_prepare_results(player.group)
+        room_mode = room_release_enabled(getattr(player, 'session', None))
+        if room_mode:
+            state = player.session.vars.get(
+                f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}', {}
+            )
+            completed_key = (
+                f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_response_completed_ts'
+            )
+            ingress_ts = player.participant.vars.get(
+                f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}:post_ingress_ts'
+            )
+            if completed_key not in player.participant.vars and ingress_ts is not None:
+                completed_ts = completed_decision_response_ts(
+                    player.participant.code,
+                    page_index=state.get('decision_page_index'), method='POST',
+                    ingress_ts=ingress_ts,
+                )
+                if completed_ts is not None:
+                    player.participant.vars[completed_key] = completed_ts
+        groups = player.subsession.get_groups() if room_mode else [player.group]
+        for group in groups:
+            maybe_prepare_results(group)
+        state = {}
+        if room_release_enabled(getattr(player, 'session', None)):
+            state = player.session.vars.get(
+                f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}', {}
+            )
+        elif room_release_enabled(getattr(player.group, 'session', None)):
+            state = player.group.session.vars.get(
+                f'{ROOM_RELEASE_ROUND_PREFIX}{player.group.round_number}', {}
+            )
         return {
-            'results_ready': player.group.results_ready,
+            'results_ready': all(group.results_ready for group in groups),
+            'technical_anomaly': state.get('technical_anomaly', ''),
             'remaining_seconds': max(0, ceil(player.group.decision_deadline_ts - time.time())),
             'poll_interval_ms': int(C.SYNC_POLL_INTERVAL_SECONDS * 1000),
             'auto_continue_delay_ms': C.AUTO_CONTINUE_DELAY_MS,
         }
+
+    @staticmethod
+    def error_message(player, values):
+        if room_release_enabled(getattr(player, 'session', None)):
+            if not all(
+                group.results_ready for group in player.subsession.get_groups()
+            ):
+                return '请等待本房间所有小组完成本轮结算。'
 
     @staticmethod
     def before_next_page(player, timeout_happened):
@@ -4164,7 +4753,12 @@ class Results(Page):
     def vars_for_template(player):
         maybe_prepare_results(player.group)
         components = result_cost_components(player)
-        snapshot = result_current_round_cost_snapshot(player)
+        public_snapshot = current_public_feedback_for_group(player.group)
+        if public_snapshot is None:
+            public_snapshot = public_feedback_snapshot_for_group(player.group)
+        snapshot = result_current_round_cost_snapshot(
+            player, public_snapshot=public_snapshot,
+        )
         phase = round_phase_context(player.round_number)
         has_previous_capacity = (
             player.round_number > 1
@@ -4194,7 +4788,9 @@ class Results(Page):
             'total_cost': number_display(components['total_cost']),
             'reward_bonus': number_display(float(player.reward_bonus)),
             'payoff_value': number_display(float(player.payoff)),
-            'departure_distribution': group_departure_distribution(player.group),
+            'departure_distribution': group_departure_distribution(
+                player.group, public_snapshot=public_snapshot,
+            ),
             'slot_load': player.slot_load,
             'coarse_toll_description': coarse_toll_description_for_player(player),
             'cost_snapshot_bars': snapshot['bars'],

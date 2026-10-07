@@ -80,6 +80,8 @@ from .room_release import (
     release_if_ready,
 )
 from .decision_ingress import (
+    decision_preexisting_choice,
+    remember_decision_preexisting_choice,
     completed_shell_response_ts,
     completed_decision_response_ts,
     completed_decision_posts_overrun,
@@ -4429,7 +4431,9 @@ class Decision(Page):
             preexisting = (
                 player.group.results_ready or player_has_departure_choice(player)
             )
-            player._room_release_choice_preexisting = bool(preexisting)
+            preexisting = remember_decision_preexisting_choice(
+                player.participant.code, player.round_number, preexisting,
+            )
             excluded = False
             if not preexisting:
                 state = room_release_state(player)
@@ -4458,6 +4462,14 @@ class Decision(Page):
         finally:
             if kind == 'ack':
                 finish_shell_ack()
+        # Echo only a correlation ID. Client clocks never determine admission.
+        clock_id = data.get('clock_id')
+        clock_token = data.get('clock_token')
+        if (type(clock_id) is int and 0 < clock_id <= 9007199254740991
+                and isinstance(clock_token, str)
+                and re.fullmatch(r'[0-9a-f]{32}', clock_token)):
+            snapshot['clock_id'] = clock_id
+            snapshot['clock_token'] = clock_token
         if (
             kind == 'operative'
             and snapshot['release_ts'] is not None
@@ -4564,8 +4576,8 @@ class Decision(Page):
     @staticmethod
     def error_message(player, values):
         if room_release_enabled(getattr(player, 'session', None)):
-            if player.group.results_ready or getattr(
-                player, '_room_release_choice_preexisting', False
+            if player.group.results_ready or decision_preexisting_choice(
+                player.participant.code, player.round_number,
             ):
                 return None
             state = room_release_state(player)
@@ -4611,8 +4623,8 @@ class Decision(Page):
     @staticmethod
     def before_next_page(player, timeout_happened):
         if room_release_enabled(getattr(player, 'session', None)):
-            if player.group.results_ready or getattr(
-                player, '_room_release_choice_preexisting', False
+            if player.group.results_ready or decision_preexisting_choice(
+                player.participant.code, player.round_number,
             ):
                 return
             state = room_release_state(player)

@@ -115,6 +115,19 @@ class RoomReleaseStateTests(unittest.TestCase):
 
 
 class SessionIntegrationTests(unittest.TestCase):
+    def test_live_clock_id_is_echoed_without_becoming_admission_time(self):
+        player = SimpleNamespace(session=SimpleNamespace(vars={
+            app.ROOM_RELEASE_PROTOCOL_VAR: 1}), id_in_group=1)
+        snapshot = {'release_ts': None, 'server_now_ts': 100}
+        with patch.object(app, 'room_release_snapshot', return_value=snapshot):
+            result = app.Decision.live_method(player, {
+                'kind': 'status', 'clock_id': 7, 'clock_token': 'a' * 32,
+                'server_now_ts': 999999,
+            })[1]
+        self.assertEqual(result['clock_id'], 7)
+        self.assertEqual(result['clock_token'], 'a' * 32)
+        self.assertEqual(result['server_now_ts'], 100)
+
     def make_player(self, session, code, group, subsession, round_number=4):
         player = SimpleNamespace(
             participant=SimpleNamespace(code=code, vars={}),
@@ -679,7 +692,8 @@ class SessionIntegrationTests(unittest.TestCase):
     def test_stale_post_cannot_overwrite_choice_after_settlement(self):
         session = SimpleNamespace(vars={app.ROOM_RELEASE_PROTOCOL_VAR: 1})
         group = SimpleNamespace(results_ready=True)
-        player = SimpleNamespace(session=session, group=group)
+        player = SimpleNamespace(session=session, group=group, round_number=4,
+                                 participant=SimpleNamespace(code='stale'))
         with (
             patch.object(app, 'player_has_departure_choice', return_value=True),
             patch.object(app, 'set_automatic_departure_choice') as auto,

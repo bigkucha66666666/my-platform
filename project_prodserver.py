@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 from otree.cli.prodserver1of2 import get_addr_port
+from otree.main import setup
 from uvicorn.main import Config, Server
 
 
@@ -16,6 +17,10 @@ def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if len(args) > 1:
         raise SystemExit('用法: python project_prodserver.py [端口或地址:端口]')
+    # Standard oTree CLI sets this before importing common/database and then
+    # initializes ORM, model freezing, logging, i18n and browser-bot runtime.
+    os.environ['USE_TIMEOUT_WORKER'] = '1'
+    setup()
     addr, port = get_addr_port(args[0] if args else None)
     subprocess.Popen(
         ['otree', 'timeoutsubprocess', str(port)], env=os.environ.copy()

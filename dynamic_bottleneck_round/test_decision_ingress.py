@@ -17,6 +17,88 @@ from dynamic_bottleneck_round.decision_ingress import (
 
 
 class DecisionIngressTests(unittest.TestCase):
+    def test_concurrent_requests_for_same_player_have_independent_snapshots(self):
+        async def exercise():
+            first_ready, second_ready = asyncio.Event(), asyncio.Event()
+
+            async def first(scope, receive, send):
+                ingress.remember_decision_preexisting_choice('SAME_FORM', 4, True)
+                first_ready.set()
+                await second_ready.wait()
+                self.assertTrue(ingress.decision_preexisting_choice('SAME_FORM', 4))
+
+            async def second(scope, receive, send):
+                await first_ready.wait()
+                ingress.remember_decision_preexisting_choice('SAME_FORM', 4, False)
+                second_ready.set()
+                self.assertFalse(ingress.decision_preexisting_choice('SAME_FORM', 4))
+
+            scope = {'type': 'http', 'method': 'POST',
+                     'path': '/p/SAME_FORM/dynamic_bottleneck_round/Decision/9'}
+            await asyncio.gather(
+                DecisionIngressMiddleware(first)(scope.copy(), None, None),
+                DecisionIngressMiddleware(second)(scope.copy(), None, None),
+            )
+            self.assertFalse(ingress.decision_preexisting_choice('SAME_FORM', 4))
+        asyncio.run(exercise())
+
+    def test_failed_request_cleans_its_form_snapshot(self):
+        async def failing(scope, receive, send):
+            ingress.remember_decision_preexisting_choice('FAILED_FORM', 4, True)
+            raise RuntimeError('intentional test failure')
+
+        async def exercise():
+            with self.assertRaisesRegex(RuntimeError, 'intentional test failure'):
+                await DecisionIngressMiddleware(failing)(
+                    {'type': 'http', 'method': 'GET',
+                     'path': '/p/FAILED_FORM/dynamic_bottleneck_round/Decision/9'},
+                    None, None,
+                )
+            self.assertFalse(ingress.decision_preexisting_choice('FAILED_FORM', 4))
+        asyncio.run(exercise())
+
+    def test_form_snapshot_survives_thread_handoff_and_resets_between_requests(self):
+        from starlette.concurrency import run_in_threadpool
+        observations = []
+
+        async def send(message):
+            return None
+
+        async def exercise():
+            for code, initially_chosen in (('FORM_A', True), ('FORM_B', False),
+                                           ('FORM_A', False)):
+                def worker():
+                    first = ingress.remember_decision_preexisting_choice(
+                        code, 4, initially_chosen,
+                    )
+                    # A repeated field query after WTForms population must
+                    # retain the request's original snapshot.
+                    repeated = ingress.remember_decision_preexisting_choice(
+                        code, 4, True,
+                    )
+                    observations.append((first, repeated,
+                        ingress.decision_preexisting_choice(code, 4),
+                        ingress.decision_preexisting_choice(code, 5)))
+
+                async def downstream(scope, receive, send):
+                    await run_in_threadpool(worker)
+                    # Context copies share this request's mutable container.
+                    self.assertEqual(ingress.decision_preexisting_choice(code, 4),
+                                     initially_chosen)
+                await DecisionIngressMiddleware(downstream)(
+                    {'type': 'http', 'method': 'POST',
+                     'path': f'/p/{code}/dynamic_bottleneck_round/Decision/9'},
+                    None, send,
+                )
+                self.assertFalse(ingress.decision_preexisting_choice(code, 4))
+
+        asyncio.run(exercise())
+        self.assertEqual(observations, [
+            (True, True, True, False),
+            (False, False, False, False),
+            (False, False, False, False),
+        ])
+
     def test_shell_completion_is_linked_to_the_acknowledged_get_instance(self):
         from unittest.mock import patch
         tokens = []

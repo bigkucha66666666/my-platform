@@ -25,6 +25,7 @@ _page_ingress_ts = ContextVar('dynamic_page_ingress_ts', default=None)
 _ack_ingress_ts = ContextVar('dynamic_shell_ack_ingress_ts', default=None)
 _ack_request_id = ContextVar('dynamic_shell_ack_request_id', default=None)
 _shell_token = ContextVar('dynamic_shell_get_token', default=None)
+_decision_form_choices = ContextVar('dynamic_decision_form_choices', default=None)
 _pending_lock = Lock()
 _pending = {}
 _failed = {}
@@ -42,6 +43,24 @@ def ingress_middleware_active():
 def request_ingress_ts():
     """Trusted request-arrival timestamp for the current Decision POST."""
     return _ingress_ts.get()
+
+
+def remember_decision_preexisting_choice(participant_code, round_number, preexisting):
+    """Snapshot before form population; repeated queries retain the first value.
+
+    The middleware installs a fresh dictionary per HTTP request. oTree copies
+    the context into its synchronous worker; both copies share this dictionary.
+    No model attribute or participant/session variable is persisted.
+    """
+    choices = _decision_form_choices.get()
+    if choices is None:
+        return bool(preexisting)
+    return choices.setdefault((participant_code, int(round_number)), bool(preexisting))
+
+
+def decision_preexisting_choice(participant_code, round_number):
+    choices = _decision_form_choices.get()
+    return bool(choices and choices.get((participant_code, int(round_number)), False))
 
 
 def page_ingress_ts():
@@ -241,6 +260,9 @@ class DecisionIngressMiddleware:
         page_token = _page_ingress_ts.set(timestamp)
         shell_token_value = secrets.token_hex(12) if is_decision_get else None
         shell_token_context = _shell_token.set(shell_token_value)
+        form_context = _decision_form_choices.set(
+            {} if is_decision_get or is_decision_post else None
+        )
         if is_decision_post:
             scope['dynamic_decision_ingress_ts'] = timestamp
         response_status = None
@@ -261,6 +283,7 @@ class DecisionIngressMiddleware:
             _ingress_ts.reset(token)
             _page_ingress_ts.reset(page_token)
             _shell_token.reset(shell_token_context)
+            _decision_form_choices.reset(form_context)
             completed_ts = time.time()
             with _pending_lock:
                 completed = _completed.setdefault(code, [])

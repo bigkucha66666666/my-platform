@@ -15,6 +15,11 @@ if not hasattr(Player, '_setattr_fields'):
 from otree.asgi import app as otree_app
 
 from dynamic_bottleneck_round.decision_ingress import DecisionIngressMiddleware
+import os
 
 
-app = DecisionIngressMiddleware(otree_app)
+if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') == '2':
+    from dynamic_bottleneck_round.sync_transport import SyncControlASGI, ThreadedASGI
+    app = SyncControlASGI(DecisionIngressMiddleware(ThreadedASGI(otree_app)))
+else:
+    app = DecisionIngressMiddleware(otree_app)

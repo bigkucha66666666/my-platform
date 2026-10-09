@@ -17,6 +17,61 @@ from dynamic_bottleneck_round.decision_ingress import (
 
 
 class DecisionIngressTests(unittest.TestCase):
+    def test_success_journal_callbacks_do_not_block_control_loop(self):
+        import threading
+        owner = threading.get_ident()
+        observed = []
+        async def app(scope, receive, send):
+            ingress.after_success(lambda: observed.append(threading.get_ident()), key='callback')
+            await send({'type': 'http.response.start', 'status': 200})
+            await send({'type': 'http.response.body', 'body': b''})
+        async def send(message):
+            pass
+        asyncio.run(DecisionIngressMiddleware(app)({'type': 'http', 'method': 'GET',
+            'path': '/p/THREAD_CALLBACK/dynamic_bottleneck_round/ResultsSync/9'}, None, send))
+        self.assertEqual(len(observed), 1)
+        self.assertNotEqual(observed[0], owner)
+
+    def test_after_success_callbacks_only_run_after_committed_success(self):
+        events = []
+        async def exercise(status, raised=False):
+            async def app(scope, receive, send):
+                ingress.after_success(lambda: events.append('settled'), key='round')
+                ingress.after_success(lambda: events.append('duplicate'), key='round')
+                await send({'type': 'http.response.start', 'status': status})
+                await send({'type': 'http.response.body', 'body': b''})
+                events.append('committed' if not raised else 'rollback')
+                if raised:
+                    raise RuntimeError('rollback')
+            async def send(message):
+                pass
+            await DecisionIngressMiddleware(app)({'type': 'http', 'method': 'GET',
+                'path': '/p/HOOK/dynamic_bottleneck_round/ResultsSync/9'}, None, send)
+        asyncio.run(exercise(200))
+        self.assertEqual(events, ['committed', 'settled'])
+        events.clear()
+        asyncio.run(exercise(500))
+        self.assertEqual(events, ['committed'])
+        events.clear()
+        with self.assertRaisesRegex(RuntimeError, 'rollback'):
+            asyncio.run(exercise(200, True))
+        self.assertEqual(events, ['rollback'])
+
+    def test_pending_and_crossed_requests_filter_old_page(self):
+        from unittest.mock import patch
+        async def downstream(scope, receive, send):
+            self.assertTrue(pending_participant_requests('PAGE_FILTER', page_index=9))
+            self.assertFalse(pending_participant_requests('PAGE_FILTER', page_index=10))
+            self.assertTrue(pending_participant_requests('PAGE_FILTER'))
+        with patch('dynamic_bottleneck_round.decision_ingress.time.time', side_effect=[100, 120]):
+            asyncio.run(DecisionIngressMiddleware(downstream)(
+                {'type': 'http', 'method': 'GET',
+                 'path': '/p/PAGE_FILTER/dynamic_bottleneck_round/Decision/9'}, None, None))
+        self.assertEqual(completed_participant_requests_crossing(
+            'PAGE_FILTER', after_ts=90, deadline_ts=110, page_index=9), ((100, 120),))
+        self.assertFalse(completed_participant_requests_crossing(
+            'PAGE_FILTER', after_ts=90, deadline_ts=110, page_index=10))
+
     def test_concurrent_requests_for_same_player_have_independent_snapshots(self):
         async def exercise():
             first_ready, second_ready = asyncio.Event(), asyncio.Event()

@@ -20,6 +20,14 @@
     if (!gate || !content || !message || !submit) return;
     const condition = gate.dataset.condition;
     const shellToken = gate.dataset.shellToken;
+    const controlEndpoint = gate.dataset.controlEndpoint;
+    const controlToken = gate.dataset.controlToken;
+    const protocol2 = Boolean(controlEndpoint && controlToken);
+    const form = submit.form;
+    let controlInFlight = false;
+    let retryTimer;
+    let savedChoice;
+    const controlQueue = new Map();
     let active = false;
     let acknowledged = false;
     let submitted = false;
@@ -35,6 +43,38 @@
     let lowerOffsetMs = -Infinity;
     let upperOffsetMs = Infinity;
     let decisionWindow;
+    const CONTROL_TIMEOUT_MS = 10000;
+
+    async function fetchControl(data, keepalive) {
+      const controller = new window.AbortController();
+      const id = data.clock_id;
+      pendingClocks.set(id, monotonicNow());
+      if (pendingClocks.size > 32) pendingClocks.delete(pendingClocks.keys().next().value);
+      let timeoutId;
+      let completed = false;
+      const timeout = new Promise((resolve, reject) => {
+        timeoutId = window.setTimeout(function () {
+          controller.abort();
+          reject(new Error('control timeout'));
+        }, CONTROL_TIMEOUT_MS);
+      });
+      try {
+        const response = await Promise.race([window.fetch(controlEndpoint, {
+          method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({...data, token: controlToken}),
+          keepalive: Boolean(keepalive), signal: controller.signal,
+        }), timeout]);
+        const status = await Promise.race([response.json(), timeout]);
+        observeClock(status);
+        completed = true;
+        return {response, status};
+      } finally {
+        window.clearTimeout(timeoutId);
+        pendingClocks.delete(id);
+        if (!completed) controller.abort();
+      }
+    }
 
     function observeClock(status) {
       if (status.clock_token !== clockToken) return;
@@ -48,7 +88,59 @@
       upperOffsetMs = Math.min(upperOffsetMs, status.server_now_ts * 1000 - sentMs);
     }
 
+    function controlPump() {
+      if (technicalStopped || controlInFlight || retryTimer || !controlQueue.size) return;
+      const kind = ['decision', 'operative', 'ack', 'status'].find(k => controlQueue.has(k));
+      const data = controlQueue.get(kind);
+      controlQueue.delete(kind);
+      data.clock_id = ++clockId;
+      data.clock_token = clockToken;
+      controlInFlight = true;
+      fetchControl(data, kind === 'decision' || kind === 'operative')
+        .then(async ({response, status}) => {
+          if (status.technical_anomaly) window.liveRecv(status);
+          if (!response.ok && response.status === 400 && kind === 'decision') {
+            const probe = {kind: 'status',
+              clock_id: ++clockId, clock_token: clockToken};
+            const checked = await fetchControl(probe, false);
+            window.liveRecv(checked.status);
+          }
+          if (!response.ok) throw new Error(status.error || 'control rejected');
+          window.liveRecv(status);
+          if (kind === 'decision') {
+            if (!status.decision_received || technicalStopped) throw new Error('decision unconfirmed');
+            submitted = true;
+            controlQueue.delete('decision');
+            if (deadlineTimer) window.clearTimeout(deadlineTimer);
+            // Durable receipt is canonical; native oTree remains responsible
+            // for advancing pages and committing business results.
+            form.submit();
+          }
+        }).catch(() => {
+          if (technicalStopped) return;
+          controlQueue.set(kind, data);
+          message.textContent = '服务器确认暂未完成，正在重试，请保持页面打开。';
+          retryTimer = window.setTimeout(function () {
+            retryTimer = undefined;
+            controlPump();
+          }, 1500);
+        }).finally(() => {
+          controlInFlight = false;
+          controlPump();
+        });
+    }
+
     function send(kind) {
+      if (protocol2) {
+        if (technicalStopped) return;
+        const data = {kind: kind};
+        if (kind === 'decision') data.departure_minute = savedChoice;
+        // Status is coalesced, and ACK supersedes a queued status.
+        if (kind === 'ack') controlQueue.delete('status');
+        controlQueue.set(kind, data);
+        controlPump();
+        return;
+      }
       if (typeof window.liveSend === 'function') {
         clockId++;
         pendingClocks.set(clockId, monotonicNow());
@@ -87,6 +179,7 @@
     }
 
     function autoAdvance() {
+      if (technicalStopped) return;
       if (!submitted) submit.click();
     }
 
@@ -123,10 +216,20 @@
       if (pollTimer) window.clearTimeout(pollTimer);
     }
 
-    submit.addEventListener('click', function () {
-      submitted = true;
-      if (deadlineTimer) window.clearTimeout(deadlineTimer);
-    });
+    if (protocol2 && form) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (technicalStopped || submitted) return;
+        if (savedChoice === undefined) savedChoice = Number(
+          window.document.getElementById('departure-minute').value);
+        send('decision');
+      });
+    } else {
+      submit.addEventListener('click', function () {
+        submitted = true;
+        if (deadlineTimer) window.clearTimeout(deadlineTimer);
+      });
+    }
 
     window.liveRecv = function (status) {
       if (technicalStopped || !status || typeof status !== 'object') return;
@@ -143,6 +246,8 @@
         message.textContent = '本轮出现技术异常，请联系实验管理员。';
         if (pollTimer) window.clearTimeout(pollTimer);
         if (deadlineTimer) window.clearTimeout(deadlineTimer);
+        if (retryTimer) window.clearTimeout(retryTimer);
+        controlQueue.clear();
         return;
       }
       if (!Number.isFinite(upperOffsetMs)) {

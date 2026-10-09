@@ -71,6 +71,8 @@ from .agents.rl_fallback import (
     valid_or_initial_state,
 )
 from .agents import prefetch_coordinator
+from . import sync_integration
+from . import sync_runtime
 from .room_release import (
     admission_kind,
     acknowledge_shell,
@@ -574,6 +576,8 @@ EXPORT_HEADERS = [
     'room_release_post_ingress_ts',
     'room_release_post_processing_ts',
     'room_release_post_response_completed_ts',
+    'room_release_receipt_ingress_ts',
+    'room_release_receipt_kind',
     'timeout_happened',
     'dropout_event',
     'recovered_this_round',
@@ -1651,7 +1655,7 @@ def creating_session(subsession):
     config = parse_stochastic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
         # Existing Sessions have no marker and continue the legacy timing path.
-        if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') == '1':
+        if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') in {'1', '2'}:
             if not ingress_middleware_active():
                 raise ValueError(
                     '统一放行需要 project_prodserver.py / project_asgi.py '
@@ -1666,7 +1670,12 @@ def creating_session(subsession):
                 ) from exc
             if not isfinite(drain_seconds) or not 0 < drain_seconds <= 120:
                 raise ValueError('决策请求清空期必须在 0–120 秒之间。')
-            subsession.session.vars[ROOM_RELEASE_PROTOCOL_VAR] = 1
+            protocol = int(os.environ['DYNAMIC_ROOM_RELEASE_PROTOCOL'])
+            if protocol == 2:
+                if not sync_runtime.control_transport_active():
+                    raise ValueError('协议 2 需要独立控制传输入口。')
+                subsession.session.vars[sync_integration.IDENTITY_VAR] = sync_runtime.journal_identity()
+            subsession.session.vars[ROOM_RELEASE_PROTOCOL_VAR] = protocol
             subsession.session.vars[ROOM_RELEASE_DRAIN_VAR] = drain_seconds
         validate_cash_payment_config(subsession.session)
         players = subsession.get_players()
@@ -1781,10 +1790,21 @@ def room_release_enabled(session):
     stored = getattr(session, '_vars', None)
     if stored is None:
         stored = getattr(session, 'vars', {})
-    return stored.get(ROOM_RELEASE_PROTOCOL_VAR) == 1
+    return stored.get(ROOM_RELEASE_PROTOCOL_VAR) in (1, 2)
+
+
+def room_sync_v2_enabled(session):
+    if session is None:
+        return False
+    stored = getattr(session, '_vars', None)
+    if stored is None:
+        stored = getattr(session, 'vars', {})
+    return stored.get(ROOM_RELEASE_PROTOCOL_VAR) == 2
 
 
 def room_release_state(player, *, now_ts=None):
+    if room_sync_v2_enabled(player.session):
+        return sync_integration.state(player, now_ts=now_ts)
     key = f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}'
     state = player.session.vars.get(key)
     if state is None:
@@ -1821,6 +1841,8 @@ def room_release_state(player, *, now_ts=None):
 def room_release_snapshot(player, *, kind='status', now_ts=None,
                           shell_token=None):
     """Idempotent, Session-wide release snapshot for one human participant."""
+    if room_sync_v2_enabled(player.session):
+        return sync_integration.snapshot(player, kind=kind, now_ts=now_ts)
     now_ts = time.time() if now_ts is None else float(now_ts)
     state = room_release_state(player, now_ts=now_ts)
     code = player.participant.code
@@ -2187,6 +2209,9 @@ def try_group_results_lock(group):
 
 
 def set_results(group):
+    if room_sync_v2_enabled(getattr(group, 'session', None)) and not group.results_ready:
+        if not sync_integration.ready_for_results(group):
+            return False
     with try_group_results_lock(group) as acquired:
         if not acquired:
             return False
@@ -2321,11 +2346,17 @@ def _set_results_locked(group):
         for player in players:
             settle_formal_totals(player, group.round_number)
     group.results_ready = True
+    if room_sync_v2_enabled(group.session):
+        sync_integration.schedule_settled(group)
     return True
 
 
 def maybe_prepare_results(group):
     if group.results_ready:
+        return
+    if room_sync_v2_enabled(getattr(group, 'session', None)):
+        if sync_integration.ready_for_results(group):
+            set_results(group)
         return
     if room_release_enabled(getattr(group, 'session', None)):
         state = group.session.vars.get(
@@ -3712,6 +3743,7 @@ ROOM_RELEASE_EXPORT_FIELDS = (
     'room_release_release_ts', 'room_release_deadline_ts',
     'room_release_operative_ts', 'room_release_post_ingress_ts',
     'room_release_post_processing_ts', 'room_release_post_response_completed_ts',
+    'room_release_receipt_ingress_ts', 'room_release_receipt_kind',
 )
 
 
@@ -3719,6 +3751,8 @@ def room_release_export_metadata(player):
     blank = dict.fromkeys(ROOM_RELEASE_EXPORT_FIELDS, '')
     if not room_release_enabled(getattr(player, 'session', None)):
         return blank
+    if room_sync_v2_enabled(player.session):
+        return sync_integration.export_metadata(player)
     stored = getattr(player.session, '_vars', None)
     if stored is None:
         stored = player.session.vars
@@ -3726,6 +3760,7 @@ def room_release_export_metadata(player):
     code = player.participant.code
     runtime = player.participant.vars
     return {
+        **blank,
         'room_release_protocol': 1,
         'room_release_phase': state.get('phase', ''),
         'room_release_technical_anomaly': state.get('technical_anomaly', ''),
@@ -4441,7 +4476,9 @@ class Decision(Page):
         else:
             preexisting = False
             excluded = False
-        if preexisting or excluded:
+        canonical = (room_sync_v2_enabled(player.session)
+            and bool(sync_integration.receipt(player)))
+        if preexisting or excluded or canonical:
             # oTree POST does not call is_displayed().  A stale POST must not
             # populate departure_minute after an auto choice/result exists.
             return []
@@ -4449,6 +4486,8 @@ class Decision(Page):
 
     @staticmethod
     def live_method(player, data):
+        if room_sync_v2_enabled(getattr(player, 'session', None)):
+            return {player.id_in_group: {'technical_anomaly': 'protocol2_requires_control_transport'}}
         if not room_release_enabled(getattr(player, 'session', None)):
             return {player.id_in_group: {'legacy': True}}
         kind = data.get('kind') if isinstance(data, dict) else None
@@ -4502,6 +4541,10 @@ class Decision(Page):
             return False
         if room_release_enabled(getattr(player, 'session', None)):
             room_release_state(player)
+            if room_sync_v2_enabled(player.session) and participant_dropout_suspended(player):
+                # Capture the eligible cohort before RecoveryGate changes it.
+                # Existing suspended proxies do not need a shell or an ACK.
+                fill_suspended_choices(player.group)
             return not (
                 player.group.results_ready or player_has_departure_choice(player)
             )
@@ -4530,6 +4573,7 @@ class Decision(Page):
         context = public_capacity_context_for_group(player.group)
         release_status = None
         room_shell = room_release_enabled(getattr(player, 'session', None))
+        room_v2 = room_sync_v2_enabled(getattr(player, 'session', None))
         if room_shell:
             release_status = room_release_snapshot(player, kind='render')
             # I1 capacity must not be present anywhere in pre-release HTML,
@@ -4553,6 +4597,8 @@ class Decision(Page):
         return {
             **context,
             'has_live_method': room_shell,
+            'room_sync_control_endpoint': '/dynamic-room-sync' if room_v2 else '',
+            'room_sync_control_token': sync_integration.control_token(player) if room_v2 else '',
             'room_release_shell': room_shell,
             'room_release_status': release_status or {},
             'room_release_shell_token': current_decision_shell_token() if room_shell else None,
@@ -4575,6 +4621,20 @@ class Decision(Page):
 
     @staticmethod
     def error_message(player, values):
+        if room_sync_v2_enabled(player.session):
+            if player.group.results_ready or decision_preexisting_choice(player.participant.code, player.round_number):
+                sync_integration.native_audit(player)
+                return None
+            state = room_release_state(player)
+            if state['technical_anomaly']:
+                return '本轮出现技术异常，请联系实验管理员。'
+            receipt = sync_integration.receipt(player)
+            if receipt or player.participant.code in state['excluded_codes']:
+                sync_integration.native_audit(player)
+                return None
+            if departure_slot_for_minute(values.get('departure_minute'), departure_schedule_for_player(player)) is None:
+                return '请选择时间范围内、1 分钟精度的有效出发时间。'
+            return '请先完成服务器选择确认，再提交本轮选择。'
         if room_release_enabled(getattr(player, 'session', None)):
             if player.group.results_ready or decision_preexisting_choice(
                 player.participant.code, player.round_number,
@@ -4622,6 +4682,13 @@ class Decision(Page):
 
     @staticmethod
     def before_next_page(player, timeout_happened):
+        if room_sync_v2_enabled(player.session):
+            sync_integration.native_audit(player)
+            if player.group.results_ready or decision_preexisting_choice(player.participant.code, player.round_number):
+                return
+            sync_integration.import_manual(player)
+            # Late missing choices are finalized only by the result drain guard.
+            return
         if room_release_enabled(getattr(player, 'session', None)):
             if player.group.results_ready or decision_preexisting_choice(
                 player.participant.code, player.round_number,
@@ -4699,7 +4766,7 @@ class ResultsSync(Page):
     @staticmethod
     def vars_for_template(player):
         room_mode = room_release_enabled(getattr(player, 'session', None))
-        if room_mode:
+        if room_mode and not room_sync_v2_enabled(player.session):
             state = player.session.vars.get(
                 f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}', {}
             )
@@ -4721,7 +4788,9 @@ class ResultsSync(Page):
         for group in groups:
             maybe_prepare_results(group)
         state = {}
-        if room_release_enabled(getattr(player, 'session', None)):
+        if room_sync_v2_enabled(getattr(player, 'session', None)):
+            state = room_release_state(player)
+        elif room_release_enabled(getattr(player, 'session', None)):
             state = player.session.vars.get(
                 f'{ROOM_RELEASE_ROUND_PREFIX}{player.round_number}', {}
             )

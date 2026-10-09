@@ -5,6 +5,7 @@ Session.vars; the deployment must use the project ASGI entrypoint with one
 worker before this middleware can be relied on for formal rounds.
 """
 from contextvars import ContextVar
+import asyncio
 import json
 import re
 import secrets
@@ -26,6 +27,7 @@ _ack_ingress_ts = ContextVar('dynamic_shell_ack_ingress_ts', default=None)
 _ack_request_id = ContextVar('dynamic_shell_ack_request_id', default=None)
 _shell_token = ContextVar('dynamic_shell_get_token', default=None)
 _decision_form_choices = ContextVar('dynamic_decision_form_choices', default=None)
+_success_callbacks = ContextVar('dynamic_business_success_callbacks', default=None)
 _pending_lock = Lock()
 _pending = {}
 _failed = {}
@@ -43,6 +45,17 @@ def ingress_middleware_active():
 def request_ingress_ts():
     """Trusted request-arrival timestamp for the current Decision POST."""
     return _ingress_ts.get()
+
+
+def after_success(callback, *, key):
+    """Run journal-only work after the native app returns a committed success.
+
+    The dictionary is shared with synchronous oTree workers via context copies.
+    Outside an instrumented HTTP request no callback is executed.
+    """
+    callbacks = _success_callbacks.get()
+    if callbacks is not None:
+        callbacks.setdefault(key, callback)
 
 
 def remember_decision_preexisting_choice(participant_code, round_number, preexisting):
@@ -113,17 +126,18 @@ def pending_decision_posts(participant_code, *, deadline_ts):
     """In-flight POSTs admitted before the shared decision deadline."""
     with _pending_lock:
         return tuple(
-            timestamp for timestamp, is_decision_post
+            timestamp for timestamp, is_decision_post, _page_index
             in _pending.get(participant_code, {}).values()
             if is_decision_post and timestamp < float(deadline_ts)
         )
 
 
-def pending_participant_requests(participant_code, *, before_ts=float('inf')):
+def pending_participant_requests(participant_code, *, before_ts=float('inf'), page_index=None):
     with _pending_lock:
         return tuple(
-            timestamp for timestamp, _ in _pending.get(participant_code, {}).values()
+            timestamp for timestamp, _, request_page_index in _pending.get(participant_code, {}).values()
             if timestamp < float(before_ts)
+            and (page_index is None or request_page_index == page_index)
         )
 
 
@@ -138,7 +152,7 @@ def failed_participant_requests(participant_code, *, after_ts=0,
 
 
 def completed_participant_requests_crossing(participant_code, *,
-                                            after_ts, deadline_ts):
+                                            after_ts, deadline_ts, page_index=None):
     """Requests that reached the server before cutoff but finished after it."""
     with _pending_lock:
         return tuple(
@@ -146,6 +160,7 @@ def completed_participant_requests_crossing(participant_code, *,
             _method in
             _completed.get(participant_code, ())
             if float(after_ts) <= started < float(deadline_ts) <= finished
+            and (page_index is None or _page_index == page_index)
         )
 
 
@@ -255,7 +270,7 @@ class DecisionIngressMiddleware:
         page_index = int(match_index.group(2)) if match_index else None
         request_id = object()
         with _pending_lock:
-            _pending.setdefault(code, {})[request_id] = (timestamp, is_decision_post)
+            _pending.setdefault(code, {})[request_id] = (timestamp, is_decision_post, page_index)
         token = _ingress_ts.set(timestamp if is_decision_post else None)
         page_token = _page_ingress_ts.set(timestamp)
         shell_token_value = secrets.token_hex(12) if is_decision_get else None
@@ -267,6 +282,7 @@ class DecisionIngressMiddleware:
             scope['dynamic_decision_ingress_ts'] = timestamp
         response_status = None
         raised = False
+        success_context = _success_callbacks.set({})
 
         async def send_observed(message):
             nonlocal response_status
@@ -280,6 +296,8 @@ class DecisionIngressMiddleware:
             raised = True
             raise
         finally:
+            callbacks = _success_callbacks.get()
+            _success_callbacks.reset(success_context)
             _ingress_ts.reset(token)
             _page_ingress_ts.reset(page_token)
             _shell_token.reset(shell_token_context)
@@ -307,3 +325,6 @@ class DecisionIngressMiddleware:
                     requests.pop(request_id, None)
                     if not requests:
                         _pending.pop(code, None)
+            if not raised and response_status is not None and response_status < 400:
+                for callback in callbacks.values():
+                    await asyncio.to_thread(callback)

@@ -138,3 +138,65 @@ assert.equal(uncertainTimers.at(-1).delay, 6150);
 uncertainTimers.at(-1).fn();
 assert.equal(uncertainClicks, 1);
 console.log('room release admission and delayed-response clock checks passed');
+
+// Protocol 2 serializes control operations and retains a failed choice for retry.
+const v2calls = [], v2timers = [];
+let formHandler, nativePosts = 0;
+const v2form = {addEventListener(kind, fn) { if (kind === 'submit') formHandler = fn; },
+  requestSubmit() { formHandler({preventDefault() {}}); }, submit() { nativePosts++; }};
+const v2elements = {
+  'room-release-gate': {dataset: {condition: 'I0', shellToken: token,
+    controlToken: 'signed', controlEndpoint: '/dynamic-room-sync'}},
+  'decision-content': {}, 'room-release-message': {},
+  'decision-submit': {form: v2form, addEventListener() {}, click() { v2form.requestSubmit(); }},
+  'departure-minute': {value: '474'},
+};
+const v2window = {document: {getElementById: id => v2elements[id]}, Math,
+  performance: {now: () => 0}, crypto: {getRandomValues: a => a.fill(4)},
+  AbortController,
+  setTimeout(fn, delay) { v2timers.push({fn, delay}); return v2timers.length; }, clearTimeout() {},
+  fetch(url, options) { return new Promise((resolve, reject) =>
+    v2calls.push({data: JSON.parse(options.body), resolve, reject})); }};
+vm.runInNewContext(script, {window: v2window});
+v2window.DynamicBottleneckRelease.start();
+assert.equal(v2calls.length, 1, 'v2 must send control ACK');
+formHandler({preventDefault() {}});
+v2elements['departure-minute'].value = '475';
+assert.equal(v2calls.length, 1, 'decision waits for ACK');
+(async () => {
+  v2calls[0].resolve({ok: true, json: async () => ({...armed,
+    clock_id: v2calls[0].data.clock_id, clock_token: v2calls[0].data.clock_token})});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(v2calls[1].data.kind, 'decision');
+  assert.equal(v2calls[1].data.departure_minute, 474);
+  formHandler({preventDefault() {}});
+  v2calls[1].reject(new Error('lost reply'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nativePosts, 0);
+  v2timers.at(-1).fn();
+  assert.equal(v2calls[2].data.departure_minute, 474);
+  formHandler({preventDefault() {}});
+  v2calls[2].resolve({ok: true, json: async () => ({...armed, decision_received: true,
+    clock_id: v2calls[2].data.clock_id, clock_token: v2calls[2].data.clock_token})});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nativePosts, 1);
+  assert.equal(v2calls.length, 3, 'repeat Enter does not send another native submit');
+  // A rejected receipt may mean the round became anomalous. Probe status
+  // before retrying so the decision queue cannot starve that notification.
+  v2window.DynamicBottleneckRelease.start();
+  v2calls[3].resolve({ok: true, json: async () => ({...armed,
+    clock_id: v2calls[3].data.clock_id, clock_token: v2calls[3].data.clock_token})});
+  await new Promise(resolve => setImmediate(resolve));
+  formHandler({preventDefault() {}});
+  v2calls[4].resolve({ok: false, status: 400,
+    json: async () => ({error: 'control_request_rejected'})});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(v2calls[5], 'rejected decision probes status');
+  assert.equal(v2calls[5].data.kind, 'status');
+  v2calls[5].resolve({ok: true, json: async () => ({...armed,
+    technical_anomaly: 'decision_control_queue_overrun'})});
+  await new Promise(resolve => setImmediate(resolve));
+  formHandler({preventDefault() {}});
+  assert.equal(v2calls.length, 6, 'technical anomaly stops further controls');
+  assert.equal(nativePosts, 1);
+})().catch(error => { console.error(error); process.exitCode = 1; });

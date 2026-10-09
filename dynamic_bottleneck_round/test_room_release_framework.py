@@ -254,7 +254,7 @@ def check_real_decision_posts():
 
 
 def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
-                                 full_flow=False):
+                                 full_flow=False, mixed_conditions=False):
     from otree.main import setup
     setup()
     import project_asgi
@@ -273,7 +273,8 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
     for condition in conditions:
         session = create_session('dynamic_bottleneck_round_prod', num_participants=40,
             modified_session_config_fields={
-                'group_treatment_spec': f'G01:H-{condition};G02:HA-{condition}',
+                'group_treatment_spec': ('G01:H-I0;G02:HA-I1' if mixed_conditions else
+                    f'G01:H-{condition};G02:HA-{condition}'),
                 'capacity_information_condition': condition,
                 'api_agent_mode': 'active', 'api_agent_count_per_group': 10,
                 'rl_agent_enabled': 1, 'rl_agent_count_per_group': 10,
@@ -288,7 +289,8 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
             participant._index_in_pages = index
             participant._last_page_timestamp = int(time.time())
             participant.time_started_utc = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
-            entries.append((participant.code, session.code, index, condition))
+            own_condition = participant.vars['dynamic_bottleneck_information_condition'] if mixed_conditions else condition
+            entries.append((participant.code, session.code, index, own_condition))
         db.commit()
 
     def mock_provider(*, config, choice_set):
@@ -308,9 +310,25 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
             (status, error) for status, _, error in shells if status != 200]
         tokens = [re.search(r'data-shell-token="([0-9a-f]{24})"', content).group(1)
                   for _, content, _ in shells]
-        connections = await asyncio.gather(*(LiveConnection(
-            project_asgi.app, code, session, index).connect()
-            for code, session, index, _ in entries))
+        protocol2 = os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') == '2'
+        if protocol2:
+            controls = [re.search(r'data-control-token="([^"]+)"', content).group(1)
+                        for _, content, _ in shells]
+            from dynamic_bottleneck_round.test_room_sync_framework import control_request
+            class ControlConnection:
+                def __init__(self, token):
+                    self.token = token
+                async def exchange(self, data):
+                    status, result = await control_request(project_asgi.app, self.token, data)
+                    assert status == 200, result
+                    return result
+                async def close(self):
+                    pass
+            connections = [ControlConnection(token) for token in controls]
+        else:
+            connections = await asyncio.gather(*(LiveConnection(
+                project_asgi.app, code, session, index).connect()
+                for code, session, index, _ in entries))
         try:
             acknowledgments = await asyncio.gather(*(connection.exchange({
                 'kind': 'ack', 'shell_token': token,
@@ -340,9 +358,14 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
                 assert bool(status.get('actual_capacity_display')) == (condition == 'I1')
             await connections[0].close()
             code, session, index, _ = entries[0]
-            connections[0] = await LiveConnection(project_asgi.app, code, session, index).connect()
+            connections[0] = (ControlConnection(controls[0]) if protocol2 else
+                await LiveConnection(project_asgi.app, code, session, index).connect())
             recovered = await connections[0].exchange({'kind': 'ack', 'shell_token': tokens[0]})
             assert recovered['release_ts'] in releases[session]
+            if protocol2:
+                receipts = await asyncio.gather(*(c.exchange({'kind': 'decision',
+                    'departure_minute': 474}) for c in connections))
+                assert all(r['decision_received'] for r in receipts)
             posts = await asyncio.gather(*(http_request(project_asgi.app,
                 f'/p/{code}/dynamic_bottleneck_round/Decision/{index}', method='POST',
                 body=urlencode({'departure_minute': 474}).encode())
@@ -362,7 +385,9 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
             db.new_session()
             for session_code in session_codes:
                 session = Session.objects_get(code=session_code)
-                state = session.vars[f'{experiment.ROOM_RELEASE_ROUND_PREFIX}{round_number}']
+                state = (experiment.room_release_state(
+                    experiment.Player.objects_filter(session=session, round_number=round_number)[0])
+                    if protocol2 else session.vars[f'{experiment.ROOM_RELEASE_ROUND_PREFIX}{round_number}'])
                 assert not state['technical_anomaly']
                 groups = list(experiment.Group.objects_filter(session=session,
                                                               round_number=round_number))

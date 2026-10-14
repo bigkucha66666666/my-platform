@@ -4211,6 +4211,8 @@ def build_admin_report_rows(players):
 
 
 def vars_for_admin_report(subsession):
+    from session_data_export_views import session_export_links
+
     players = []
     for round_subsession in subsession.in_all_rounds():
         players.extend(round_subsession.get_players())
@@ -4245,6 +4247,7 @@ def vars_for_admin_report(subsession):
         },
         'export_headers': EXPORT_HEADERS,
         'session_code': subsession.session.code,
+        'session_export_links': session_export_links(subsession.session.code),
     }
 
 

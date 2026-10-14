@@ -13,6 +13,9 @@ if not hasattr(Player, '_setattr_fields'):
     )
 
 from otree.asgi import app as otree_app
+from session_data_export_views import register_session_export_routes
+
+register_session_export_routes(otree_app)
 
 from dynamic_bottleneck_round.decision_ingress import DecisionIngressMiddleware
 import os

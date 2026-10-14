@@ -5,6 +5,15 @@
 <div class="dynamic-report">
   <div class="report-meta">
     <div>Session Code：<strong>{{ session_code }}</strong></div>
+    {{ if session_export_links.available }}
+    <div class="my-2 d-flex flex-wrap gap-2" aria-label="当前 Session 数据导出">
+      <a class="btn btn-primary mr-2" href="{{ session_export_links.all_rounds }}">导出本 Session 全部轮次</a>
+      <a class="btn btn-outline-primary" href="{{ session_export_links.raw }}">导出本 Session 全部原始数据</a>
+    </div>
+    <div class="mb-2">全部轮次包含热身和正式轮次、已记录的 Human / LLM / RL 决策；未完成的选择和结果字段留空。原始数据为包含问卷和结算已保存字段的宽表。两种文件均为 Excel 可打开的 CSV。</div>
+    {{ else }}
+    <div class="alert alert-warning my-2">单 Session 导出尚未加载。请使用项目现有入口 <code>python project_prodserver.py [地址:端口]</code> 启动服务；此处不会回退为全部 Session 导出。</div>
+    {{ endif }}
     <div>实验模式：<strong>{{ if pilot_mode_enabled }}预实验（自定义人数）{{ else }}正式/预览配置{{ endif }}</strong></div>
     <div class="agent-summary">
       <span>服务率分布：<strong>截断正态（{{ capacity_metadata.distribution }}）</strong></span>

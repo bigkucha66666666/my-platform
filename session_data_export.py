@@ -41,7 +41,7 @@ HEADERS = (
     'room_release_deadline_ts', 'agent_type', 'agent_fallback_used',
     'agent_latency_ms', 'agent_reason', 'agent_context_json',
     'agent_memory_input', 'agent_memory_output', 'agent_persona_id',
-    'agent_persona_label', 'agent_policy_version', 'rl_rounds_observed',
+    'agent_persona_label', 'agent_policy_version', 'agent_prompt_version', 'rl_rounds_observed',
 )
 
 CHOICE_FIELDS = {
@@ -68,6 +68,7 @@ AGENT_FIELDS = {
     'agent_context_json': 'context_json', 'agent_memory_input': 'memory_input',
     'agent_memory_output': 'memory_output', 'agent_persona_id': 'persona_id',
     'agent_persona_label': 'persona_label', 'agent_policy_version': 'policy_version',
+    'agent_prompt_version': 'prompt_version',
     'rl_rounds_observed': 'rounds_observed',
 }
 

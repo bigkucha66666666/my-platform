@@ -1,0 +1,196 @@
+{
+  "started_utc": "2026-10-15T04:33:11.923731+00:00",
+  "max_http_calls": 3,
+  "scope": "Independent synthetic request, no Session writes, no retries",
+  "model": "deepseek-v4-flash",
+  "timeout_seconds": 45,
+  "records": [
+    {
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "Return only valid JSON. Do not explain."
+          },
+          {
+            "role": "user",
+            "content": "Return exactly {\"ok\":true}."
+          }
+        ]
+      },
+      "events": [
+        {
+          "stage": "request_started",
+          "elapsed_seconds": 0.0002
+        },
+        {
+          "stage": "tcp_connected",
+          "elapsed_seconds": 0.0162
+        },
+        {
+          "stage": "tls_completed",
+          "elapsed_seconds": 0.194,
+          "protocol": "TLSv1.3"
+        },
+        {
+          "stage": "response_headers_received",
+          "elapsed_seconds": 0.3414,
+          "http_status": 200
+        },
+        {
+          "stage": "response_body_completed",
+          "elapsed_seconds": 5.567,
+          "byte_count": 465
+        }
+      ],
+      "http_status": 200,
+      "safe_response_headers": {
+        "server": "openresty",
+        "content-type": "application/json",
+        "x-ds-trace-id": "3e01db948ec6a0ee763869c52320ef94",
+        "transfer-encoding": "chunked",
+        "connection": "close",
+        "date": "Thu, 15 Oct 2026 04:33:12 GMT"
+      },
+      "response_received": true,
+      "raw_response": {
+        "id": "7c05db73-e598-43c1-a1c7-611963945d85",
+        "object": "chat.completion",
+        "created": 1792038792,
+        "model": "deepseek-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "{\"ok\":true}"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 43,
+          "completion_tokens": 5,
+          "total_tokens": 48,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 43
+        },
+        "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+      },
+      "failed_stage": "",
+      "error_type": "",
+      "error": "",
+      "elapsed_seconds": 5.5673,
+      "variant": "minimal",
+      "valid_model_answer": true,
+      "request_bytes": 297
+    },
+    {
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是动态瓶颈出发时间实验中的一名独立虚拟参与者，与其他主体同时决策。目标是在给定人格偏好下权衡成本，自主选择一个合法出发档位。\n【时间与客观成本】所有分钟数是同一天的时刻，时钟为对应显示。以 cost_parameters 的本轮参数为准，不用人格分数替换客观成本系数。实际到达时刻 = departure_minute + free_flow_travel_minutes + 额外瓶颈行程。queue_delay_minutes 是含瓶颈通过时间的额外行程，非负，全部计入到达时刻。早到分钟 = max(preferred_arrival_minute - 实际到达时刻, 0)；晚到分钟 = max(实际到达时刻 - preferred_arrival_minute, 0)。总成本 = fixed_travel_time_cost + queue_cost_per_minute × 额外行程 + early_cost_per_minute × 早到分钟 + late_cost_per_minute × 晚到分钟。当前场景没有额外通行收费或奖励，tolls / rewards 为空，不得虚构。\n【每档时间参照】fixed_travel_arrival_minute / fixed_travel_arrival_time 仅为出发加固定行程、忽略额外行程的到达下界，不是实际到达预测，也不是预期总成本。实际到达不能早于这个基准。更晚出发会推迟基准；避开拥挤可能减少额外行程，但不能因此声称晚于目标的基准能准时到达。所有 available_slots 均合法，基准晚到的档位仍可自主选择。\n【信息边界】只使用 capacity_context 已公开的信息。I0 在选择时不知道当轮实际服务率，上一轮公布值不等于当轮值；I1 可以使用已公开的当轮值。两者均不知道其他主体的当轮选择或未来服务率序列，不得自行声称已知。\n【反馈与人格】history 中上一轮个人结果和公开统计是已观察事实。历史空档成本为未知，不是零成本，也不代表本轮无人选择。limited_memory 是可修正的个人印象，矛盾时以结构化事实为准。保留 persona 的风险偏好、适应速度与选择惯性；人格不改变时间算术和客观成本。当轮尚未结算，主观预期不能写成已发生的结果。不补造完整历史。\n【最终输出】仅返回一个 JSON 对象，不要 Markdown 或长篇分析。departure_slot 必须是 available_slots 中的整数；reason 用简短中文只说明最终选定档位的依据，所述档位、出发时刻和到达基准须相互对应。若改选，以最终档位为准，不保留互相矛盾的候选结论；不把未知额外行程当作零。memory_summary 不超过 400 字符，仅提炼已公布反馈与自身上一轮结果形成的个人印象，允许表达不确定性；没有历史就说明暂无经验。不得将当前选择或预测记成当轮已发生结果，不得与最终行动或已有事实矛盾。"
+          },
+          {
+            "role": "user",
+            "content": "请依据以下实验上下文完成本轮同时选择。先核对所选档位的出发时刻和固定行程到达基准，再给出一致的最终 JSON；无需输出核对过程。\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"fixed_travel_arrival_minute\": 472.0, \"fixed_travel_arrival_time\": \"07:52\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"fixed_travel_arrival_minute\": 473.0, \"fixed_travel_arrival_time\": \"07:53\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"fixed_travel_arrival_minute\": 474.0, \"fixed_travel_arrival_time\": \"07:54\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"fixed_travel_arrival_minute\": 475.0, \"fixed_travel_arrival_time\": \"07:55\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"fixed_travel_arrival_minute\": 476.0, \"fixed_travel_arrival_time\": \"07:56\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"fixed_travel_arrival_minute\": 477.0, \"fixed_travel_arrival_time\": \"07:57\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"fixed_travel_arrival_minute\": 478.0, \"fixed_travel_arrival_time\": \"07:58\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"fixed_travel_arrival_minute\": 479.0, \"fixed_travel_arrival_time\": \"07:59\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"fixed_travel_arrival_minute\": 480.0, \"fixed_travel_arrival_time\": \"08:00\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"fixed_travel_arrival_minute\": 481.0, \"fixed_travel_arrival_time\": \"08:01\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"fixed_travel_arrival_minute\": 482.0, \"fixed_travel_arrival_time\": \"08:02\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"fixed_travel_arrival_minute\": 483.0, \"fixed_travel_arrival_time\": \"08:03\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"fixed_travel_arrival_minute\": 484.0, \"fixed_travel_arrival_time\": \"08:04\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"fixed_travel_arrival_minute\": 485.0, \"fixed_travel_arrival_time\": \"08:05\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"fixed_travel_arrival_minute\": 486.0, \"fixed_travel_arrival_time\": \"08:06\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"fixed_travel_arrival_minute\": 487.0, \"fixed_travel_arrival_time\": \"08:07\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 1 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": null, \"public_feedback\": null}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"prompt_version\": \"dynamic_bottleneck_prompt_v2\", \"rewards\": [], \"round_number\": 1, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "events": [
+        {
+          "stage": "request_started",
+          "elapsed_seconds": 0.0004
+        },
+        {
+          "stage": "tcp_connected",
+          "elapsed_seconds": 0.0187
+        },
+        {
+          "stage": "tls_completed",
+          "elapsed_seconds": 0.1345,
+          "protocol": "TLSv1.3"
+        },
+        {
+          "stage": "response_headers_received",
+          "elapsed_seconds": 0.2644,
+          "http_status": 200
+        },
+        {
+          "stage": "response_body_completed",
+          "elapsed_seconds": 4.2478,
+          "byte_count": 911
+        }
+      ],
+      "http_status": 200,
+      "safe_response_headers": {
+        "server": "openresty",
+        "content-type": "application/json",
+        "x-ds-trace-id": "eb6f31e304eef2aa76f7c7beb845b51f",
+        "transfer-encoding": "chunked",
+        "connection": "close",
+        "date": "Thu, 15 Oct 2026 04:33:17 GMT"
+      },
+      "response_received": true,
+      "raw_response": {
+        "id": "1a16a79e-bbb7-41a8-b5be-a41d1ac8d940",
+        "object": "chat.completion",
+        "created": 1792038797,
+        "model": "deepseek-flash",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "{\"departure_slot\": 9, \"reason\": \"选07:54出发，固定行程基准08:00正好等于偏好到达时刻；该档位在可用档位中较早，可降低晚到风险，且I0下无法预知当轮服务率，避免更晚档位基准已晚到。\", \"memory_summary\": \"暂无历史反馈与个人结果，无经验可循；本轮为正式第1轮，I0条件下当轮服务率未知，仅能依据公开容量分布与成本参数做保守选择。\"}"
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2158,
+          "completion_tokens": 119,
+          "total_tokens": 2277,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2158
+        },
+        "system_fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+      },
+      "failed_stage": "",
+      "error_type": "",
+      "error": "",
+      "elapsed_seconds": 4.248,
+      "variant": "full",
+      "valid_model_answer": true,
+      "request_bytes": 7629
+    }
+  ],
+  "finished_utc": "2026-10-15T04:33:21.741452+00:00"
+}

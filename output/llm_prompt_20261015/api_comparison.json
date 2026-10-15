@@ -1,0 +1,435 @@
+{
+  "started_utc": "2026-10-15T03:08:24.058447+00:00",
+  "purpose": "independent simulation smoke check, not formal experiment data",
+  "simulation_seed": 2026101501,
+  "information_condition": "I0",
+  "actor_count": 30,
+  "persona": {
+    "persona_id": "adaptive_v1",
+    "persona_version": "dynamic_bottleneck_persona_v1",
+    "label": "adaptive",
+    "traits": {
+      "queue_aversion": 6,
+      "early_arrival_aversion": 5,
+      "late_arrival_aversion": 8,
+      "toll_sensitivity": 6,
+      "reward_sensitivity": 6,
+      "capacity_risk_aversion": 4,
+      "choice_inertia": 2,
+      "adaptation_speed": 9
+    }
+  },
+  "request_parameters": {
+    "model": "deepseek-v4-flash",
+    "temperature": 0.0,
+    "thinking_enabled": false,
+    "max_tokens": 512,
+    "timeout_seconds": 12,
+    "limited_memory_enabled": true,
+    "limited_memory_max_chars": 400
+  },
+  "scenarios": [
+    {
+      "round_number": 1,
+      "capacity": 1.8169602822800577,
+      "opponent_slots": [
+        7,
+        7,
+        5,
+        2,
+        8,
+        3,
+        13,
+        9,
+        8,
+        12,
+        2,
+        7,
+        12,
+        5,
+        8,
+        4,
+        4,
+        6,
+        14,
+        10,
+        10,
+        12,
+        10,
+        12,
+        7,
+        12,
+        6,
+        15,
+        7
+      ]
+    },
+    {
+      "round_number": 2,
+      "capacity": 2.1973447283450263,
+      "opponent_slots": [
+        4,
+        6,
+        6,
+        9,
+        7,
+        2,
+        1,
+        10,
+        9,
+        12,
+        3,
+        9,
+        7,
+        12,
+        14,
+        6,
+        12,
+        7,
+        16,
+        11,
+        6,
+        8,
+        7,
+        12,
+        12,
+        5,
+        7,
+        7,
+        7
+      ]
+    },
+    {
+      "round_number": 3,
+      "capacity": 2.890502298100113,
+      "opponent_slots": [
+        4,
+        8,
+        8,
+        5,
+        8,
+        7,
+        1,
+        6,
+        9,
+        4,
+        12,
+        9,
+        6,
+        9,
+        8,
+        5,
+        4,
+        9,
+        6,
+        9,
+        11,
+        14,
+        7,
+        10,
+        9,
+        10,
+        12,
+        8,
+        6
+      ]
+    }
+  ],
+  "records": [
+    {
+      "round_number": 1,
+      "prompt_version": "dynamic_bottleneck_prompt_v1",
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a virtual participant in a dynamic-capacity single-bottleneck departure-time experiment. Treat the persona traits as stable preferences. Any limited_memory is your own fallible prior impression, not a system fact; revise it only from the public context supplied in this request. Use only capacity information present in the context; an unrevealed current capacity is unknown. Choose one legal departure slot. Return only valid JSON with keys departure_slot and reason. Also return memory_summary: a concise subjective memory for the next round, no more than 400 characters. Base it only on the supplied public feedback and your own result; do not invent observations or reproduce a complete round-by-round history. Do not include markdown."
+          },
+          {
+            "role": "user",
+            "content": "You cannot observe current-round human choices. Make a simultaneous choice from the available slots using this experiment context:\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 1 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": null, \"public_feedback\": null}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"rewards\": [], \"round_number\": 1, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "raw_response": null,
+      "departure_slot": 9,
+      "reason": "The read operation timed out",
+      "memory_summary": null,
+      "latency_ms": 12366,
+      "decision_source": "fallback_lowest_schedule_cost",
+      "fallback_used": true,
+      "simulated_outcome": {
+        "departure_slot": 9,
+        "departure_minute": 474.0,
+        "departure_time_label": "07:54",
+        "arrival_minute": 483.80591620853824,
+        "arrival_time_label": "08:03:48",
+        "queue_delay_minutes": 3.8059162085382168,
+        "travel_time_minutes": 9.805916208538235,
+        "early_minutes": 0,
+        "late_minutes": 3.8059162085382354,
+        "slot_load": 2,
+        "total_cost": 19.02958104269114
+      }
+    },
+    {
+      "round_number": 1,
+      "prompt_version": "dynamic_bottleneck_prompt_v2",
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是动态瓶颈出发时间实验中的一名独立虚拟参与者，与其他主体同时决策。目标是在给定人格偏好下权衡成本，自主选择一个合法出发档位。\n【时间与客观成本】所有分钟数是同一天的时刻，时钟为对应显示。以 cost_parameters 的本轮参数为准，不用人格分数替换客观成本系数。实际到达时刻 = departure_minute + free_flow_travel_minutes + 额外瓶颈行程。queue_delay_minutes 是含瓶颈通过时间的额外行程，非负，全部计入到达时刻。早到分钟 = max(preferred_arrival_minute - 实际到达时刻, 0)；晚到分钟 = max(实际到达时刻 - preferred_arrival_minute, 0)。总成本 = fixed_travel_time_cost + queue_cost_per_minute × 额外行程 + early_cost_per_minute × 早到分钟 + late_cost_per_minute × 晚到分钟。当前场景没有额外通行收费或奖励，tolls / rewards 为空，不得虚构。\n【每档时间参照】fixed_travel_arrival_minute / fixed_travel_arrival_time 仅为出发加固定行程、忽略额外行程的到达下界，不是实际到达预测，也不是预期总成本。实际到达不能早于这个基准。更晚出发会推迟基准；避开拥挤可能减少额外行程，但不能因此声称晚于目标的基准能准时到达。所有 available_slots 均合法，基准晚到的档位仍可自主选择。\n【信息边界】只使用 capacity_context 已公开的信息。I0 在选择时不知道当轮实际服务率，上一轮公布值不等于当轮值；I1 可以使用已公开的当轮值。两者均不知道其他主体的当轮选择或未来服务率序列，不得自行声称已知。\n【反馈与人格】history 中上一轮个人结果和公开统计是已观察事实。历史空档成本为未知，不是零成本，也不代表本轮无人选择。limited_memory 是可修正的个人印象，矛盾时以结构化事实为准。保留 persona 的风险偏好、适应速度与选择惯性；人格不改变时间算术和客观成本。当轮尚未结算，主观预期不能写成已发生的结果。不补造完整历史。\n【最终输出】仅返回一个 JSON 对象，不要 Markdown 或长篇分析。departure_slot 必须是 available_slots 中的整数；reason 用简短中文只说明最终选定档位的依据，所述档位、出发时刻和到达基准须相互对应。若改选，以最终档位为准，不保留互相矛盾的候选结论；不把未知额外行程当作零。memory_summary 不超过 400 字符，仅提炼已公布反馈与自身上一轮结果形成的个人印象，允许表达不确定性；没有历史就说明暂无经验。不得将当前选择或预测记成当轮已发生结果，不得与最终行动或已有事实矛盾。"
+          },
+          {
+            "role": "user",
+            "content": "请依据以下实验上下文完成本轮同时选择。先核对所选档位的出发时刻和固定行程到达基准，再给出一致的最终 JSON；无需输出核对过程。\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"fixed_travel_arrival_minute\": 472.0, \"fixed_travel_arrival_time\": \"07:52\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"fixed_travel_arrival_minute\": 473.0, \"fixed_travel_arrival_time\": \"07:53\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"fixed_travel_arrival_minute\": 474.0, \"fixed_travel_arrival_time\": \"07:54\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"fixed_travel_arrival_minute\": 475.0, \"fixed_travel_arrival_time\": \"07:55\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"fixed_travel_arrival_minute\": 476.0, \"fixed_travel_arrival_time\": \"07:56\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"fixed_travel_arrival_minute\": 477.0, \"fixed_travel_arrival_time\": \"07:57\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"fixed_travel_arrival_minute\": 478.0, \"fixed_travel_arrival_time\": \"07:58\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"fixed_travel_arrival_minute\": 479.0, \"fixed_travel_arrival_time\": \"07:59\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"fixed_travel_arrival_minute\": 480.0, \"fixed_travel_arrival_time\": \"08:00\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"fixed_travel_arrival_minute\": 481.0, \"fixed_travel_arrival_time\": \"08:01\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"fixed_travel_arrival_minute\": 482.0, \"fixed_travel_arrival_time\": \"08:02\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"fixed_travel_arrival_minute\": 483.0, \"fixed_travel_arrival_time\": \"08:03\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"fixed_travel_arrival_minute\": 484.0, \"fixed_travel_arrival_time\": \"08:04\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"fixed_travel_arrival_minute\": 485.0, \"fixed_travel_arrival_time\": \"08:05\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"fixed_travel_arrival_minute\": 486.0, \"fixed_travel_arrival_time\": \"08:06\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"fixed_travel_arrival_minute\": 487.0, \"fixed_travel_arrival_time\": \"08:07\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 1 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": null, \"public_feedback\": null}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"prompt_version\": \"dynamic_bottleneck_prompt_v2\", \"rewards\": [], \"round_number\": 1, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "raw_response": null,
+      "departure_slot": 9,
+      "reason": "The read operation timed out",
+      "memory_summary": null,
+      "latency_ms": 12423,
+      "decision_source": "fallback_lowest_schedule_cost",
+      "fallback_used": true,
+      "simulated_outcome": {
+        "departure_slot": 9,
+        "departure_minute": 474.0,
+        "departure_time_label": "07:54",
+        "arrival_minute": 483.80591620853824,
+        "arrival_time_label": "08:03:48",
+        "queue_delay_minutes": 3.8059162085382168,
+        "travel_time_minutes": 9.805916208538235,
+        "early_minutes": 0,
+        "late_minutes": 3.8059162085382354,
+        "slot_load": 2,
+        "total_cost": 19.02958104269114
+      }
+    },
+    {
+      "round_number": 2,
+      "prompt_version": "dynamic_bottleneck_prompt_v1",
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a virtual participant in a dynamic-capacity single-bottleneck departure-time experiment. Treat the persona traits as stable preferences. Any limited_memory is your own fallible prior impression, not a system fact; revise it only from the public context supplied in this request. Use only capacity information present in the context; an unrevealed current capacity is unknown. Choose one legal departure slot. Return only valid JSON with keys departure_slot and reason. Also return memory_summary: a concise subjective memory for the next round, no more than 400 characters. Base it only on the supplied public feedback and your own result; do not invent observations or reproduce a complete round-by-round history. Do not include markdown."
+          },
+          {
+            "role": "user",
+            "content": "You cannot observe current-round human choices. Make a simultaneous choice from the available slots using this experiment context:\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 2 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": {\"arrival_time_label\": \"08:03:48\", \"departure_time_label\": \"07:54\", \"queue_delay_minutes\": 3.8059162085382168, \"round_number\": 1, \"slot_load\": 2, \"total_cost\": 19.02958104269114, \"travel_time_minutes\": 9.805916208538235}, \"public_feedback\": {\"actual_capacity\": 1.8169602822800577, \"capacity_distribution\": \"truncated_normal\", \"capacity_level\": \"low\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_sigma\": 0.8, \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"departure_outcomes\": [{\"average_cost\": null, \"departure_minute\": 466, \"departure_time\": \"07:46\", \"participant_count\": 0, \"slot\": 1}, {\"average_cost\": 8.1007, \"departure_minute\": 467, \"departure_time\": \"07:47\", \"participant_count\": 2, \"slot\": 2}, {\"average_cost\": 6.6511, \"departure_minute\": 468, \"departure_time\": \"07:48\", \"participant_count\": 1, \"slot\": 3}, {\"average_cost\": 6.1007, \"departure_minute\": 469, \"departure_time\": \"07:49\", \"participant_count\": 2, \"slot\": 4}, {\"average_cost\": 5.2015, \"departure_minute\": 470, \"departure_time\": \"07:50\", \"participant_count\": 2, \"slot\": 5}, {\"average_cost\": 4.3022, \"departure_minute\": 471, \"departure_time\": \"07:51\", \"participant_count\": 2, \"slot\": 6}, {\"average_cost\": 9.2703, \"departure_minute\": 472, \"departure_time\": \"07:52\", \"participant_count\": 5, \"slot\": 7}, {\"average_cost\": 15.5259, \"departure_minute\": 473, \"departure_time\": \"07:53\", \"participant_count\": 3, \"slot\": 8}, {\"average_cost\": 19.0296, \"departure_minute\": 474, \"departure_time\": \"07:54\", \"participant_count\": 2, \"slot\": 9}, {\"average_cost\": 25.2851, \"departure_minute\": 475, \"departure_time\": \"07:55\", \"participant_count\": 3, \"slot\": 10}, {\"average_cost\": null, \"departure_minute\": 476, \"departure_time\": \"07:56\", \"participant_count\": 0, \"slot\": 11}, {\"average_cost\": 35.0444, \"departure_minute\": 477, \"departure_time\": \"07:57\", \"participant_count\": 5, \"slot\": 12}, {\"average_cost\": 35.7962, \"departure_minute\": 478, \"departure_time\": \"07:58\", \"participant_count\": 1, \"slot\": 13}, {\"average_cost\": 36.5481, \"departure_minute\": 479, \"departure_time\": \"07:59\", \"participant_count\": 1, \"slot\": 14}, {\"average_cost\": 37.2999, \"departure_minute\": 480, \"departure_time\": \"08:00\", \"participant_count\": 1, \"slot\": 15}, {\"average_cost\": null, \"departure_minute\": 481, \"departure_time\": \"08:01\", \"participant_count\": 0, \"slot\": 16}], \"dynamic_capacity\": 1.8169602822800577, \"group_average_cost\": 18.1924, \"information_condition\": \"I0\", \"round_number\": 1}}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"rewards\": [], \"round_number\": 2, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "raw_response": null,
+      "departure_slot": 9,
+      "reason": "The read operation timed out",
+      "memory_summary": null,
+      "latency_ms": 12312,
+      "decision_source": "fallback_lowest_schedule_cost",
+      "fallback_used": true,
+      "simulated_outcome": {
+        "departure_slot": 9,
+        "departure_minute": 474.0,
+        "departure_time_label": "07:54",
+        "arrival_minute": 484.2815156373077,
+        "arrival_time_label": "08:04:17",
+        "queue_delay_minutes": 4.281515637307703,
+        "travel_time_minutes": 10.281515637307677,
+        "early_minutes": 0,
+        "late_minutes": 4.2815156373076775,
+        "slot_load": 4,
+        "total_cost": 21.407578186538437
+      }
+    },
+    {
+      "round_number": 2,
+      "prompt_version": "dynamic_bottleneck_prompt_v2",
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是动态瓶颈出发时间实验中的一名独立虚拟参与者，与其他主体同时决策。目标是在给定人格偏好下权衡成本，自主选择一个合法出发档位。\n【时间与客观成本】所有分钟数是同一天的时刻，时钟为对应显示。以 cost_parameters 的本轮参数为准，不用人格分数替换客观成本系数。实际到达时刻 = departure_minute + free_flow_travel_minutes + 额外瓶颈行程。queue_delay_minutes 是含瓶颈通过时间的额外行程，非负，全部计入到达时刻。早到分钟 = max(preferred_arrival_minute - 实际到达时刻, 0)；晚到分钟 = max(实际到达时刻 - preferred_arrival_minute, 0)。总成本 = fixed_travel_time_cost + queue_cost_per_minute × 额外行程 + early_cost_per_minute × 早到分钟 + late_cost_per_minute × 晚到分钟。当前场景没有额外通行收费或奖励，tolls / rewards 为空，不得虚构。\n【每档时间参照】fixed_travel_arrival_minute / fixed_travel_arrival_time 仅为出发加固定行程、忽略额外行程的到达下界，不是实际到达预测，也不是预期总成本。实际到达不能早于这个基准。更晚出发会推迟基准；避开拥挤可能减少额外行程，但不能因此声称晚于目标的基准能准时到达。所有 available_slots 均合法，基准晚到的档位仍可自主选择。\n【信息边界】只使用 capacity_context 已公开的信息。I0 在选择时不知道当轮实际服务率，上一轮公布值不等于当轮值；I1 可以使用已公开的当轮值。两者均不知道其他主体的当轮选择或未来服务率序列，不得自行声称已知。\n【反馈与人格】history 中上一轮个人结果和公开统计是已观察事实。历史空档成本为未知，不是零成本，也不代表本轮无人选择。limited_memory 是可修正的个人印象，矛盾时以结构化事实为准。保留 persona 的风险偏好、适应速度与选择惯性；人格不改变时间算术和客观成本。当轮尚未结算，主观预期不能写成已发生的结果。不补造完整历史。\n【最终输出】仅返回一个 JSON 对象，不要 Markdown 或长篇分析。departure_slot 必须是 available_slots 中的整数；reason 用简短中文只说明最终选定档位的依据，所述档位、出发时刻和到达基准须相互对应。若改选，以最终档位为准，不保留互相矛盾的候选结论；不把未知额外行程当作零。memory_summary 不超过 400 字符，仅提炼已公布反馈与自身上一轮结果形成的个人印象，允许表达不确定性；没有历史就说明暂无经验。不得将当前选择或预测记成当轮已发生结果，不得与最终行动或已有事实矛盾。"
+          },
+          {
+            "role": "user",
+            "content": "请依据以下实验上下文完成本轮同时选择。先核对所选档位的出发时刻和固定行程到达基准，再给出一致的最终 JSON；无需输出核对过程。\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"fixed_travel_arrival_minute\": 472.0, \"fixed_travel_arrival_time\": \"07:52\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"fixed_travel_arrival_minute\": 473.0, \"fixed_travel_arrival_time\": \"07:53\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"fixed_travel_arrival_minute\": 474.0, \"fixed_travel_arrival_time\": \"07:54\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"fixed_travel_arrival_minute\": 475.0, \"fixed_travel_arrival_time\": \"07:55\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"fixed_travel_arrival_minute\": 476.0, \"fixed_travel_arrival_time\": \"07:56\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"fixed_travel_arrival_minute\": 477.0, \"fixed_travel_arrival_time\": \"07:57\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"fixed_travel_arrival_minute\": 478.0, \"fixed_travel_arrival_time\": \"07:58\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"fixed_travel_arrival_minute\": 479.0, \"fixed_travel_arrival_time\": \"07:59\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"fixed_travel_arrival_minute\": 480.0, \"fixed_travel_arrival_time\": \"08:00\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"fixed_travel_arrival_minute\": 481.0, \"fixed_travel_arrival_time\": \"08:01\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"fixed_travel_arrival_minute\": 482.0, \"fixed_travel_arrival_time\": \"08:02\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"fixed_travel_arrival_minute\": 483.0, \"fixed_travel_arrival_time\": \"08:03\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"fixed_travel_arrival_minute\": 484.0, \"fixed_travel_arrival_time\": \"08:04\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"fixed_travel_arrival_minute\": 485.0, \"fixed_travel_arrival_time\": \"08:05\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"fixed_travel_arrival_minute\": 486.0, \"fixed_travel_arrival_time\": \"08:06\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"fixed_travel_arrival_minute\": 487.0, \"fixed_travel_arrival_time\": \"08:07\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 2 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": {\"arrival_time_label\": \"08:03:48\", \"departure_time_label\": \"07:54\", \"queue_delay_minutes\": 3.8059162085382168, \"round_number\": 1, \"slot_load\": 2, \"total_cost\": 19.02958104269114, \"travel_time_minutes\": 9.805916208538235}, \"public_feedback\": {\"actual_capacity\": 1.8169602822800577, \"capacity_distribution\": \"truncated_normal\", \"capacity_level\": \"low\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_sigma\": 0.8, \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"departure_outcomes\": [{\"average_cost\": null, \"departure_minute\": 466, \"departure_time\": \"07:46\", \"participant_count\": 0, \"slot\": 1}, {\"average_cost\": 8.1007, \"departure_minute\": 467, \"departure_time\": \"07:47\", \"participant_count\": 2, \"slot\": 2}, {\"average_cost\": 6.6511, \"departure_minute\": 468, \"departure_time\": \"07:48\", \"participant_count\": 1, \"slot\": 3}, {\"average_cost\": 6.1007, \"departure_minute\": 469, \"departure_time\": \"07:49\", \"participant_count\": 2, \"slot\": 4}, {\"average_cost\": 5.2015, \"departure_minute\": 470, \"departure_time\": \"07:50\", \"participant_count\": 2, \"slot\": 5}, {\"average_cost\": 4.3022, \"departure_minute\": 471, \"departure_time\": \"07:51\", \"participant_count\": 2, \"slot\": 6}, {\"average_cost\": 9.2703, \"departure_minute\": 472, \"departure_time\": \"07:52\", \"participant_count\": 5, \"slot\": 7}, {\"average_cost\": 15.5259, \"departure_minute\": 473, \"departure_time\": \"07:53\", \"participant_count\": 3, \"slot\": 8}, {\"average_cost\": 19.0296, \"departure_minute\": 474, \"departure_time\": \"07:54\", \"participant_count\": 2, \"slot\": 9}, {\"average_cost\": 25.2851, \"departure_minute\": 475, \"departure_time\": \"07:55\", \"participant_count\": 3, \"slot\": 10}, {\"average_cost\": null, \"departure_minute\": 476, \"departure_time\": \"07:56\", \"participant_count\": 0, \"slot\": 11}, {\"average_cost\": 35.0444, \"departure_minute\": 477, \"departure_time\": \"07:57\", \"participant_count\": 5, \"slot\": 12}, {\"average_cost\": 35.7962, \"departure_minute\": 478, \"departure_time\": \"07:58\", \"participant_count\": 1, \"slot\": 13}, {\"average_cost\": 36.5481, \"departure_minute\": 479, \"departure_time\": \"07:59\", \"participant_count\": 1, \"slot\": 14}, {\"average_cost\": 37.2999, \"departure_minute\": 480, \"departure_time\": \"08:00\", \"participant_count\": 1, \"slot\": 15}, {\"average_cost\": null, \"departure_minute\": 481, \"departure_time\": \"08:01\", \"participant_count\": 0, \"slot\": 16}], \"dynamic_capacity\": 1.8169602822800577, \"group_average_cost\": 18.1924, \"information_condition\": \"I0\", \"round_number\": 1}}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"prompt_version\": \"dynamic_bottleneck_prompt_v2\", \"rewards\": [], \"round_number\": 2, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "raw_response": null,
+      "departure_slot": 9,
+      "reason": "The read operation timed out",
+      "memory_summary": null,
+      "latency_ms": 12276,
+      "decision_source": "fallback_lowest_schedule_cost",
+      "fallback_used": true,
+      "simulated_outcome": {
+        "departure_slot": 9,
+        "departure_minute": 474.0,
+        "departure_time_label": "07:54",
+        "arrival_minute": 484.2815156373077,
+        "arrival_time_label": "08:04:17",
+        "queue_delay_minutes": 4.281515637307703,
+        "travel_time_minutes": 10.281515637307677,
+        "early_minutes": 0,
+        "late_minutes": 4.2815156373076775,
+        "slot_load": 4,
+        "total_cost": 21.407578186538437
+      }
+    },
+    {
+      "round_number": 3,
+      "prompt_version": "dynamic_bottleneck_prompt_v1",
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a virtual participant in a dynamic-capacity single-bottleneck departure-time experiment. Treat the persona traits as stable preferences. Any limited_memory is your own fallible prior impression, not a system fact; revise it only from the public context supplied in this request. Use only capacity information present in the context; an unrevealed current capacity is unknown. Choose one legal departure slot. Return only valid JSON with keys departure_slot and reason. Also return memory_summary: a concise subjective memory for the next round, no more than 400 characters. Base it only on the supplied public feedback and your own result; do not invent observations or reproduce a complete round-by-round history. Do not include markdown."
+          },
+          {
+            "role": "user",
+            "content": "You cannot observe current-round human choices. Make a simultaneous choice from the available slots using this experiment context:\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 3 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": {\"arrival_time_label\": \"08:04:17\", \"departure_time_label\": \"07:54\", \"queue_delay_minutes\": 4.281515637307703, \"round_number\": 2, \"slot_load\": 4, \"total_cost\": 21.407578186538437, \"travel_time_minutes\": 10.281515637307677}, \"public_feedback\": {\"actual_capacity\": 2.1973447283450263, \"capacity_distribution\": \"truncated_normal\", \"capacity_level\": \"low\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_sigma\": 0.8, \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"departure_outcomes\": [{\"average_cost\": 8.4551, \"departure_minute\": 466, \"departure_time\": \"07:46\", \"participant_count\": 1, \"slot\": 1}, {\"average_cost\": 7.4551, \"departure_minute\": 467, \"departure_time\": \"07:47\", \"participant_count\": 1, \"slot\": 2}, {\"average_cost\": 6.4551, \"departure_minute\": 468, \"departure_time\": \"07:48\", \"participant_count\": 1, \"slot\": 3}, {\"average_cost\": 5.4551, \"departure_minute\": 469, \"departure_time\": \"07:49\", \"participant_count\": 1, \"slot\": 4}, {\"average_cost\": 4.4551, \"departure_minute\": 470, \"departure_time\": \"07:50\", \"participant_count\": 1, \"slot\": 5}, {\"average_cost\": 4.8204, \"departure_minute\": 471, \"departure_time\": \"07:51\", \"participant_count\": 4, \"slot\": 6}, {\"average_cost\": 14.0302, \"departure_minute\": 472, \"departure_time\": \"07:52\", \"participant_count\": 7, \"slot\": 7}, {\"average_cost\": 14.3057, \"departure_minute\": 473, \"departure_time\": \"07:53\", \"participant_count\": 1, \"slot\": 8}, {\"average_cost\": 21.4076, \"departure_minute\": 474, \"departure_time\": \"07:54\", \"participant_count\": 4, \"slot\": 9}, {\"average_cost\": 21.6831, \"departure_minute\": 475, \"departure_time\": \"07:55\", \"participant_count\": 1, \"slot\": 10}, {\"average_cost\": 21.9585, \"departure_minute\": 476, \"departure_time\": \"07:56\", \"participant_count\": 1, \"slot\": 11}, {\"average_cost\": 31.3359, \"departure_minute\": 477, \"departure_time\": \"07:57\", \"participant_count\": 5, \"slot\": 12}, {\"average_cost\": null, \"departure_minute\": 478, \"departure_time\": \"07:58\", \"participant_count\": 0, \"slot\": 13}, {\"average_cost\": 29.6114, \"departure_minute\": 479, \"departure_time\": \"07:59\", \"participant_count\": 1, \"slot\": 14}, {\"average_cost\": null, \"departure_minute\": 480, \"departure_time\": \"08:00\", \"participant_count\": 0, \"slot\": 15}, {\"average_cost\": 27.8868, \"departure_minute\": 481, \"departure_time\": \"08:01\", \"participant_count\": 1, \"slot\": 16}], \"dynamic_capacity\": 2.1973447283450263, \"group_average_cost\": 16.9175, \"information_condition\": \"I0\", \"round_number\": 2}}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"rewards\": [], \"round_number\": 3, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "raw_response": null,
+      "departure_slot": 9,
+      "reason": "The read operation timed out",
+      "memory_summary": null,
+      "latency_ms": 12261,
+      "decision_source": "fallback_lowest_schedule_cost",
+      "fallback_used": true,
+      "simulated_outcome": {
+        "departure_slot": 9,
+        "departure_minute": 474.0,
+        "departure_time_label": "07:54",
+        "arrival_minute": 483.22729136449095,
+        "arrival_time_label": "08:03:14",
+        "queue_delay_minutes": 3.227291364490947,
+        "travel_time_minutes": 9.227291364490952,
+        "early_minutes": 0,
+        "late_minutes": 3.227291364490952,
+        "slot_load": 7,
+        "total_cost": 16.13645682245475
+      }
+    },
+    {
+      "round_number": 3,
+      "prompt_version": "dynamic_bottleneck_prompt_v2",
+      "request_payload": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0.0,
+        "thinking": {
+          "type": "disabled"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 512,
+        "messages": [
+          {
+            "role": "system",
+            "content": "你是动态瓶颈出发时间实验中的一名独立虚拟参与者，与其他主体同时决策。目标是在给定人格偏好下权衡成本，自主选择一个合法出发档位。\n【时间与客观成本】所有分钟数是同一天的时刻，时钟为对应显示。以 cost_parameters 的本轮参数为准，不用人格分数替换客观成本系数。实际到达时刻 = departure_minute + free_flow_travel_minutes + 额外瓶颈行程。queue_delay_minutes 是含瓶颈通过时间的额外行程，非负，全部计入到达时刻。早到分钟 = max(preferred_arrival_minute - 实际到达时刻, 0)；晚到分钟 = max(实际到达时刻 - preferred_arrival_minute, 0)。总成本 = fixed_travel_time_cost + queue_cost_per_minute × 额外行程 + early_cost_per_minute × 早到分钟 + late_cost_per_minute × 晚到分钟。当前场景没有额外通行收费或奖励，tolls / rewards 为空，不得虚构。\n【每档时间参照】fixed_travel_arrival_minute / fixed_travel_arrival_time 仅为出发加固定行程、忽略额外行程的到达下界，不是实际到达预测，也不是预期总成本。实际到达不能早于这个基准。更晚出发会推迟基准；避开拥挤可能减少额外行程，但不能因此声称晚于目标的基准能准时到达。所有 available_slots 均合法，基准晚到的档位仍可自主选择。\n【信息边界】只使用 capacity_context 已公开的信息。I0 在选择时不知道当轮实际服务率，上一轮公布值不等于当轮值；I1 可以使用已公开的当轮值。两者均不知道其他主体的当轮选择或未来服务率序列，不得自行声称已知。\n【反馈与人格】history 中上一轮个人结果和公开统计是已观察事实。历史空档成本为未知，不是零成本，也不代表本轮无人选择。limited_memory 是可修正的个人印象，矛盾时以结构化事实为准。保留 persona 的风险偏好、适应速度与选择惯性；人格不改变时间算术和客观成本。当轮尚未结算，主观预期不能写成已发生的结果。不补造完整历史。\n【最终输出】仅返回一个 JSON 对象，不要 Markdown 或长篇分析。departure_slot 必须是 available_slots 中的整数；reason 用简短中文只说明最终选定档位的依据，所述档位、出发时刻和到达基准须相互对应。若改选，以最终档位为准，不保留互相矛盾的候选结论；不把未知额外行程当作零。memory_summary 不超过 400 字符，仅提炼已公布反馈与自身上一轮结果形成的个人印象，允许表达不确定性；没有历史就说明暂无经验。不得将当前选择或预测记成当轮已发生结果，不得与最终行动或已有事实矛盾。"
+          },
+          {
+            "role": "user",
+            "content": "请依据以下实验上下文完成本轮同时选择。先核对所选档位的出发时刻和固定行程到达基准，再给出一致的最终 JSON；无需输出核对过程。\n\n{\"agent_id\": \"INDEPENDENT_CHECK_API_01\", \"available_slots\": [{\"departure_minute\": 466, \"departure_time\": \"07:46\", \"fixed_travel_arrival_minute\": 472.0, \"fixed_travel_arrival_time\": \"07:52\", \"slot\": 1}, {\"departure_minute\": 467, \"departure_time\": \"07:47\", \"fixed_travel_arrival_minute\": 473.0, \"fixed_travel_arrival_time\": \"07:53\", \"slot\": 2}, {\"departure_minute\": 468, \"departure_time\": \"07:48\", \"fixed_travel_arrival_minute\": 474.0, \"fixed_travel_arrival_time\": \"07:54\", \"slot\": 3}, {\"departure_minute\": 469, \"departure_time\": \"07:49\", \"fixed_travel_arrival_minute\": 475.0, \"fixed_travel_arrival_time\": \"07:55\", \"slot\": 4}, {\"departure_minute\": 470, \"departure_time\": \"07:50\", \"fixed_travel_arrival_minute\": 476.0, \"fixed_travel_arrival_time\": \"07:56\", \"slot\": 5}, {\"departure_minute\": 471, \"departure_time\": \"07:51\", \"fixed_travel_arrival_minute\": 477.0, \"fixed_travel_arrival_time\": \"07:57\", \"slot\": 6}, {\"departure_minute\": 472, \"departure_time\": \"07:52\", \"fixed_travel_arrival_minute\": 478.0, \"fixed_travel_arrival_time\": \"07:58\", \"slot\": 7}, {\"departure_minute\": 473, \"departure_time\": \"07:53\", \"fixed_travel_arrival_minute\": 479.0, \"fixed_travel_arrival_time\": \"07:59\", \"slot\": 8}, {\"departure_minute\": 474, \"departure_time\": \"07:54\", \"fixed_travel_arrival_minute\": 480.0, \"fixed_travel_arrival_time\": \"08:00\", \"slot\": 9}, {\"departure_minute\": 475, \"departure_time\": \"07:55\", \"fixed_travel_arrival_minute\": 481.0, \"fixed_travel_arrival_time\": \"08:01\", \"slot\": 10}, {\"departure_minute\": 476, \"departure_time\": \"07:56\", \"fixed_travel_arrival_minute\": 482.0, \"fixed_travel_arrival_time\": \"08:02\", \"slot\": 11}, {\"departure_minute\": 477, \"departure_time\": \"07:57\", \"fixed_travel_arrival_minute\": 483.0, \"fixed_travel_arrival_time\": \"08:03\", \"slot\": 12}, {\"departure_minute\": 478, \"departure_time\": \"07:58\", \"fixed_travel_arrival_minute\": 484.0, \"fixed_travel_arrival_time\": \"08:04\", \"slot\": 13}, {\"departure_minute\": 479, \"departure_time\": \"07:59\", \"fixed_travel_arrival_minute\": 485.0, \"fixed_travel_arrival_time\": \"08:05\", \"slot\": 14}, {\"departure_minute\": 480, \"departure_time\": \"08:00\", \"fixed_travel_arrival_minute\": 486.0, \"fixed_travel_arrival_time\": \"08:06\", \"slot\": 15}, {\"departure_minute\": 481, \"departure_time\": \"08:01\", \"fixed_travel_arrival_minute\": 487.0, \"fixed_travel_arrival_time\": \"08:07\", \"slot\": 16}], \"capacity_context\": {\"capacity_distribution\": \"truncated_normal\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_reveal_timing\": \"I0\", \"capacity_sigma\": 0.8, \"capacity_standard_deviation\": 0.6371680565366133, \"capacity_states\": [{\"capacity\": 1.9463110575005085, \"label\": \"低\", \"probability\": 0.3333333333333333, \"range_label\": \"1.33–2.35\", \"state\": \"low\"}, {\"capacity\": 2.665, \"label\": \"中\", \"probability\": 0.3333333333333333, \"range_label\": \"2.36–2.97\", \"state\": \"medium\"}, {\"capacity\": 3.383688942499491, \"label\": \"高\", \"probability\": 0.3333333333333333, \"range_label\": \"2.98–4.00\", \"state\": \"high\"}], \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"current_capacity_revealed\": false, \"expected_capacity\": 2.665, \"experiment_phase\": \"formal\", \"information_condition\": \"I0\", \"round_label\": \"正式第 3 轮\"}, \"cost_parameters\": {\"capacity_window_minutes\": 1, \"early_cost_per_minute\": 1, \"first_departure_minute\": 466, \"fixed_travel_time_cost\": 0, \"free_flow_travel_minutes\": 6, \"last_departure_minute\": 481, \"late_cost_per_minute\": 3, \"preferred_arrival_minute\": 480, \"preferred_arrival_time\": \"08:00\", \"queue_cost_per_minute\": 2}, \"history\": {\"own_previous_result\": {\"arrival_time_label\": \"08:04:17\", \"departure_time_label\": \"07:54\", \"queue_delay_minutes\": 4.281515637307703, \"round_number\": 2, \"slot_load\": 4, \"total_cost\": 21.407578186538437, \"travel_time_minutes\": 10.281515637307677}, \"public_feedback\": {\"actual_capacity\": 2.1973447283450263, \"capacity_distribution\": \"truncated_normal\", \"capacity_level\": \"low\", \"capacity_max\": 4.0, \"capacity_min\": 1.33, \"capacity_mu\": 2.665, \"capacity_sigma\": 0.8, \"capacity_truncated_mean\": 2.665, \"capacity_truncated_sd\": 0.6371680565366133, \"departure_outcomes\": [{\"average_cost\": 8.4551, \"departure_minute\": 466, \"departure_time\": \"07:46\", \"participant_count\": 1, \"slot\": 1}, {\"average_cost\": 7.4551, \"departure_minute\": 467, \"departure_time\": \"07:47\", \"participant_count\": 1, \"slot\": 2}, {\"average_cost\": 6.4551, \"departure_minute\": 468, \"departure_time\": \"07:48\", \"participant_count\": 1, \"slot\": 3}, {\"average_cost\": 5.4551, \"departure_minute\": 469, \"departure_time\": \"07:49\", \"participant_count\": 1, \"slot\": 4}, {\"average_cost\": 4.4551, \"departure_minute\": 470, \"departure_time\": \"07:50\", \"participant_count\": 1, \"slot\": 5}, {\"average_cost\": 4.8204, \"departure_minute\": 471, \"departure_time\": \"07:51\", \"participant_count\": 4, \"slot\": 6}, {\"average_cost\": 14.0302, \"departure_minute\": 472, \"departure_time\": \"07:52\", \"participant_count\": 7, \"slot\": 7}, {\"average_cost\": 14.3057, \"departure_minute\": 473, \"departure_time\": \"07:53\", \"participant_count\": 1, \"slot\": 8}, {\"average_cost\": 21.4076, \"departure_minute\": 474, \"departure_time\": \"07:54\", \"participant_count\": 4, \"slot\": 9}, {\"average_cost\": 21.6831, \"departure_minute\": 475, \"departure_time\": \"07:55\", \"participant_count\": 1, \"slot\": 10}, {\"average_cost\": 21.9585, \"departure_minute\": 476, \"departure_time\": \"07:56\", \"participant_count\": 1, \"slot\": 11}, {\"average_cost\": 31.3359, \"departure_minute\": 477, \"departure_time\": \"07:57\", \"participant_count\": 5, \"slot\": 12}, {\"average_cost\": null, \"departure_minute\": 478, \"departure_time\": \"07:58\", \"participant_count\": 0, \"slot\": 13}, {\"average_cost\": 29.6114, \"departure_minute\": 479, \"departure_time\": \"07:59\", \"participant_count\": 1, \"slot\": 14}, {\"average_cost\": null, \"departure_minute\": 480, \"departure_time\": \"08:00\", \"participant_count\": 0, \"slot\": 15}, {\"average_cost\": 27.8868, \"departure_minute\": 481, \"departure_time\": \"08:01\", \"participant_count\": 1, \"slot\": 16}], \"dynamic_capacity\": 2.1973447283450263, \"group_average_cost\": 16.9175, \"information_condition\": \"I0\", \"round_number\": 2}}, \"persona\": {\"label\": \"adaptive\", \"persona_id\": \"adaptive_v1\", \"persona_version\": \"dynamic_bottleneck_persona_v1\", \"traits\": {\"adaptation_speed\": 9, \"capacity_risk_aversion\": 4, \"choice_inertia\": 2, \"early_arrival_aversion\": 5, \"late_arrival_aversion\": 8, \"queue_aversion\": 6, \"reward_sensitivity\": 6, \"toll_sensitivity\": 6}}, \"prompt_version\": \"dynamic_bottleneck_prompt_v2\", \"rewards\": [], \"round_number\": 3, \"tolls\": [], \"total_rounds\": 30}"
+          }
+        ]
+      },
+      "raw_response": null,
+      "departure_slot": 9,
+      "reason": "The read operation timed out",
+      "memory_summary": null,
+      "latency_ms": 12288,
+      "decision_source": "fallback_lowest_schedule_cost",
+      "fallback_used": true,
+      "simulated_outcome": {
+        "departure_slot": 9,
+        "departure_minute": 474.0,
+        "departure_time_label": "07:54",
+        "arrival_minute": 483.22729136449095,
+        "arrival_time_label": "08:03:14",
+        "queue_delay_minutes": 3.227291364490947,
+        "travel_time_minutes": 9.227291364490952,
+        "early_minutes": 0,
+        "late_minutes": 3.227291364490952,
+        "slot_load": 7,
+        "total_cost": 16.13645682245475
+      }
+    }
+  ],
+  "summary": {
+    "dynamic_bottleneck_prompt_v1": {
+      "api_success_count": 0,
+      "average_latency_ms": 12313,
+      "average_simulated_cost": 18.8579,
+      "departure_slots": [
+        9,
+        9,
+        9
+      ],
+      "slot_changes": 0
+    },
+    "dynamic_bottleneck_prompt_v2": {
+      "api_success_count": 0,
+      "average_latency_ms": 12329,
+      "average_simulated_cost": 18.8579,
+      "departure_slots": [
+        9,
+        9,
+        9
+      ],
+      "slot_changes": 0
+    }
+  },
+  "finished_utc": "2026-10-15T03:09:38.009898+00:00"
+}

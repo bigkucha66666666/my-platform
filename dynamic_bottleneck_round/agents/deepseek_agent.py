@@ -10,6 +10,11 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Iterable, Mapping, Sequence
 
+from .prompts import (
+    CURRENT_PROMPT_VERSION, LEGACY_PROMPT_VERSION, build_prompt_messages,
+    prepare_prompt_context, prompt_version_from_session, validate_prompt_version,
+)
+
 
 DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
 DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
@@ -34,6 +39,10 @@ class DeepSeekAgentConfig:
     max_tokens: int = DEFAULT_MAX_TOKENS
     limited_memory_enabled: bool = False
     limited_memory_max_chars: int = DEFAULT_LIMITED_MEMORY_MAX_CHARS
+    prompt_version: str = LEGACY_PROMPT_VERSION
+
+    def __post_init__(self):
+        validate_prompt_version(self.prompt_version)
 
     @property
     def chat_completions_url(self) -> str:
@@ -77,17 +86,13 @@ def build_chat_completion_payload(
     config: DeepSeekAgentConfig,
     choice_set: AgentChoiceSet,
 ) -> dict[str, object]:
-    context = asdict(choice_set)
-    if not config.limited_memory_enabled or not choice_set.limited_memory:
-        context.pop('limited_memory', None)
-    memory_instruction = ''
-    if config.limited_memory_enabled:
-        memory_instruction = (
-            ' Also return memory_summary: a concise subjective memory for the next '
-            f'round, no more than {config.limited_memory_max_chars} characters. Base '
-            'it only on the supplied public feedback and your own result; do not '
-            'invent observations or reproduce a complete round-by-round history.'
-        )
+    context = prepare_prompt_context(
+        asdict(choice_set), config.prompt_version, config.limited_memory_enabled,
+    )
+    return _payload_for_context(config, context)
+
+
+def _payload_for_context(config, context):
     return {
         'model': config.model,
         'temperature': config.temperature,
@@ -96,29 +101,10 @@ def build_chat_completion_payload(
         },
         'response_format': {'type': 'json_object'},
         'max_tokens': config.max_tokens,
-        'messages': [
-            {
-                'role': 'system',
-                'content': (
-                    'You are a virtual participant in a dynamic-capacity '
-                    'single-bottleneck departure-time experiment. Treat the persona '
-                    'traits as stable preferences. Any limited_memory is your own '
-                    'fallible prior impression, not a system fact; revise it only from '
-                    'the public context supplied in this request. Use only capacity information '
-                    'present in the context; an unrevealed current capacity is unknown. '
-                    'Choose one legal departure slot. Return only valid JSON with keys '
-                    f'departure_slot and reason.{memory_instruction} Do not include markdown.'
-                ),
-            },
-            {
-                'role': 'user',
-                'content': (
-                    'You cannot observe current-round human choices. Make a simultaneous '
-                    'choice from the available slots using this experiment context:\n\n'
-                    f'{json.dumps(context, ensure_ascii=False, sort_keys=True)}'
-                ),
-            },
-        ],
+        'messages': build_prompt_messages(
+            context, config.prompt_version, config.limited_memory_enabled,
+            config.limited_memory_max_chars,
+        ),
     }
 
 
@@ -128,8 +114,16 @@ def choose_agent_departure(
     choice_set: AgentChoiceSet,
     http_post: HttpPost | None = None,
 ) -> AgentChoice:
-    payload = build_chat_completion_payload(config, choice_set)
-    context_json = json.dumps(asdict(choice_set), ensure_ascii=False, sort_keys=True)
+    original_context = asdict(choice_set)
+    context = prepare_prompt_context(
+        original_context, config.prompt_version, config.limited_memory_enabled,
+    )
+    payload = _payload_for_context(config, context)
+    # v1 audit shape remains unchanged; v2 records exactly what the model saw.
+    context_json = json.dumps(
+        context if config.prompt_version == CURRENT_PROMPT_VERSION else original_context,
+        ensure_ascii=False, sort_keys=True,
+    )
     post = http_post or post_chat_completion
     started = time.monotonic()
     try:
@@ -267,6 +261,7 @@ def fallback_lowest_schedule_cost(choice_set: AgentChoiceSet) -> int:
 
 def config_from_session(session_config) -> DeepSeekAgentConfig:
     return DeepSeekAgentConfig(
+        prompt_version=prompt_version_from_session(session_config),
         api_key=os.environ.get('DEEPSEEK_AGENT_API_KEY', '').strip(),
         base_url=str(
             session_config.get(

@@ -70,6 +70,14 @@ def run_framework_checks():
     sessions = [create_session('session_export_test', num_participants=2)
                 for _ in range(2)]
     target, foreign = sessions
+    from dynamic_bottleneck_round.agents.deepseek_agent import config_from_session
+    from dynamic_bottleneck_round.agents.prompts import CURRENT_PROMPT_VERSION, LEGACY_PROMPT_VERSION
+    assert target.config['api_agent_prompt_version'] == CURRENT_PROMPT_VERSION
+    assert config_from_session(target.config).prompt_version == CURRENT_PROMPT_VERSION
+    # Simulate a saved pre-version Session, never infer v2 from today's settings.
+    legacy_config = dict(target.config)
+    legacy_config.pop('api_agent_prompt_version')
+    assert config_from_session(legacy_config).prompt_version == LEGACY_PROMPT_VERSION
     players = experiment.Player.objects_filter(session=target).all()
     for player in players:
         if player.round_number in (1, 4, 33):
@@ -95,6 +103,8 @@ def run_framework_checks():
                 policy_version='frozen-test-v1')]
             if actor == 'rl_agent':
                 records[str(number)][0]['payoff'] = records[str(number)][0].pop('payoff_unrounded')
+            elif number == 4:
+                records[str(number)][0]['prompt_version'] = CURRENT_PROMPT_VERSION
     for player in survey.Player.objects_filter(session=target):
         player.service_rate_understanding = 'fewer_pass_more_queue'
     for player in payment_info.Player.objects_filter(session=target):
@@ -138,6 +148,9 @@ def run_framework_checks():
         assert {int(row['round_number']) for row in humans} == set(range(1, 34))
         assert {int(row['round_number']) for row in agents} == {1, 4}
         assert all(row['payoff'] == '133' for row in agents), 'legacy Agent payoff must be preserved'
+        for row in agents:
+            expected = CURRENT_PROMPT_VERSION if row['actor_type'] == 'deepseek_api_agent' and row['round_number'] == '4' else ''
+            assert row['agent_prompt_version'] == expected, row
         assert all(row['formal_round_number'] == '' for row in rows if row['round_phase'] == 'warmup')
         assert all(row['total_cost'] == '' for row in humans if row['round_number'] == '2')
         assert all(row['total_cost'] == '0.0' for row in humans if row['round_number'] == '33')

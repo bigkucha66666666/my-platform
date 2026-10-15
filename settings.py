@@ -135,6 +135,8 @@ DYNAMIC_BOTTLENECK_ROUND_COMMON = dict(
     api_agent_count_per_group=DYNAMIC_BOTTLENECK_API_AGENT_COUNT,
     group_agent_spec='',
     api_agent_model=DEEPSEEK_AGENT_MODEL,
+    # Saved on new Sessions; old saved configs without this key retain prompt v1.
+    api_agent_prompt_version='dynamic_bottleneck_prompt_v2',
     api_agent_timeout_seconds=DYNAMIC_BOTTLENECK_API_AGENT_TIMEOUT_SECONDS,
     api_agent_temperature=DEEPSEEK_AGENT_TEMPERATURE,
     api_agent_thinking_enabled=DEEPSEEK_AGENT_THINKING_ENABLED,
@@ -261,7 +263,7 @@ SESSION_CONFIGS = [
         participant_password=PROD_PARTICIPANT_PASSWORD,
         participant_label_file='_rooms/econ101.txt',
         participant_label_assignment='sequential',
-        cash_payment_rule='dynamic_cost_v1',
+        cash_payment_rule='dynamic_cost_budget_v2',
         participation_fee=15.00,
         real_world_currency_per_point=0.01,
         payoff_source_label='正式 30 轮个人成本（热身轮不计入）',

@@ -106,12 +106,8 @@ class WarmupRoundPhaseTests(unittest.TestCase):
         html = Path('dynamic_bottleneck_round/FormalStart.html').read_text(
             encoding='utf-8'
         )
-        self.assertIn('基础报酬 15 元', html)
-        self.assertIn('绩效报酬 0–20 元', html)
-        self.assertIn('正式 30 轮', html)
-        self.assertIn('平均成本为 20', html)
-        self.assertIn('25 元', html)
-        self.assertIn('热身轮不计入', html)
+        self.assertIn('{{ cash_payment_description }}', html)
+        self.assertNotIn('最高 35 元', html, 'amounts must follow the saved Session rule')
 
     def test_formal_payoff_total_excludes_warmup_rounds(self):
         formal_payoff_total = getattr(dynamic_app, 'formal_payoff_total', None)
@@ -1282,7 +1278,7 @@ class SettingsContractTests(unittest.TestCase):
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         formal = configs['dynamic_bottleneck_round_prod']
         self.assertEqual(settings.REAL_WORLD_CURRENCY_CODE, 'CNY')
-        self.assertEqual(formal['cash_payment_rule'], 'dynamic_cost_v1')
+        self.assertEqual(formal['cash_payment_rule'], 'dynamic_cost_budget_v2')
         self.assertEqual(formal['participation_fee'], 15)
         self.assertEqual(formal['real_world_currency_per_point'], 0.01)
         self.assertNotIn('cash_payment_rule', configs['dynamic_bottleneck_round_demo'])

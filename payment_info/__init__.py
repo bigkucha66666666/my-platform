@@ -1,6 +1,8 @@
 from otree.api import *
 
-from .cash_payment import BASE_CENTS, RULE_VERSION, calculate_cash_payment
+from .cash_payment import (
+    BASE_CENTS, calculate_cash_payment, cash_payment_description, cash_rule_for_version,
+)
 
 
 
@@ -98,13 +100,17 @@ def _restore_formal_cost_if_available(participant):
 
 
 def dynamic_cash_payment_for_player(player: Player):
-    if player.session.config.get('cash_payment_rule') != RULE_VERSION:
+    rule_version = player.session.config.get('cash_payment_rule')
+    try:
+        cash_rule_for_version(rule_version)
+    except ValueError:
         return None
     participant = player.participant
     if 'dynamic_bottleneck_round_total_cost_decimal' not in participant.vars:
         _restore_formal_cost_if_available(participant)
     try:
         return calculate_cash_payment(
+            rule_version=rule_version,
             total_cost=participant.vars.get(
                 'dynamic_bottleneck_round_total_cost_decimal',
                 participant.vars.get('dynamic_bottleneck_round_total_cost'),
@@ -198,13 +204,19 @@ class PaymentInfo(Page):
         )
         if context['is_dynamic_cash']:
             payment = dynamic_cash_payment_for_player(player)
+            saved_rule = player.session.config.get('cash_payment_rule')
+            try:
+                description = cash_payment_description(saved_rule)
+            except ValueError:
+                description = '报酬规则需要管理员核对。'
             context.update(
                 cash_settlement_ready=payment is not None,
                 cash_total_label=(format_cash_cents(payment.total_cents) if payment else ''),
                 cash_base_label=format_cash_cents(BASE_CENTS),
                 cash_bonus_label=(format_cash_cents(payment.bonus_cents) if payment else ''),
                 formal_mean_cost_label=(f'{payment.mean_cost:.2f}' if payment else ''),
-                payment_rule_version=RULE_VERSION,
+                payment_rule_version=saved_rule,
+                cash_payment_description=description,
             )
         return context
 
@@ -224,6 +236,10 @@ PAYMENT_EXPORT_HEADERS = [
     'total_cny',
     'native_cash_total_cny',
     'accounting_adjustment_points',
+    'max_bonus_cny',
+    'max_total_cny',
+    'budget_human_limit',
+    'budget_total_cny',
 ]
 
 
@@ -237,6 +253,12 @@ def custom_export(players):
         base_cents = vars.get('dynamic_bottleneck_cash_base_cents') if dynamic_cash else None
         bonus_cents = vars.get('dynamic_bottleneck_cash_bonus_cents') if dynamic_cash else None
         total_cents = vars.get('dynamic_bottleneck_cash_payment_cents') if dynamic_cash else None
+        # Derive immutable limits from the recorded settlement version, never
+        # attach today's budget to old or never-settled participant records.
+        try:
+            rule = cash_rule_for_version(vars.get('dynamic_bottleneck_cash_payment_rule')) if dynamic_cash else None
+        except ValueError:
+            rule = None
         yield [
             player.session.code,
             participant.code,
@@ -252,6 +274,10 @@ def custom_export(players):
             format_cash_cents(total_cents) if total_cents is not None else '',
             f'{float(participant.payoff_plus_participation_fee()):.2f}' if dynamic_cash else '',
             float(player.payoff) if dynamic_cash else '',
+            format_cash_cents(rule.max_bonus_cents) if rule else '',
+            format_cash_cents(rule.max_total_cents) if rule else '',
+            rule.budget_human_limit if rule and rule.budget_human_limit is not None else '',
+            format_cash_cents(rule.budget_total_cents) if rule and rule.budget_total_cents is not None else '',
         ]
 
 

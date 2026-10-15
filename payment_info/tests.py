@@ -9,6 +9,7 @@ class PlayerBot(Bot):
             from payment_info.cash_payment import calculate_cash_payment
 
             preview_payment = calculate_cash_payment(
+                rule_version=self.session.config['cash_payment_rule'],
                 total_cost=self.participant.vars[
                     'dynamic_bottleneck_round_total_cost_decimal'
                 ],
@@ -35,6 +36,7 @@ class PlayerBot(Bot):
             from payment_info.cash_payment import calculate_cash_payment
 
             payment = calculate_cash_payment(
+                rule_version=self.session.config['cash_payment_rule'],
                 total_cost=self.participant.vars[
                     'dynamic_bottleneck_round_total_cost_decimal'
                 ],

@@ -57,6 +57,24 @@ def make_player(group, code='human1', chosen=True):
 
 
 class SessionDataExportTests(unittest.TestCase):
+    def test_prompt_version_is_record_based_and_missing_history_stays_blank(self):
+        module = self.module()
+        session = make_session()
+        session.config['api_agent_prompt_version'] = 'dynamic_bottleneck_prompt_v2'
+        player = make_player(make_group(session, 4))
+        player.participant._vars[LLM_STORE] = {'4': [
+            dict(actor_type='deepseek_api_agent', agent_id='legacy', departure_slot=9),
+            dict(actor_type='deepseek_api_agent', agent_id='new', departure_slot=9,
+                 prompt_version='dynamic_bottleneck_prompt_v2')]}
+        before = copy.deepcopy(player.participant._vars)
+        rows = list(module.all_round_rows(session, [player], warmup_rounds=3))
+        self.assertIn('agent_prompt_version', module.HEADERS)
+        by_agent = {row['agent_id']: row for row in rows if row['actor_type'] != 'human'}
+        self.assertEqual(by_agent['legacy']['agent_prompt_version'], '')
+        self.assertEqual(by_agent['new']['agent_prompt_version'], 'dynamic_bottleneck_prompt_v2')
+        self.assertEqual(rows[0]['agent_prompt_version'], '')
+        self.assertEqual(player.participant._vars, before)
+
     def module(self):
         self.assertIsNotNone(importlib.util.find_spec('session_data_export'),
                              'per-Session export module has not been implemented')

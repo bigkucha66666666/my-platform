@@ -42,6 +42,7 @@ from .agents.deepseek_agent import (
     config_from_session,
     fallback_lowest_schedule_cost,
 )
+from .agents.prompts import prompt_version_from_session
 from .agents.independent_rl_agent import (
     INDEPENDENT_RL_POLICY_VERSION,
     choose_independent_rl_departure,
@@ -603,6 +604,7 @@ EXPORT_HEADERS = [
     'agent_persona_id',
     'agent_persona_label',
     'agent_policy_version',
+    'agent_prompt_version',
     'agent_fallback_reason',
     'rl_policy_version',
     'rl_rounds_observed',
@@ -1636,14 +1638,15 @@ def validate_cash_payment_config(session):
     if not is_formal_session(session):
         return
     config = session.config
+    from payment_info.cash_payment import cash_rule_for_version
+    cash_rule_for_version(config.get('cash_payment_rule'))
     try:
         participation_fee = float(config.get('participation_fee'))
         cash_per_point = float(config.get('real_world_currency_per_point'))
     except (TypeError, ValueError) as exc:
         raise ValueError('动态场景报酬配置必须使用 15 元基础报酬与每积分 0.01 元。') from exc
     if (
-        config.get('cash_payment_rule') != 'dynamic_cost_v1'
-        or not isfinite(participation_fee)
+        not isfinite(participation_fee)
         or not isfinite(cash_per_point)
         or abs(participation_fee - 15) > 1e-9
         or abs(cash_per_point - 0.01) > 1e-9
@@ -1654,6 +1657,7 @@ def validate_cash_payment_config(session):
 def creating_session(subsession):
     config = parse_stochastic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
+        prompt_version_from_session(subsession.session.config)
         # Existing Sessions have no marker and continue the legacy timing path.
         if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') in {'1', '2'}:
             if not ingress_middleware_active():
@@ -3220,6 +3224,7 @@ def build_api_agent_records_for_group(group, prepared_agents, choices):
                 'agent_id': agent_id,
                 'agent_type': API_AGENT_TYPE_DEEPSEEK,
                 'api_agent_mode': API_AGENT_MODE_ACTIVE,
+                'prompt_version': prompt_version_from_session(group.session.config),
                 'policy_version': str(
                     group.session.config.get(
                         'api_agent_policy_version',
@@ -4042,6 +4047,7 @@ def export_row_for_agent_record(record, reference_player):
         'agent_persona_id': record.get('persona_id', ''),
         'agent_persona_label': record.get('persona_label', ''),
         'agent_policy_version': record.get('policy_version', ''),
+        'agent_prompt_version': record.get('prompt_version', ''),
         'agent_fallback_reason': (
             record.get('reason', '') if record.get('fallback_used') else ''
         ),
@@ -4408,13 +4414,19 @@ class FormalStart(Page):
     @staticmethod
     def vars_for_template(player):
         config = capacity_config_for_player(player)
+        saved_cash_rule = player.session.config.get('cash_payment_rule')
+        description = ''
+        if saved_cash_rule:
+            from payment_info.cash_payment import cash_payment_description
+            description = cash_payment_description(saved_cash_rule)
         return {
             'formal_rounds': C.FORMAL_ROUNDS,
             'capacity_min': f'{config.capacity_min:.2f}',
             'capacity_max': f'{config.capacity_max:.2f}',
             'capacity_mu': number_display(config.capacity_mu),
             'capacity_reveal_description': capacity_reveal_description(config),
-            'cash_payment_enabled': bool(player.session.config.get('cash_payment_rule')),
+            'cash_payment_enabled': bool(saved_cash_rule),
+            'cash_payment_description': description,
         }
 
 

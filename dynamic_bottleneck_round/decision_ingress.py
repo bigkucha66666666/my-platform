@@ -12,6 +12,7 @@ import secrets
 from threading import Lock
 import time
 from urllib.parse import parse_qs
+from timeout_navigation import is_timeout_navigation
 
 
 _DECISION_POST_PATH = re.compile(
@@ -74,6 +75,13 @@ def remember_decision_preexisting_choice(participant_code, round_number, preexis
 def decision_preexisting_choice(participant_code, round_number):
     choices = _decision_form_choices.get()
     return bool(choices and choices.get((participant_code, int(round_number)), False))
+
+
+def decision_form_was_empty(participant_code, round_number):
+    """Only a recorded native POST snapshot authorizes form reconciliation."""
+    choices = _decision_form_choices.get()
+    return (request_ingress_ts() is not None and choices is not None
+            and choices.get((participant_code, int(round_number))) is False)
 
 
 def page_ingress_ts():
@@ -257,6 +265,24 @@ class DecisionIngressMiddleware:
         match = _PARTICIPANT_PATH.match(path)
         if match is None:
             return await self.app(scope, receive, send)
+        if is_timeout_navigation():
+            # Keep post-commit settlement callbacks, but no browser evidence,
+            # ingress deadlines, native tickets or shell credentials.
+            context = _success_callbacks.set({})
+            status = None
+            async def system_send(message):
+                nonlocal status
+                if message.get('type') == 'http.response.start':
+                    status = message.get('status')
+                await send(message)
+            try:
+                await self.app(scope, receive, system_send)
+                if status is not None and status < 400:
+                    for callback in _success_callbacks.get().values():
+                        await asyncio.to_thread(callback)
+            finally:
+                _success_callbacks.reset(context)
+            return
         code = match.group(1)
         is_decision_post = bool(
             scope.get('method') == 'POST' and _DECISION_POST_PATH.match(path)
@@ -268,6 +294,9 @@ class DecisionIngressMiddleware:
         match_index = _PAGE_INDEX.match(path)
         page_name = match_index.group(1) if match_index else None
         page_index = int(match_index.group(2)) if match_index else None
+        from . import sync_runtime
+        native_ticket = (sync_runtime.begin_native_request(code, page_index)
+                         if is_decision_get or is_decision_post else None)
         request_id = object()
         with _pending_lock:
             _pending.setdefault(code, {})[request_id] = (timestamp, is_decision_post, page_index)
@@ -303,6 +332,8 @@ class DecisionIngressMiddleware:
             _shell_token.reset(shell_token_context)
             _decision_form_choices.reset(form_context)
             completed_ts = time.time()
+            native_callbacks = sync_runtime.finish_native_request(native_ticket,
+                failed=raised or (response_status is not None and response_status >= 500))
             with _pending_lock:
                 completed = _completed.setdefault(code, [])
                 completed.append((
@@ -328,3 +359,5 @@ class DecisionIngressMiddleware:
             if not raised and response_status is not None and response_status < 400:
                 for callback in callbacks.values():
                     await asyncio.to_thread(callback)
+            for callback in native_callbacks:
+                await asyncio.to_thread(callback)

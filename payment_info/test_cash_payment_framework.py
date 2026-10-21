@@ -11,6 +11,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def run_framework_checks():
+    import otree
+    expected_source = os.environ.get('CASH_EXPECTED_OTREE_SOURCE')
+    if expected_source:
+        assert Path(otree.__file__).resolve() == Path(expected_source).resolve()
     from otree.main import setup
     setup()
     from otree.api import cu
@@ -32,6 +36,7 @@ def run_framework_checks():
                 'capacity_information_condition': condition,
                 'api_agent_mode': 'active', 'api_agent_count_per_group': 10,
                 'rl_agent_enabled': 1, 'rl_agent_count_per_group': 10,
+                'cash_payment_rule': BUDGET_RULE_VERSION,
             }) for condition in ('I0', 'I1')]
     old_config = SessionConfig(SESSION_CONFIGS_DICT['dynamic_bottleneck_round_demo'].copy())
     old_config.update(name='cash_legacy_fixture',
@@ -45,7 +50,7 @@ def run_framework_checks():
         totals = []
         for participant in session.get_participants():
             # Synthetic completed-round inputs; no decisions or LLM calls.
-            first = participant.get_player('dynamic_bottleneck_round', 1)
+            first = experiment.Player.objects_get(participant=participant, round_number=1)
             first.payoff = cu(4200)
             participant.vars.update(
                 dynamic_bottleneck_round_total_cost_decimal='0',
@@ -53,7 +58,7 @@ def run_framework_checks():
                 dynamic_bottleneck_round_mean_cost=0,
                 dynamic_bottleneck_round_settled_formal_rounds=30,
                 dynamic_bottleneck_round_total_payoff=4200)
-            player = participant.get_player('payment_info', 1)
+            player = payment_info.Player.objects_get(participant=participant, round_number=1)
             context = payment_info.PaymentInfo.vars_for_template(player)
             assert context['payment_rule_version'] == expected_rule
             assert context['cash_total_label'] == f'{expected_cny:.2f}'
@@ -63,7 +68,7 @@ def run_framework_checks():
             payment_info.PaymentInfo.vars_for_template(player)
             assert float(participant.payoff_plus_participation_fee()) == expected_cny
             assert participant.vars['dynamic_bottleneck_cash_payment_cents'] == expected_cny * 100
-            formal_player = participant.get_player('dynamic_bottleneck_round', 4)
+            formal_player = experiment.Player.objects_get(participant=participant, round_number=4)
             disclosure = formal_template.render(experiment.FormalStart.vars_for_template(formal_player))
             assert f'最高 {max_label} 元' in disclosure
             if expected_rule == BUDGET_RULE_VERSION:
@@ -87,12 +92,14 @@ def run_framework_checks():
 
 class CashBudgetFrameworkTests(unittest.TestCase):
     def test_two_rooms_budget_and_legacy_in_real_framework(self):
+        import otree
         with tempfile.TemporaryDirectory(prefix='cash-budget-test-') as directory:
             for name in ('_static', '_templates', '_rooms', 'access_gate',
                          'dynamic_bottleneck_round', 'dynamic_bottleneck_survey',
                          'payment_info', 'route_choice', 'single_bottleneck'):
                 Path(directory, name).symlink_to(PROJECT_ROOT / name, target_is_directory=True)
-            env = dict(os.environ, PYTHONPATH=str(PROJECT_ROOT),
+            env = dict(os.environ, PYTHONPATH=str(PROJECT_ROOT) + os.pathsep + os.environ.get('PYTHONPATH', ''),
+                CASH_EXPECTED_OTREE_SOURCE=otree.__file__,
                 DATABASE_URL='sqlite:///:memory:', OTREE_IN_MEMORY='1', OTREE_PRODUCTION='0',
                 DYNAMIC_ROOM_RELEASE_PROTOCOL='', DYNAMIC_ROOM_SYNC_DB=str(Path(directory) / 'journal.sqlite3'),
                 DYNAMIC_BOTTLENECK_API_AGENT_MODE='off', DYNAMIC_BOTTLENECK_RL_AGENT_ENABLED='0')

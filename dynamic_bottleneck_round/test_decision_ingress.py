@@ -17,6 +17,73 @@ from dynamic_bottleneck_round.decision_ingress import (
 
 
 class DecisionIngressTests(unittest.TestCase):
+    def test_native_registry_is_storage_free_and_isolates_sessions_and_pages(self):
+        from . import sync_runtime as runtime
+        from unittest.mock import patch
+        with patch.object(runtime, 'get_journal', side_effect=AssertionError('ingress journal read')), \
+                patch.object(runtime.sqlite3, 'connect', side_effect=AssertionError('ingress SQL')):
+            runtime.bind_native_round('pure_a', 1, ['PURE_A'], 9)
+            runtime.bind_native_round('pure_a', 2, ['PURE_A'], 19)
+            runtime.bind_native_round('pure_b', 1, ['PURE_B'], 9)
+            ticket = runtime.begin_native_request('PURE_A', 9)
+            self.assertTrue(runtime.native_round_pending('pure_a', 1))
+            self.assertFalse(runtime.native_round_pending('pure_a', 2))
+            self.assertFalse(runtime.native_round_pending('pure_b', 1))
+            runtime.finish_native_request(ticket, failed=True)
+            self.assertEqual(runtime.control_fault('pure_a', 1), 'decision_page_http_failure')
+            self.assertTrue(runtime.close_control_round('pure_a', 2))
+            self.assertTrue(runtime.close_control_round('pure_b', 1))
+            self.assertFalse(runtime.close_control_round('pure_a', 1))
+
+    def test_native_fault_and_close_share_boundary_including_first_request(self):
+        from . import sync_runtime as runtime
+        async def exercise(status, raised=False, closed=False):
+            code = f'NATIVE_{status}_{raised}_{closed}'
+            session = code + '_session'
+            async def app(scope, receive, send):
+                # Initialization occurs inside the first request, after ingress.
+                runtime.bind_native_round(session, 1, [code], 9, settled=closed)
+                if not closed:
+                    self.assertFalse(runtime.close_control_round(session, 1))
+                await send({'type': 'http.response.start', 'status': status})
+                if raised:
+                    raise RuntimeError('native raised')
+            async def send(message):
+                pass
+            try:
+                await DecisionIngressMiddleware(app)({'type': 'http', 'method': 'POST',
+                    'path': f'/p/{code}/dynamic_bottleneck_round/Decision/9'}, None, send)
+            except RuntimeError:
+                self.assertTrue(raised)
+            self.assertEqual(runtime.control_fault(session, 1),
+                'decision_page_http_failure' if (status >= 500 or raised) and not closed else '')
+            self.assertFalse(runtime.native_round_pending(session, 1))
+        for status, raised, closed in [(500, False, False), (200, True, False),
+                                       (200, False, False), (500, False, True)]:
+            asyncio.run(exercise(status, raised, closed))
+
+    def test_native_close_defers_normal_requests_and_runs_callback_off_loop(self):
+        from . import sync_runtime as runtime
+        import threading
+        owner = threading.get_ident()
+        callbacks = []
+        async def app(scope, receive, send):
+            runtime.bind_native_round('defer_session', 1, ['NATIVE_DEFER'], 9)
+            def close():
+                callbacks.append(threading.get_ident())
+                self.assertFalse(runtime._lock._is_owned())
+                self.assertTrue(runtime.close_control_round('defer_session', 1))
+            self.assertIsNone(runtime.close_control_round('defer_session', 1,
+                on_native_drained=close))
+            await send({'type': 'http.response.start', 'status': 302})
+        async def send(message):
+            pass
+        asyncio.run(DecisionIngressMiddleware(app)({'type': 'http', 'method': 'POST',
+            'path': '/p/NATIVE_DEFER/dynamic_bottleneck_round/Decision/9'}, None, send))
+        self.assertEqual(len(callbacks), 1)
+        self.assertNotEqual(callbacks[0], owner)
+        self.assertEqual(runtime.control_fault('defer_session', 1), '')
+
     def test_success_journal_callbacks_do_not_block_control_loop(self):
         import threading
         owner = threading.get_ident()

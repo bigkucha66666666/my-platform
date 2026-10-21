@@ -1,6 +1,10 @@
 {{ block title }}{{ round_label }}结果{{ endblock }}
 
 {{ block content }}
+{{ if results_unsettled }}
+<div class="alert alert-warning" role="status">本轮尚未完成结算，请等待同步完成。若长时间未恢复，请联系管理员；当前不展示或补填成本，也不会进入下一轮。</div>
+<script>setTimeout(function () { window.location.reload(); }, 5000);</script>
+{{ else }}
 <style>
   .result-shell {
     --ink: #18343c;
@@ -11,6 +15,7 @@
     --warm: #d96352;
     --queue: #df914b;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     color: var(--ink);
   }
@@ -206,6 +211,43 @@
     color: var(--muted);
     font-size: 13px;
     line-height: 1.55;
+  }
+
+  .ranking-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+    margin: 17px 0 12px;
+  }
+
+  .ranking-summary dt {
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .ranking-summary dd {
+    margin: 0;
+    color: var(--teal-dark);
+    font-size: 30px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+
+  .ranking-summary small {
+    display: block;
+    margin-top: 7px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  @media (max-width: 480px) {
+    .ranking-summary { grid-template-columns: 1fr; gap: 16px; }
+    .ranking-summary dd { font-size: 27px; }
   }
 
   .cost-grid {
@@ -465,6 +507,21 @@
     </div>
   </section>
 
+  {{ if cumulative_ranking.enabled }}
+  <section class="cost-card ranking-card" id="cumulative-ranking" aria-labelledby="cumulative-ranking-title">
+    <h3 id="cumulative-ranking-title">你的累计排名</h3>
+    {{ if cumulative_ranking.available }}
+    <dl class="ranking-summary">
+      <div><dt>组内排名</dt><dd>{{ if cumulative_ranking.tied_count > 1 }}并列{{ endif }}第 {{ cumulative_ranking.rank }} 名<small>组内共 {{ cumulative_ranking.actor_count }} 个主体{{ if cumulative_ranking.includes_agents }}，含真人和 Agent{{ endif }}</small></dd></div>
+      <div><dt>截至本轮平均成本</dt><dd>{{ cumulative_ranking.mean_cost }}<small>已完成 {{ cumulative_ranking.completed_rounds }} 轮正式实验</small></dd></div>
+    </dl>
+    <p class="card-note">按截至本轮的正式累计成本由低到高排名，同成本并列；热身轮不计入。平均成本显示值已四舍五入。</p>
+    {{ else }}
+    <p class="card-note" role="status">累计排名暂不可用，请联系实验员核对已完成轮次。</p>
+    {{ endif }}
+  </section>
+  {{ endif }}
+
   <section class="cost-card"><h3>成本分解</h3><p class="card-note">粗收费直接计入最终选择成本。</p><div class="cost-grid"><div class="cost-item"><span>固定行驶成本</span><strong>{{ fixed_cost }}</strong></div><div class="cost-item"><span>排队成本</span><strong>{{ queue_cost }}</strong></div><div class="cost-item"><span>早到成本</span><strong>{{ early_cost }}</strong></div><div class="cost-item"><span>晚到成本</span><strong>{{ late_cost }}</strong></div><div class="cost-item"><span>粗收费</span><strong>{{ toll_cost }}</strong></div></div></section>
 
   <section class="chart-card"><h3>所有参与者的成本分布</h3><p class="card-note">横轴为出发时间，柱高为该时间的平均最终选择成本；人数带显示选择人数，紫色虚线为当前轮所有参与者平均成本。</p><p class="chart-axis">纵轴最高 {{ cost_snapshot_axis_max_label }}</p><div class="chart-scroll"><div class="cost-chart"><div class="average-plot"><div class="average-line" data-bottom="{{ cost_snapshot_average_line_pct }}"><span class="average-label">平均成本 {{ cost_snapshot_average_cost_label }}</span></div></div>{{ for item in cost_snapshot_bars }}<div class="cost-column {{ if item.is_current }}is-current{{ endif }}"><span class="cost-value">{{ item.average_cost_label }}</span><div class="cost-track"><div class="cost-bar" data-height="{{ item.height_pct }}"></div></div><span class="count-band">{{ item.participant_count }} 人</span><span class="time-label">{{ item.departure_time }}</span><span class="current-label">{{ if item.is_current }}你的选择{{ endif }}</span></div>{{ endfor }}</div></div></section>
@@ -475,4 +532,5 @@
   document.querySelectorAll('.cost-bar').forEach(function(bar){bar.style.height=(Number(bar.dataset.height)||0)+'%';});
   const line=document.querySelector('.average-line');if(line){line.style.bottom=(Number(line.dataset.bottom)||0)+'%';}
 </script>
+{{ endif }}
 {{ endblock }}

@@ -4,16 +4,23 @@ The caller persists the returned dictionary in ``Session.vars`` under a
 round-specific key.  This module does not make a browser ACK a decision.
 """
 
+from math import isfinite
+
 PROTOCOL_VERSION = 1
 DECISION_SECONDS = 60
 RELEASE_LEAD_SECONDS = 5
 
 
-def make_round_state(*, round_number, now_ts, expected_codes):
+def make_round_state(*, round_number, now_ts, expected_codes,
+                     decision_seconds=DECISION_SECONDS):
+    decision_seconds = float(decision_seconds)
+    if not isfinite(decision_seconds) or decision_seconds <= 0:
+        raise ValueError('Decision duration must be finite and positive')
     codes = list(dict.fromkeys(expected_codes))
     return {
         'protocol': PROTOCOL_VERSION,
         'round_number': int(round_number),
+        'decision_seconds': decision_seconds,
         'phase': 'SHELL_LOADING',
         'prepare_started_ts': float(now_ts),
         'prepare_deadline_ts': float(now_ts) + (120 if int(round_number) == 1 else 60),
@@ -65,7 +72,7 @@ def release_if_ready(state, *, now_ts):
         return False
     release_ts = float(now_ts) + RELEASE_LEAD_SECONDS
     state['release_ts'] = release_ts
-    state['deadline_ts'] = release_ts + DECISION_SECONDS
+    state['deadline_ts'] = release_ts + state.get('decision_seconds', DECISION_SECONDS)
     state['phase'] = 'ARMED'
     return True
 
@@ -96,7 +103,7 @@ def expire_preparation(state, *, now_ts, pending_codes, drain_limit_seconds=None
     state['excluded_codes'] = sorted(missing)
     release_ts = float(now_ts) + RELEASE_LEAD_SECONDS
     state['release_ts'] = release_ts
-    state['deadline_ts'] = release_ts + DECISION_SECONDS
+    state['deadline_ts'] = release_ts + state.get('decision_seconds', DECISION_SECONDS)
     state['phase'] = 'ARMED'
     return True
 

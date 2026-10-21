@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 import re
 import unittest
 from urllib.parse import urlencode
@@ -53,10 +54,28 @@ def run_scenario(scenario):
         if expected_source:
             assert Path(otree.__file__).resolve() == Path(expected_source).resolve()
         print(f'isolated oTree {otree.__version__}: {otree.__file__}; cwd={directory}', flush=True)
-        for name in ('_static', '_rooms', 'access_gate', 'dynamic_bottleneck_round',
+        from otree.database import engine
+        assert engine.url.get_backend_name() == 'sqlite'
+        assert Path(engine.url.database).resolve() == Path(directory, 'db.sqlite3').resolve()
+        for name in ('_static', '_templates', '_rooms', 'access_gate', 'dynamic_bottleneck_round',
                      'dynamic_bottleneck_survey', 'payment_info', 'route_choice', 'single_bottleneck'):
             Path(name).symlink_to(PROJECT_ROOT / name, target_is_directory=True)
-        if scenario == 'edges':
+        if scenario in {'timeout_redirect', 'timeout_first', 'admin_advance_guard', 'unsettled_results'}:
+            from dynamic_bottleneck_round.timeout_worker_scenarios import check_scenario
+            check_scenario(scenario, helper, control_request)
+        elif scenario == 'adaptive_window':
+            from dynamic_bottleneck_round.test_adaptive_window import check_adaptive_market_orm
+            check_adaptive_market_orm()
+        elif scenario == 'cumulative_ranking':
+            from dynamic_bottleneck_round.test_result_ranking import check_cumulative_ranking_orm
+            check_cumulative_ranking_orm(http_request)
+        elif scenario == 'hybrid_payment':
+            from payment_info.test_rank_payment import check_hybrid_payment_orm
+            check_hybrid_payment_orm()
+        elif scenario == 'staged_timing':
+            from dynamic_bottleneck_round.test_staged_timing import check_frozen_staged_timing
+            check_frozen_staged_timing(http_request, control_request)
+        elif scenario == 'edges':
             check_edges()
         elif scenario == 'decision_failure':
             check_edges(failure=True)
@@ -64,6 +83,11 @@ def run_scenario(scenario):
             check_edges(pending=True)
         elif scenario == 'receipt_race':
             check_edges(race=True)
+        elif scenario in {'form_receipt_race', 'late_native_failure', 'native_recovery',
+                          'third_miss_recovery', 'pending_native_manual', 'admitted_export',
+                          'concurrent_native', 'first_native_failure', 'third_miss_unrecovered',
+                          'excluded_form_race'}:
+            check_edges(native_case=scenario)
         elif scenario in {'control_failure', 'control_fault_race', 'control_anomaly_unavailable',
                           'worker_overrun_after_native_block'}:
             check_edges(control_fault=scenario)
@@ -83,7 +107,7 @@ def run_scenario(scenario):
                 full_flow=scenario == 'full_flow', mixed_conditions=scenario == 'mixed')
 
 
-def check_edges(*, failure=False, pending=False, race=False, control_fault=None):
+def check_edges(*, failure=False, pending=False, race=False, control_fault=None, native_case=None):
     from otree.main import setup
     setup()
     import project_asgi
@@ -118,6 +142,63 @@ def check_edges(*, failure=False, pending=False, race=False, control_fault=None)
             f'/p/{code}/dynamic_bottleneck_round/Decision/{index}', method='POST',
             body=urlencode({'departure_minute': minute}).encode())
     async def exercise():
+        if native_case == 'excluded_form_race':
+            from unittest.mock import patch
+            tokens = []
+            # This actor never rendered a shell. A late native POST is not
+            # evidence that they were present before preparation expired.
+            for code in codes[1:]:
+                status, content, error = await http_request(project_asgi.app,
+                    f'/p/{code}/dynamic_bottleneck_round/Decision/{index}')
+                assert status == 200, error
+                token = re.search(r'data-control-token="([^"]+)"', content).group(1)
+                assert (await control_request(project_asgi.app, token, {'kind': 'ack'}))[0] == 200
+                tokens.append(token)
+            ref = player(codes[0])
+            prior_minute = e.departure_schedule_for_player(ref)['first_departure_minute']
+            e.set_dropout_runtime_var(ref, 'last_manual_departure_minute', prior_minute)
+            db.commit()
+            j = runtime.get_journal()
+            with j._connection(write=True) as connection:
+                record, original = j._load(connection, session_code, 1)
+                record['state']['prepare_deadline_ts'] = time.time() - 1
+                j._save(connection, session_code, 1, record, original)
+            original = e.Decision.error_message
+            def exclude_during_validation(p, values):
+                assert codes[0] not in j.state(session_code, 1)['excluded_codes']
+                status, result = asyncio.run(control_request(project_asgi.app, tokens[0],
+                    {'kind': 'status'}))
+                assert status == 200 and not result['technical_anomaly'], result
+                assert codes[0] in j.state(session_code, 1)['excluded_codes']
+                assert j.receipt(session_code, 1, codes[0]) is None
+                return original(p, values)
+            with patch.object(e.Decision, 'error_message', side_effect=exclude_during_validation):
+                status, _, error = await post(codes[0], 475)
+            assert status == 302, error
+            ref = player(codes[0])
+            assert not e.player_has_departure_choice(ref), 'unconfirmed native form value must be discarded'
+            assert e.participant_dropout_active(ref), 'excluded native form without a control receipt must enter recovery'
+            assert _get_session_lookups(session_code)[ref.participant._index_in_pages].page_class.__name__ == 'RecoveryGate'
+            e.fill_missing_choices(ref.group)
+            assert ref.departure_minute == prior_minute, ref.departure_minute
+            assert ref.decision_source == e.DECISION_SOURCE_DISCONNECT_AUTO
+            assert ref.dropout_event == 'disconnect'
+            return
+        if native_case == 'first_native_failure':
+            from unittest.mock import patch
+            original = e.Decision.vars_for_template
+            def first_failure(p):
+                original(p)
+                raise RuntimeError('first shell fails after initializing identity')
+            with patch.object(e.Decision, 'vars_for_template', side_effect=first_failure):
+                status, _, error = await http_request(project_asgi.app,
+                    f'/p/{codes[0]}/dynamic_bottleneck_round/Decision/{index}')
+            assert status == 500, (status, error)
+            assert runtime.control_fault(session_code, 1) == 'decision_page_http_failure'
+            ref = player(codes[0])
+            assert e.sync_integration.state(ref)['technical_anomaly']
+            assert not e.set_results(ref.group)
+            return
         tokens = []
         for code in codes:
             status, content, error = await http_request(project_asgi.app,
@@ -128,6 +209,167 @@ def check_edges(*, failure=False, pending=False, race=False, control_fault=None)
             status, result = await control_request(project_asgi.app, token, {'kind': 'ack'})
             assert status == 200 and result['acknowledged'], result
         arm(time.time() + 55)
+        if native_case == 'admitted_export':
+            from unittest.mock import patch
+            j = runtime.get_journal()
+            original = j.exchange
+            payload = runtime.verify_control_token(tokens[0])
+            def fault_before_transaction(*args, **kwargs):
+                runtime.latch_control_fault(payload, 'decision_control_queue_overrun')
+                runtime.persist_control_fault(session_code, 1)
+                return original(*args, **kwargs)
+            with patch.object(j, 'exchange', side_effect=fault_before_transaction):
+                status, result = await control_request(project_asgi.app, tokens[0],
+                    {'kind': 'decision', 'departure_minute': 474})
+            assert status == 503, result
+            audit = j.audit(session_code, 1, codes[0])['admitted_decision']
+            assert audit['kind'] == 'manual' and audit['departure_minute'] == 474
+            assert 'admitted_decision' not in result and 'shell_token' not in result
+            ref = player(codes[0])
+            metadata = e.room_release_export_metadata(ref)
+            for field, value in audit.items():
+                assert metadata.get('room_release_admitted_' + field) == value, (field, metadata)
+            assert metadata['room_release_exclude_behavior']
+            assert metadata['room_release_receipt_kind'] == ''
+            e.sync_integration.import_manual(ref, reconcile_form=True)
+            assert not e.player_has_departure_choice(ref)
+            assert not e.set_results(ref.group)
+            # Round 1 is warmup and correctly omitted by custom_export.
+            row = e.export_row_for_player(ref)
+            agent_row = e.export_row_for_agent_record({}, ref)
+            for field, value in audit.items():
+                name = 'room_release_admitted_' + field
+                assert row[e.EXPORT_HEADERS.index(name)] == value
+                assert agent_row[e.EXPORT_HEADERS.index(name)] == ''
+            return
+        if native_case == 'concurrent_native':
+            import threading
+            from unittest.mock import patch
+            for token in tokens:
+                assert (await control_request(project_asgi.app, token,
+                    {'kind': 'decision', 'departure_minute': 474}))[0] == 200
+            assert (await post(codes[0], 474))[0] == 302
+            entered, release = threading.Event(), threading.Event()
+            original = e.Decision.error_message
+            def block_native(p, values):
+                if p.participant.code == codes[1]:
+                    entered.set()
+                    assert release.wait(5)
+                return original(p, values)
+            path = f'/p/{codes[0]}/dynamic_bottleneck_round/ResultsSync/{index + 2}'
+            with patch.object(e.Decision, 'error_message', side_effect=block_native):
+                first = asyncio.create_task(post(codes[1], 475))
+                assert await asyncio.to_thread(entered.wait, 2)
+                result_request = asyncio.create_task(http_request(project_asgi.app, path))
+                second = asyncio.create_task(post(codes[2], 475))
+                await asyncio.sleep(0)
+                assert runtime.native_round_pending(session_code, 1)
+                release.set()
+                outputs = await asyncio.gather(first, second, result_request)
+            assert [item[0] for item in outputs] == [302, 302, 200], outputs
+            status, _, error = await http_request(project_asgi.app, path)
+            assert status == 200, error
+            state = runtime.get_journal().state(session_code, 1)
+            assert state['settled'] and not state['technical_anomaly'], state
+            for code in codes:
+                ref = player(code)
+                assert ref.departure_minute == 474 and ref.decision_source == e.DECISION_SOURCE_MANUAL
+            # A failed actual historical HTTP replay cannot contaminate closure.
+            business = project_asgi.app.app.app
+            async def historical_500(scope, receive, send):
+                await send({'type': 'http.response.start', 'status': 500})
+                await send({'type': 'http.response.body', 'body': b'old replay failure'})
+            with patch.object(business, 'app', side_effect=historical_500):
+                assert (await post(codes[0], 475))[0] == 500
+            assert runtime.get_journal().state(session_code, 1) == state
+            assert runtime.control_fault(session_code, 1) == ''
+            return
+        if native_case == 'form_receipt_race':
+            from unittest.mock import patch
+            original = e.Decision.error_message
+            def validate(p, values):
+                status, result = asyncio.run(control_request(project_asgi.app, tokens[0],
+                    {'kind': 'decision', 'departure_minute': 474}))
+                assert status == 200, result
+                return original(p, values)
+            with patch.object(e.Decision, 'error_message', side_effect=validate):
+                status, _, error = await post(codes[0], 475)
+            assert status == 302, error
+            saved = player(codes[0])
+            assert saved.departure_minute == 474, saved.departure_minute
+            assert saved.decision_source == e.DECISION_SOURCE_MANUAL
+            assert saved.participant.vars['last_manual_departure_minute'] == 474
+            return
+        if native_case == 'late_native_failure':
+            from unittest.mock import patch
+            arm(time.time() - 11)
+            with patch.object(e.Decision, 'error_message', side_effect=RuntimeError('late native failure')):
+                status, _, error = await post(codes[1], 474)
+            assert status == 500, (status, error)
+            ref = player(codes[0])
+            assert not e.set_results(ref.group), 'post-deadline native 500 must block settlement'
+            assert runtime.get_journal().state(session_code, 1)['technical_anomaly'] == 'decision_page_http_failure'
+            return
+        if native_case in {'native_recovery', 'third_miss_recovery', 'pending_native_manual', 'third_miss_unrecovered'}:
+            if native_case in {'third_miss_recovery', 'third_miss_unrecovered'}:
+                ref = player(codes[1])
+                e.set_dropout_runtime_var(ref, 'consecutive_missed_decisions', 2)
+                db.commit()
+            arm(time.time() - 1)
+            status, r = await control_request(project_asgi.app, tokens[1],
+                {'kind': 'decision', 'departure_minute': 475})
+            assert status == 200 and r['decision_kind'] == 'late', r
+            payload = runtime.verify_control_token(tokens[1])
+            ticket = runtime.register_pending(payload, 'decision', time.time() - 2) if native_case == 'pending_native_manual' else None
+            try:
+                status, content, error = await post(codes[1], 475)
+                if ticket:
+                    assert status == 200, 'pending earlier manual must keep native Decision on page'
+                    ref = player(codes[1])
+                    assert not e.participant_dropout_active(ref)
+                    assert not e.player_has_departure_choice(ref)
+                    return
+                assert status == 302, (status, error)
+            finally:
+                if ticket:
+                    runtime.finish_pending(ticket)
+            ref = player(codes[1])
+            part = ref.participant
+            info = _get_session_lookups(session_code)[part._index_in_pages]
+            assert info.page_class.__name__ == 'RecoveryGate', info.page_class.__name__
+            path = f'/p/{codes[1]}/dynamic_bottleneck_round/RecoveryGate/{part._index_in_pages}'
+            status, content, error = await http_request(project_asgi.app, path)
+            assert status == 200 and '等待系统补选' in content, (status, error)
+            if native_case == 'third_miss_unrecovered':
+                arm(time.time() - 11)
+                ref = player(codes[1])
+                e.fill_suspended_choices(ref.group)
+                assert not e.player_has_departure_choice(ref), 'new third miss remains eligible this round'
+                assert e.set_results(ref.group)
+                assert ref.decision_source == e.DECISION_SOURCE_TIMEOUT_AUTO
+                assert e.participant_dropout_suspended(ref)
+                assert e.participant_var(ref, 'consecutive_missed_decisions') == 3
+                return
+            # Outside native HTTP, a missing request snapshot is not permission
+            # to erase a real preexisting automatic choice.
+            preserved = player(codes[1])
+            prior_minute = e.departure_schedule_for_player(preserved)['first_departure_minute']
+            e.set_player_departure_choice(preserved, prior_minute, e.DECISION_SOURCE_DISCONNECT_AUTO)
+            e.sync_integration.import_manual(preserved, reconcile_form=True)
+            e.Decision.before_next_page(preserved, False)
+            assert preserved.departure_minute == prior_minute
+            db.rollback()
+            status, _, error = await http_request(project_asgi.app, path, method='POST')
+            assert status == 302, (status, error)
+            ref = player(codes[1])
+            assert not e.participant_dropout_active(ref)
+            assert _get_session_lookups(session_code)[ref.participant._index_in_pages].page_class.__name__ == 'ResultsSync'
+            arm(time.time() - 11)
+            assert e.set_results(ref.group)
+            assert ref.decision_source == e.DECISION_SOURCE_TIMEOUT_AUTO, ref.decision_source
+            assert not e.participant_dropout_active(ref), 'drain must not reopen confirmed recovery'
+            assert ref.dropout_event == 'timeout'
+            return
         if control_fault == 'worker_overrun_after_native_block':
             import concurrent.futures
             import threading
@@ -607,6 +849,8 @@ def check_readonly_export():
             row = dict(zip(e.EXPORT_HEADERS, e.export_row_for_player(p)))
             assert row['room_release_protocol'] == 2
             assert row['room_release_prepare_started_ts'] == '', 'export must not start a future prepare clock'
+            assert all(row[name] == '' for name in e.ROOM_RELEASE_EXPORT_FIELDS
+                       if name.startswith('room_release_admitted_'))
         assert current._vars[e.sync_integration.ROUNDS_VAR] == [4]
         with j._connection() as connection:
             assert connection.execute('SELECT count(*) FROM sync_rounds').fetchone()[0] == 1
@@ -622,17 +866,96 @@ def check_readonly_export():
 
 
 class RoomSyncFrameworkTests(unittest.TestCase):
+    def test_real_timeout_post_redirect_does_not_become_browser_shell(self):
+        self.run_check('timeout_redirect')
+
+    def test_real_timeout_first_visitor_does_not_start_prepare_clock(self):
+        self.run_check('timeout_first')
+
+    def test_admin_advance_rejects_v2_without_partial_progress(self):
+        self.run_check('admin_advance_guard')
+
+    def test_unsettled_results_never_render_fake_costs(self):
+        self.run_check('unsettled_results')
+
+    def test_exclusion_during_validation_discards_unconfirmed_form_value(self):
+        self.run_check('excluded_form_race')
+
+    def test_admitted_private_audit_exports_without_manual_authority(self):
+        self.run_check('admitted_export')
+
+    def test_concurrent_native_posts_results_and_historical_replay(self):
+        self.run_check('concurrent_native')
+
+    def test_first_native_http_initializes_fault_mapping(self):
+        self.run_check('first_native_failure')
+
+    def test_new_third_miss_is_not_suspended_proxy_before_recovery(self):
+        self.run_check('third_miss_unrecovered')
+
+    def test_form_population_race_consumes_canonical_receipt(self):
+        self.run_check('form_receipt_race')
+
+    def test_post_deadline_native_failure_blocks_settlement(self):
+        self.run_check('late_native_failure')
+
+    def test_late_native_post_enters_and_completes_recovery(self):
+        self.run_check('native_recovery')
+
+    def test_third_miss_stays_timeout_after_recovery_and_drain(self):
+        self.run_check('third_miss_recovery')
+
+    def test_pending_manual_blocks_late_native_progression(self):
+        self.run_check('pending_native_manual')
+
     def run_check(self, scenario):
         import otree
         env = dict(os.environ, PYTHONPATH=str(PROJECT_ROOT) + os.pathsep + os.environ.get('PYTHONPATH', ''), DATABASE_URL='sqlite:///db.sqlite3',
             OTREE_IN_MEMORY='', DYNAMIC_ROOM_RELEASE_PROTOCOL='2',
             DYNAMIC_ROOM_RELEASE_DRAIN_SECONDS='10', ROOM_SYNC_EXPECTED_OTREE_SOURCE=otree.__file__)
-        result = subprocess.run([sys.executable, str(Path(__file__).resolve()), '--scenario', scenario],
-            env=env, capture_output=True, text=True, timeout=700 if scenario == 'full_flow' else 150)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        command = [sys.executable, str(Path(__file__).resolve()), '--scenario', scenario]
+        if scenario == 'full_flow':
+            # 80 actors x 33 rounds plus ORM-backed surveys/payment can exceed
+            # 700s on one local CPU. This is a harness wall-time limit, never
+            # the experiment's preparation, 60s decision or drain deadline.
+            # Stream actual round milestones into the evidence log too.
+            with subprocess.Popen(command, env=env, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, text=True) as process:
+                output = []
+                def capture():
+                    for line in process.stdout:
+                        output.append(line)
+                        print(line, end='', flush=True)
+                reader = threading.Thread(target=capture, daemon=True)
+                reader.start()
+                try:
+                    code = process.wait(timeout=1200)
+                except BaseException:
+                    process.kill()
+                    process.wait()
+                    raise
+                finally:
+                    reader.join(5)
+                self.assertFalse(reader.is_alive(), 'test log reader did not stop')
+                self.assertEqual(code, 0, ''.join(output))
+        else:
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=150)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_v2_get_ack_receipt_native_post_and_h_ha_results(self):
         self.run_check('smoke')
+
+    def test_staged_timing_boundaries_with_real_orm_and_result_timeouts(self):
+        self.run_check('staged_timing')
+
+    def test_adaptive_window_and_late4_with_real_pilot_markets(self):
+        self.run_check('adaptive_window')
+
+    def test_cumulative_ranking_with_real_mixed_markets_and_result_http(self):
+        self.run_check('cumulative_ranking')
+
+    def test_hybrid_rank_payment_after_all_formal_mixed_market_rounds(self):
+        self.run_check('hybrid_payment')
 
     def test_canonical_native_validation_late_and_direct_settlement_drain(self):
         self.run_check('edges')
@@ -697,6 +1020,8 @@ class RoomSyncFrameworkTests(unittest.TestCase):
         values = experiment.room_release_export_metadata(player)
         self.assertEqual(values.get('room_release_receipt_ingress_ts'), '')
         self.assertEqual(values.get('room_release_receipt_kind'), '')
+        self.assertTrue(all(values[name] == '' for name in experiment.ROOM_RELEASE_EXPORT_FIELDS
+                            if name.startswith('room_release_admitted_')))
 
 
 if __name__ == '__main__':

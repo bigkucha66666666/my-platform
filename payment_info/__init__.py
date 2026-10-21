@@ -1,7 +1,7 @@
 from otree.api import *
 
 from .cash_payment import (
-    BASE_CENTS, calculate_cash_payment, cash_payment_description, cash_rule_for_version,
+    BASE_CENTS, RANK_RULE_VERSION, calculate_cash_payment, cash_payment_description, cash_rule_for_version,
 )
 
 
@@ -108,6 +108,19 @@ def dynamic_cash_payment_for_player(player: Player):
     participant = player.participant
     if 'dynamic_bottleneck_round_total_cost_decimal' not in participant.vars:
         _restore_formal_cost_if_available(participant)
+    ranking = None
+    if rule_version == RANK_RULE_VERSION:
+        from dynamic_bottleneck_round.result_ranking import (
+            RANKING_RESULTS_VAR, ranking_enabled, saved_vars,
+        )
+        if not ranking_enabled(player.session):
+            return None
+        history = saved_vars(participant).get(RANKING_RESULTS_VAR, {})
+        ranking = history.get('33') if isinstance(history, dict) else None
+        schedule = saved_vars(participant).get('dynamic_bottleneck_round_departure_schedule', {})
+        if (not isinstance(ranking, dict) or not isinstance(schedule, dict)
+                or schedule.get('players_count') != ranking.get('actor_count')):
+            return None
     try:
         return calculate_cash_payment(
             rule_version=rule_version,
@@ -118,6 +131,7 @@ def dynamic_cash_payment_for_player(player: Player):
             formal_rounds=participant.vars.get(
                 'dynamic_bottleneck_round_settled_formal_rounds'
             ),
+            ranking=ranking,
         )
     except ValueError:
         return None
@@ -142,12 +156,21 @@ def settle_dynamic_cash_payment(player: Player):
         participant.vars['dynamic_bottleneck_cash_bonus_cents'] = 0
         participant.vars.pop('dynamic_bottleneck_cash_payment_cents', None)
         participant.vars['dynamic_bottleneck_cash_payment_status'] = 'manual_review'
+        participant.vars.pop('dynamic_bottleneck_cash_rank_breakdown', None)
         player.payoff = -prior_points
         return
 
     participant.vars['dynamic_bottleneck_cash_bonus_cents'] = payment.bonus_cents
     participant.vars['dynamic_bottleneck_cash_payment_cents'] = payment.total_cents
     participant.vars['dynamic_bottleneck_cash_payment_status'] = 'settled'
+    if payment.rule_version == RANK_RULE_VERSION:
+        participant.vars['dynamic_bottleneck_cash_rank_breakdown'] = dict(
+            cost_bonus_cents=payment.cost_bonus_cents,
+            rank_bonus_cents=payment.rank_bonus_cents,
+            rank=payment.rank, tied_count=payment.rank_tied_count,
+            actor_count=payment.rank_actor_count,
+            midpoint=str(payment.rank_midpoint), percentile=str(payment.rank_percentile),
+        )
     player.payoff = cu(payment.bonus_cents) - prior_points
 
 
@@ -217,6 +240,15 @@ class PaymentInfo(Page):
                 formal_mean_cost_label=(f'{payment.mean_cost:.2f}' if payment else ''),
                 payment_rule_version=saved_rule,
                 cash_payment_description=description,
+                cash_is_rank_based=saved_rule == RANK_RULE_VERSION,
+                cash_cost_bonus_label=(format_cash_cents(payment.cost_bonus_cents) if payment else ''),
+                cash_rank_bonus_label=(format_cash_cents(payment.rank_bonus_cents) if payment else ''),
+                cash_rank=(payment.rank if payment else ''),
+                cash_rank_tied=(bool(payment and payment.rank_tied_count > 1)
+                    if saved_rule == RANK_RULE_VERSION else False),
+                cash_rank_actor_count=(payment.rank_actor_count if payment else ''),
+                cash_rank_midpoint=(str(payment.rank_midpoint) if payment else ''),
+                cash_rank_includes_agents=bool(payment and payment.rank_includes_agents),
             )
         return context
 
@@ -240,6 +272,13 @@ PAYMENT_EXPORT_HEADERS = [
     'max_total_cny',
     'budget_human_limit',
     'budget_total_cny',
+    'cost_bonus_cny',
+    'rank_bonus_cny',
+    'final_rank',
+    'rank_tied_count',
+    'rank_actor_count',
+    'rank_midpoint',
+    'rank_percentile',
 ]
 
 
@@ -259,6 +298,9 @@ def custom_export(players):
             rule = cash_rule_for_version(vars.get('dynamic_bottleneck_cash_payment_rule')) if dynamic_cash else None
         except ValueError:
             rule = None
+        breakdown = vars.get('dynamic_bottleneck_cash_rank_breakdown', {}) if dynamic_cash else {}
+        if not isinstance(breakdown, dict) or not rule or rule.version != RANK_RULE_VERSION or status != 'settled':
+            breakdown = {}
         yield [
             player.session.code,
             participant.code,
@@ -278,6 +320,13 @@ def custom_export(players):
             format_cash_cents(rule.max_total_cents) if rule else '',
             rule.budget_human_limit if rule and rule.budget_human_limit is not None else '',
             format_cash_cents(rule.budget_total_cents) if rule and rule.budget_total_cents is not None else '',
+            format_cash_cents(breakdown['cost_bonus_cents']) if breakdown else '',
+            format_cash_cents(breakdown['rank_bonus_cents']) if breakdown else '',
+            breakdown.get('rank', ''),
+            breakdown.get('tied_count', ''),
+            breakdown.get('actor_count', ''),
+            breakdown.get('midpoint', ''),
+            breakdown.get('percentile', ''),
         ]
 
 

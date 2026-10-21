@@ -139,7 +139,7 @@ uncertainTimers.at(-1).fn();
 assert.equal(uncertainClicks, 1);
 console.log('room release admission and delayed-response clock checks passed');
 
-// Protocol 2 serializes control operations and retains a failed choice for retry.
+// Protocol 2 sends decision independently and retains a failed choice for retry.
 const v2calls = [], v2timers = [];
 let formHandler, nativePosts = 0;
 const v2form = {addEventListener(kind, fn) { if (kind === 'submit') formHandler = fn; },
@@ -162,7 +162,7 @@ v2window.DynamicBottleneckRelease.start();
 assert.equal(v2calls.length, 1, 'v2 must send control ACK');
 formHandler({preventDefault() {}});
 v2elements['departure-minute'].value = '475';
-assert.equal(v2calls.length, 1, 'decision waits for ACK');
+assert.equal(v2calls.length, 2, 'decision starts independently of ACK');
 (async () => {
   v2calls[0].resolve({ok: true, json: async () => ({...armed,
     clock_id: v2calls[0].data.clock_id, clock_token: v2calls[0].data.clock_token})});

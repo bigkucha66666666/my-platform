@@ -9,6 +9,7 @@ import re
 import sqlite3
 import threading
 import uuid
+from collections import deque
 from functools import lru_cache
 from contextlib import closing, contextmanager
 
@@ -19,6 +20,10 @@ _identity = None
 _file_identity = None
 _active = False
 _pending = {}
+_admitted_requests = {}
+_decision_queues = {}
+_dispatch = {}
+_admission_serial = 0
 # Authorization metadata only. Choices, clocks and settlement remain in SQLite.
 # Refuse further issuance at the bound rather than evicting a live capability.
 _controls = {}
@@ -26,6 +31,49 @@ _MAX_CONTROLS = 32768
 _faults = {}
 _faults_to_persist = set()
 _settlement_closed = set()
+_native_pages = {}
+_native_requests = {}
+_native_close_callbacks = {}
+
+
+def bind_native_round(session_code, round_number, participant_codes, page_index, *, settled=False):
+    """Business-validated association only; no model objects cross this boundary."""
+    key = session_code, round_number
+    with _lock:
+        if settled:
+            _settlement_closed.add(key)
+        if key in _settlement_closed:
+            return
+        for code in participant_codes:
+            _native_pages[(code, page_index)] = key
+
+
+def begin_native_request(participant_code, page_index):
+    ticket = object()
+    with _lock:
+        _native_requests[ticket] = participant_code, page_index
+    return ticket
+
+
+def native_round_pending(session_code, round_number):
+    with _lock:
+        return any(_native_pages.get(identity) == (session_code, round_number)
+                   for identity in _native_requests.values())
+
+
+def finish_native_request(ticket, *, failed):
+    """Latch failure before releasing ownership; return worker-only callbacks."""
+    with _lock:
+        identity = _native_requests.get(ticket)
+        key = _native_pages.get(identity)
+        if key is not None and failed:
+            latch_control_fault(dict(session_code=key[0], round_number=key[1]),
+                                'decision_page_http_failure')
+        _native_requests.pop(ticket, None)
+        if key is not None and not native_round_pending(*key):
+            callback = _native_close_callbacks.pop(key, None)
+            return (callback,) if callback else ()
+        return ()
 
 
 def get_journal():
@@ -181,7 +229,7 @@ def persist_control_fault(session_code, round_number):
     return reason
 
 
-def close_control_round(session_code, round_number):
+def close_control_round(session_code, round_number, *, on_native_drained=None):
     """Atomic final control boundary, called after successful native commit.
 
     No database work under this lock. Later replay failures cannot invalidate a
@@ -191,7 +239,15 @@ def close_control_round(session_code, round_number):
     with _lock:
         if key in _faults or any((s, n) == key for s, n, *_ in _pending.values()):
             return False
+        if native_round_pending(session_code, round_number):
+            if on_native_drained is not None:
+                _native_close_callbacks[key] = on_native_drained
+                return None
+            return False
         _settlement_closed.add(key)
+        _native_close_callbacks.pop(key, None)
+        for identity in [identity for identity, mapped in _native_pages.items() if mapped == key]:
+            _native_pages.pop(identity, None)
         return True
 
 
@@ -252,7 +308,60 @@ def register_pending(payload, kind, arrival):
 
 def finish_pending(ticket):
     with _lock:
-        _pending.pop(ticket, None)
+        pending = _pending.pop(ticket, None)
+        _admitted_requests.pop(ticket, None)
+        _dispatch.pop(ticket, None)
+        if pending is not None:
+            key = pending[:3]
+            queue = _decision_queues.get(key)
+            if queue is not None and queue[0] is ticket:
+                queue.popleft()
+                if queue:
+                    return _dispatch[queue[0]]
+                del _decision_queues[key]
+
+
+def admit_control_work(ticket, payload, data, arrival, dispatch):
+    """Bind server admission and choose a runnable head; never execute under lock.
+
+    Called only by the validated complete-body boundary after obtaining a slot.
+    A ticket is an opaque in-process capability, never accepted from request JSON.
+    """
+    global _admission_serial
+    with _lock:
+        _admission_serial += 1
+        key = (payload['session_code'], payload['round_number'])
+        _admitted_requests[ticket] = (
+            _control_identity(payload), data['kind'], data.get('departure_minute'),
+            arrival, key not in _faults and key not in _settlement_closed, _admission_serial)
+        if data['kind'] != 'decision':
+            return dispatch
+        actor = (*key, payload['participant_code'])
+        queue = _decision_queues.setdefault(actor, deque())
+        queue.append(ticket)
+        _dispatch[ticket] = dispatch
+        return dispatch if len(queue) == 1 else None
+
+
+def admitted_before_fault(ticket, payload, data, arrival):
+    with _lock:
+        return _admitted_requests.get(ticket, ())[:5] == (
+            _control_identity(payload), data['kind'], data.get('departure_minute'),
+            arrival, True)
+
+
+def admission_checkpoint():
+    """Pure serial boundary for durable faults; no wall-clock ordering guesses."""
+    with _lock:
+        return {'boot_id': PROCESS_BOOT_ID, 'serial': _admission_serial}
+
+
+def admission_precedes_checkpoint(ticket, checkpoint):
+    with _lock:
+        admitted = _admitted_requests.get(ticket)
+        return bool(admitted and checkpoint
+                    and checkpoint.get('boot_id') == PROCESS_BOOT_ID
+                    and admitted[-1] <= checkpoint.get('serial', -1))
 
 
 def pending_control_codes(session_code, round_number, *, kind, before_ts=float('inf')):
@@ -271,6 +380,12 @@ def reset_runtime():
         _journal = _identity = _file_identity = None
         _active = False
         _controls.clear()
+        _admitted_requests.clear()
+        _decision_queues.clear()
+        _dispatch.clear()
         _faults.clear()
         _faults_to_persist.clear()
         _settlement_closed.clear()
+        _native_pages.clear()
+        _native_requests.clear()
+        _native_close_callbacks.clear()

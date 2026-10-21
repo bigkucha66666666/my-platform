@@ -12,7 +12,7 @@ import re
 import sqlite3
 
 from .room_release import (
-    acknowledge_shell, admission_kind, expire_preparation, make_round_state,
+    DECISION_SECONDS, acknowledge_shell, admission_kind, expire_preparation, make_round_state,
     mark_shell_rendered, release_if_ready,
 )
 
@@ -94,17 +94,21 @@ class SyncJournal:
             return
         record['state']['technical_anomaly'] = str(reason)
         record['state']['phase'] = 'TECHNICAL_ANOMALY'
+        from . import sync_runtime as runtime
+        record['admission_fault_boundary'] = runtime.admission_checkpoint()
 
     def ensure_round(self, session_code, round_number, *, expected_codes, now_ts,
                      decision_page_index, drain_limit_seconds, information_condition,
                      allowed_minutes, actual_capacity_display=None,
-                     capacity_level_label=None, boot_id=None):
+                     capacity_level_label=None, boot_id=None,
+                     decision_seconds=DECISION_SECONDS):
         with self._connection(write=True) as connection:
             row = connection.execute('SELECT record FROM sync_rounds '
                 'WHERE session_code=? AND round_number=?', (session_code, round_number)).fetchone()
             if row is None:
                 state = make_round_state(round_number=round_number, now_ts=now_ts,
-                                         expected_codes=expected_codes)
+                                         expected_codes=expected_codes,
+                                         decision_seconds=decision_seconds)
                 state.update(protocol=SYNC_PROTOCOL_VERSION,
                              decision_page_index=decision_page_index,
                              drain_limit_seconds=drain_limit_seconds,
@@ -297,6 +301,49 @@ class SyncJournal:
             record, _ = self._load(connection, session_code, round_number)
             return deepcopy(record['participants'].get(participant_code, {}).get('receipt'))
 
+    def retain_admitted_decision(self, payload, data, arrival, *, admission_ticket):
+        """Retain first eligible pre-fault evidence, never a confirmed receipt.
+
+        Only a live, bound server admission ticket grants this permission. This
+        audit cannot advance state, replace a receipt, or heal an anomaly.
+        """
+        from . import sync_runtime as runtime
+        if data['kind'] != 'decision' or not runtime.admitted_before_fault(
+                admission_ticket, payload, data, arrival):
+            raise SyncRequestRejected('no server admission capability')
+        session, number, code = (payload[key] for key in
+                                ('session_code', 'round_number', 'participant_code'))
+        with self._connection(write=True) as connection:
+            record, original = self._load(connection, session, number)
+            state = record['state']
+            registered = connection.execute('SELECT page_index FROM sync_shells WHERE session_code=? '
+                'AND round_number=? AND participant_code=? AND shell_token=?',
+                (session, number, code, payload['shell_token'])).fetchone()
+            if (registered != (payload['page_index'],)
+                    or payload['page_index'] != state['decision_page_index']
+                    or type(data.get('departure_minute')) is not int
+                    or data['departure_minute'] not in record['private']['allowed_minutes']):
+                raise SyncRequestRejected('invalid admitted identity or choice')
+            if state['settled']:
+                return
+            if state['technical_anomaly'] and not runtime.admission_precedes_checkpoint(
+                    admission_ticket, record.get('admission_fault_boundary')):
+                # Older records without this boundary fail closed. An anomaly
+                # already durable before admission cannot confer audit rights.
+                return
+            eligibility = dict(state, technical_anomaly='')
+            kind = admission_kind(eligibility, code, arrival)
+            if kind not in {'manual', 'late', 'excluded'}:
+                return
+            participant = self._participant(record, code)
+            previous = participant.get('admitted_decision')
+            if previous is None or (previous['kind'] != 'manual' and kind == 'manual'):
+                participant['admitted_decision'] = {
+                    'kind': kind, 'departure_minute': data['departure_minute'],
+                    'ingress_ts': arrival, 'shell_token': payload['shell_token'],
+                    'page_index': payload['page_index']}
+                self._save(connection, session, number, record, original)
+
     def audit(self, session_code, round_number, participant_code):
         with self._connection() as connection:
             record, _ = self._load(connection, session_code, round_number)
@@ -308,6 +355,7 @@ class SyncJournal:
                 'operative_ts': participant.get('operative_ts'),
                 'shell_token': participant.get('shell_token'),
                 'receipt': deepcopy(participant.get('receipt')),
+                'admitted_decision': deepcopy(participant.get('admitted_decision')),
                 'page_index': state['decision_page_index']}
 
     def mark_anomaly(self, session_code, round_number, reason):

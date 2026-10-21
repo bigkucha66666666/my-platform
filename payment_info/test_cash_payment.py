@@ -117,7 +117,7 @@ class FakeParticipant:
         self.finished = False
 
     def payoff_plus_participation_fee(self):
-        return 15 + self.payoff / 100
+        return 15 + float(self.payoff) / 100
 
 
 class FakePlayer:
@@ -329,7 +329,7 @@ class DynamicBudgetIntegrationTests(unittest.TestCase):
         import settings
         import dynamic_bottleneck_round as app
         formal = next(c for c in settings.SESSION_CONFIGS if c['name'] == 'dynamic_bottleneck_round_prod')
-        self.assertEqual(formal['cash_payment_rule'], BUDGET_RULE)
+        self.assertEqual(formal['cash_payment_rule'], 'dynamic_cost_rank_v3')
         player = self.make_player()
         context = PaymentInfo.vars_for_template(player)
         self.assertIn('最高 25 元', context.get('cash_payment_description', ''))

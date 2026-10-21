@@ -1949,13 +1949,15 @@ class DynamicAgentAdminTemplateTests(unittest.TestCase):
             html,
         )
 
-    def test_create_session_page_extends_otree_5_11_admin_base(self):
-        html = Path('_templates/otree/CreateSession.html').read_text(
-            encoding='utf-8'
-        )
+    def test_create_session_uses_installed_admin_shell(self):
+        import otree
+        from otree.templating.loader import ibis_loader
 
-        self.assertIn('{% extends "otree/BaseAdmin.html" %}', html)
-        self.assertNotIn('{% extends "otree/BaseAdminRegular.html" %}', html)
+        self.assertFalse(Path('_templates/otree/CreateSession.html').exists())
+        native = Path(otree.__file__).parent / 'templates/otree/CreateSession.html'
+        html = native.read_text(encoding='utf-8')
+        self.assertIn('otree/includes/CreateSessionForm.html', html)
+        ibis_loader.load('otree/CreateSession.html')
 
     def test_dynamic_controls_define_fixed_treatments_and_custom_builder(self):
         html = Path('_templates/otree/includes/DynamicSessionControls.html').read_text(

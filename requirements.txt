@@ -1,6 +1,9 @@
-# Keep deployment dependencies narrow and predictable.
-# Pin major versions to reduce surprises during ECS/RDS deployment.
-otree>=5.11,<6.0
+# New-server baseline: CPython 3.10, matching the local otree_env.
+# Do not use this file to upgrade an existing oTree 5.x production database.
+# See docs/新服务器依赖与启动说明_2026-10-19.md before deployment.
+# oTree itself pins Starlette, SQLAlchemy, uvicorn and its other direct deps.
+-c requirements-lock.txt
+otree==6.0.13
 
 # Binary wheel avoids compiling libpq on the ECS host during install.
-psycopg2-binary>=2.9,<3.0
+psycopg2-binary==2.9.10

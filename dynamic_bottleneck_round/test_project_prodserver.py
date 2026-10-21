@@ -1,7 +1,9 @@
 """The opt-in launcher must preserve installed oTree prodserver semantics."""
 import unittest
 import os
-from unittest.mock import patch
+import sys
+from pathlib import Path
+from unittest.mock import patch, Mock
 
 import project_prodserver
 
@@ -18,7 +20,7 @@ class ProjectProdserverTests(unittest.TestCase):
             patch.dict(os.environ, {'USE_TIMEOUT_WORKER': ''}),
             patch('project_prodserver.setup', side_effect=setup, create=True),
             patch('project_prodserver.subprocess.Popen',
-                  side_effect=lambda *args, **kwargs: events.append('timeout')),
+                  side_effect=lambda *args, **kwargs: (events.append('timeout') or Mock())),
             patch('project_prodserver.Config'),
             patch('project_prodserver.Server'),
         ):
@@ -35,11 +37,25 @@ class ProjectProdserverTests(unittest.TestCase):
             project_prodserver.main(['127.0.0.1:19999'])
         timeout_worker.assert_called_once()
         self.assertEqual(timeout_worker.call_args.args[0],
-                         ['otree', 'timeoutsubprocess', '19999'])
+                         [sys.executable, str(Path(project_prodserver.__file__).with_name(
+                             'project_timeout_worker.py')), '19999'])
+        self.assertGreater(len(timeout_worker.call_args.kwargs['env']['PROJECT_TIMEOUT_WORKER_SECRET']), 32)
         self.assertEqual(config.call_args.args[0], 'project_asgi:app')
         self.assertEqual(config.call_args.kwargs['workers'], 1)
         self.assertEqual(config.call_args.kwargs['ws'], 'websockets')
         server.return_value.run.assert_called_once_with()
+
+    def test_child_is_stopped_if_server_raises(self):
+        with (patch('project_prodserver.setup'),
+              patch('project_prodserver.subprocess.Popen') as worker,
+              patch('project_prodserver.Config'),
+              patch('project_prodserver.Server') as server):
+            worker.return_value.poll.return_value = None
+            server.return_value.run.side_effect = RuntimeError('fixture')
+            with self.assertRaises(RuntimeError):
+                project_prodserver.main(['127.0.0.1:19999'])
+            worker.return_value.terminate.assert_called_once_with()
+            worker.return_value.wait.assert_called_once()
 
 
 if __name__ == '__main__':

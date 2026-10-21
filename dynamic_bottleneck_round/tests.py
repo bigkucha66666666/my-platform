@@ -457,9 +457,9 @@ class DynamicCostExportTests(unittest.TestCase):
 
         self.assertEqual(components['fixed_cost'], 0)
         self.assertEqual(components['queue_cost'], 4)
-        self.assertEqual(components['late_cost'], 3)
+        self.assertEqual(components['late_cost'], 4)
         self.assertEqual(components['toll_cost'], 0)
-        self.assertEqual(components['total_cost'], 7)
+        self.assertEqual(components['total_cost'], 8)
 
     def test_export_contains_fixed_schedule_but_no_toll_metadata(self):
         required = {
@@ -1278,7 +1278,7 @@ class SettingsContractTests(unittest.TestCase):
         configs = {config['name']: config for config in settings.SESSION_CONFIGS}
         formal = configs['dynamic_bottleneck_round_prod']
         self.assertEqual(settings.REAL_WORLD_CURRENCY_CODE, 'CNY')
-        self.assertEqual(formal['cash_payment_rule'], 'dynamic_cost_budget_v2')
+        self.assertEqual(formal['cash_payment_rule'], 'dynamic_cost_rank_v3')
         self.assertEqual(formal['participation_fee'], 15)
         self.assertEqual(formal['real_world_currency_per_point'], 0.01)
         self.assertNotIn('cash_payment_rule', configs['dynamic_bottleneck_round_demo'])
@@ -1402,16 +1402,16 @@ class TruncatedNormalCapacityExperimentContractTests(unittest.TestCase):
         self.assertEqual(C.WARMUP_ROUNDS, 3)
         self.assertEqual(C.FORMAL_ROUNDS, 30)
         self.assertEqual(C.NUM_ROUNDS, 33)
-        self.assertEqual(C.NUM_DEPARTURE_SLOTS, 16)
+        self.assertEqual(C.NUM_DEPARTURE_SLOTS, 14)
         self.assertEqual(C.FIXED_TRAVEL_TIME_COST, 0)
         self.assertEqual(C.QUEUE_COST_PER_MINUTE, 2)
         self.assertEqual(C.EARLY_COST_PER_MINUTE, 1)
-        self.assertEqual(C.LATE_COST_PER_MINUTE, 3)
+        self.assertEqual(C.LATE_COST_PER_MINUTE, 4)
 
         schedule = dynamic_app.static_departure_schedule()
-        self.assertEqual(schedule['num_slots'], 16)
-        self.assertEqual(schedule['first_departure_time'], '07:46')
-        self.assertEqual(schedule['last_departure_time'], '08:01')
+        self.assertEqual(schedule['num_slots'], 14)
+        self.assertEqual(schedule['first_departure_time'], '07:44')
+        self.assertEqual(schedule['last_departure_time'], '07:57')
 
     @staticmethod
     def make_session(
@@ -2165,9 +2165,9 @@ class DynamicRandomCapacityCostTests(unittest.TestCase):
                 'fixed_cost': 0.0,
                 'queue_cost': 4.0,
                 'early_cost': 3.0,
-                'late_cost': 12.0,
+                'late_cost': 16.0,
                 'toll_cost': 0.0,
-                'total_cost': 19.0,
+                'total_cost': 23.0,
             },
         )
 

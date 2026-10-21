@@ -395,7 +395,9 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
                 assert all(g.results_ready for g in groups)
                 assert {g.round_started_at_ts for g in groups} == {state['release_ts']}
                 assert {g.decision_deadline_ts for g in groups} == {state['deadline_ts']}
-                assert state['deadline_ts'] - state['release_ts'] == 60
+                expected_seconds = experiment.round_timing_for_session(
+                    session, round_number)['decision_seconds']
+                assert state['deadline_ts'] - state['release_ts'] == expected_seconds
                 assert all(p.decision_source == 'manual' for g in groups for p in g.get_players())
                 assert len(experiment.active_virtual_decisions_for_group(groups[0])) == 0
                 actors = experiment.active_virtual_decisions_for_group(groups[1])
@@ -465,6 +467,7 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
                 await advance_to(next_round)
         if full_flow:
             from decimal import Decimal, ROUND_HALF_UP
+            from payment_info.cash_payment import cash_rule_for_version, RANK_RULE_VERSION
             import dynamic_bottleneck_survey as survey
             db.new_session()
             for code, _, _, _ in entries:
@@ -476,8 +479,22 @@ def check_dual_session_live_flow(conditions=('I0', 'I1'), *, round_numbers=(4,),
                 runtime = participant.vars
                 assert runtime[experiment.SETTLED_FORMAL_ROUNDS_VAR] == 30
                 assert Decimal(runtime[experiment.TOTAL_COST_DECIMAL_VAR]) == cost
-                bonus = max(Decimal(0), min(Decimal(20), Decimal(20) - cost / 60))
-                cents = 1500 + int((100 * bonus).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+                rule = cash_rule_for_version(participant.session.config['cash_payment_rule'])
+                if rule.version == RANK_RULE_VERSION:
+                    final = runtime[experiment.RANKING_RESULTS_VAR]['33']
+                    assert final['completed_rounds'] == 30
+                    assert Decimal(final['total_cost']) == cost
+                    mid = Decimal(final['rank']) + Decimal(final['tied_count'] - 1) / 2
+                    count = final['actor_count']
+                    rank_cents = (Decimal(300) * (count - mid) / (count - 1)
+                                  if count > 1 else Decimal(150))
+                    cost_cents = max(Decimal(0), 1200 - cost)
+                    cents = 1500 + sum(int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+                                       for value in (cost_cents, rank_cents))
+                else:
+                    cap = Decimal(rule.max_bonus_cents) / 100
+                    bonus = max(Decimal(0), min(cap, cap - cost / 30 / rule.cost_divisor))
+                    cents = 1500 + int((100 * bonus).quantize(Decimal(1), rounding=ROUND_HALF_UP))
                 assert runtime['dynamic_bottleneck_cash_payment_cents'] == cents
                 # Currency.__str__ adds the display unit; compare its numeric
                 # Decimal value, not participant-facing formatted text.

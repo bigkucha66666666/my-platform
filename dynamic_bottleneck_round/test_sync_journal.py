@@ -52,6 +52,18 @@ class SyncJournalTests(unittest.TestCase):
         self.assertEqual(reopened.receipt('s', 1, 'p'),
                          dict(kind='manual', departure_minute=474, ingress_ts=166))
 
+    def test_forged_server_admission_cannot_retain_anomaly_audit(self):
+        journal = self.armed_journal()
+        journal.mark_anomaly('s', 1, 'decision_control_queue_overrun')
+        payload = dict(session_code='s', round_number=1, participant_code='p',
+                       shell_token=self.token, page_index=9, journal_id='a' * 32)
+        data = dict(kind='decision', departure_minute=474, admitted_before_fault=True)
+        with self.assertRaises(ValueError):
+            journal.retain_admitted_decision(payload, data, self.release_ts+1,
+                                            admission_ticket=object())
+        self.assertIsNone(journal.audit('s', 1, 'p').get('admitted_decision'))
+        self.assertIsNone(journal.receipt('s', 1, 'p'))
+
     def test_novel_manual_processing_overrun_retains_receipt_and_faults(self):
         journal = self.armed_journal()
         result = journal.exchange('s', 1, 'p', self.token, kind='decision',

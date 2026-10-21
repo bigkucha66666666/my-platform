@@ -16,6 +16,8 @@ from otree.asgi import app as otree_app
 from session_data_export_views import register_session_export_routes
 
 register_session_export_routes(otree_app)
+from protocol2_admin import register_protocol2_admin_routes
+register_protocol2_admin_routes(otree_app)
 
 from dynamic_bottleneck_round.decision_ingress import DecisionIngressMiddleware
 import os
@@ -26,3 +28,6 @@ if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') == '2':
     app = SyncControlASGI(DecisionIngressMiddleware(ThreadedASGI(otree_app)))
 else:
     app = DecisionIngressMiddleware(otree_app)
+
+from timeout_navigation import TimeoutOriginMiddleware
+app = TimeoutOriginMiddleware(app)

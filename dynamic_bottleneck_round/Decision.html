@@ -1,6 +1,9 @@
 {{ block title }}动态瓶颈出发时间选择{{ endblock }}
 
 {{ block content }}
+{{ if system_navigation }}
+<p>系统自动推进已到达下一轮。此请求不代表真人进入准备页，真人访问后才开始准备。</p>
+{{ else }}
 <style>
   .decision-shell {
     --ink: #18343c;
@@ -361,7 +364,7 @@
 {{ if room_release_shell }}
 <section id="room-release-gate" data-condition="{{ information_condition }}" data-shell-token="{{ room_release_shell_token }}" data-control-endpoint="{{ room_sync_control_endpoint }}" data-control-token="{{ room_sync_control_token }}" role="status" aria-live="polite" style="padding:24px;border:1px solid #c8d8dc;border-radius:12px;background:#f7fbfa;color:#173f49">
   <h3 style="margin:0 0 10px">决策页面已加载，等待本房间统一放行</h3>
-  <p id="room-release-message" style="margin:0">请保持页面打开。此时尚未开始 60 秒决策计时。</p>
+  <p id="room-release-message" style="margin:0">请保持页面打开。此时尚未开始 {{ decision_seconds }} 秒决策计时。</p>
 </section>
 {{ endif }}
 <div class="decision-shell" id="decision-content" {{ if room_release_shell }}hidden{{ endif }}>
@@ -445,5 +448,6 @@
 {{ if room_release_shell }}
 <script src="{{ static 'dynamic_bottleneck_round/room_release.js' }}?v=2"></script>
 <script>DynamicBottleneckRelease.start();</script>
+{{ endif }}
 {{ endif }}
 {{ endblock }}

@@ -58,6 +58,7 @@ from .agents.liu_rel_pretraining import (
     load_pretraining_profile,
     validate_pretraining_bank,
 )
+from .agents.adaptive_pretraining import build_adaptive_bank, load_adaptive_profile
 from .agents.personas import (
     get_or_create_api_agent_persona,
     get_or_create_rl_agent_persona,
@@ -74,6 +75,19 @@ from .agents.rl_fallback import (
 from .agents import prefetch_coordinator
 from . import sync_integration
 from . import sync_runtime
+from .round_timing import (
+    ROUND_TIMING_SESSION_VAR, new_round_timing_rule, round_timing_for_session,
+)
+from .experiment_parameters import (
+    EXPERIMENT_PARAMETERS_VAR, EXPERIMENT_PARAMETERS_VERSION,
+    ADAPTIVE_BANK_FINGERPRINTS_VAR, calculate_departure_window,
+    new_experiment_parameters, experiment_parameters_for_session,
+)
+from .result_ranking import (
+    RANKING_RULE_VAR, RANKING_RULE_VERSION, RANKING_STATE_VAR, RANKING_RESULTS_VAR,
+    accumulate_rankings, ranking_enabled, saved_vars,
+)
+from timeout_navigation import is_timeout_navigation
 from .room_release import (
     admission_kind,
     acknowledge_shell,
@@ -84,6 +98,7 @@ from .room_release import (
 )
 from .decision_ingress import (
     decision_preexisting_choice,
+    decision_form_was_empty,
     remember_decision_preexisting_choice,
     completed_shell_response_ts,
     completed_decision_response_ts,
@@ -295,6 +310,7 @@ class C(BaseConstants):
     FORMAL_ROUNDS = 30
     NUM_ROUNDS = WARMUP_ROUNDS + FORMAL_ROUNDS
 
+    # Compatibility defaults for Sessions created before staged timing.
     DECISION_TIMEOUT_SECONDS = 60
     RESULTS_TIMEOUT_SECONDS = 50
     DROPOUT_TIMEOUT_SECONDS = 1
@@ -306,15 +322,15 @@ class C(BaseConstants):
     FREE_FLOW_TRAVEL_MINUTES = 6
     CAPACITY_WINDOW_MINUTES = 1
     DEPARTURE_CHOICE_STEP_MINUTES = 1
-    NUM_DEPARTURE_SLOTS = 16
+    NUM_DEPARTURE_SLOTS = 14  # Reference window for a full 30-actor market.
     MAX_DEPARTURE_SLOT_CHOICES = 401
-    FIRST_DEPARTURE_MINUTE = 7 * 60 + 46
+    FIRST_DEPARTURE_MINUTE = 7 * 60 + 44
 
     BASE_POINTS = 140
     FIXED_TRAVEL_TIME_COST = 0
     QUEUE_COST_PER_MINUTE = 2
     EARLY_COST_PER_MINUTE = 1
-    LATE_COST_PER_MINUTE = 3
+    LATE_COST_PER_MINUTE = 4
 
 
 def is_warmup_round(round_number):
@@ -579,6 +595,11 @@ EXPORT_HEADERS = [
     'room_release_post_response_completed_ts',
     'room_release_receipt_ingress_ts',
     'room_release_receipt_kind',
+    'room_release_admitted_kind',
+    'room_release_admitted_departure_minute',
+    'room_release_admitted_ingress_ts',
+    'room_release_admitted_shell_token',
+    'room_release_admitted_page_index',
     'timeout_happened',
     'dropout_event',
     'recovered_this_round',
@@ -1079,7 +1100,8 @@ def validate_liu_rel_session_config(session) -> dict:
         and not parameters_frozen
     ):
         raise ValueError('RL 正式实验启动前必须冻结 Liu-REL 参数。')
-    if rl_agent_enabled(session):
+    if (rl_agent_enabled(session) and experiment_parameters_for_session(session)['version']
+            != EXPERIMENT_PARAMETERS_VERSION):
         validate_pretraining_bank()
 
     validated = {
@@ -1237,44 +1259,68 @@ def config_float(value, default):
         return default
 
 
-def static_departure_schedule():
-    first_minute = C.FIRST_DEPARTURE_MINUTE
-    last_minute = first_minute + (
-        C.NUM_DEPARTURE_SLOTS - 1
-    ) * C.DEPARTURE_CHOICE_STEP_MINUTES
+def static_departure_schedule(actor_count=30, *, parameters=None):
+    parameters = parameters or new_experiment_parameters()
+    if parameters['version'] == 'legacy_fixed16_late3':
+        window = dict(first_departure_minute=466, last_departure_minute=481,
+                      num_slots=16, slot_size_minutes=1)
+        source, basis = 'fixed_truncated_normal_capacity_design', 4.0
+    else:
+        window = calculate_departure_window(actor_count=actor_count,
+            mean_capacity=parameters['mean_capacity'],
+            standard_minute=parameters['window_standard_minute'],
+            early_cost_rate=parameters['early_cost_per_minute'],
+            late_cost_rate=parameters['late_cost_per_minute'],
+            step_minutes=parameters['departure_step_minutes'],
+            free_flow_minutes=parameters['free_flow_travel_minutes'])
+        source, basis = 'mean_capacity_population_window_v1', parameters['mean_capacity']
+    first_minute, last_minute = window['first_departure_minute'], window['last_departure_minute']
     return {
+        **window,
         'enabled': True,
-        'source': 'fixed_truncated_normal_capacity_design',
-        'players_count': 20,
-        'capacity_basis': 4.0,
-        'required_occupied_slots': C.NUM_DEPARTURE_SLOTS,
+        'source': source,
+        'players_count': actor_count,
+        'capacity_basis': basis,
+        'required_occupied_slots': window['num_slots'],
         'slots_each_side': None,
-        'num_slots': C.NUM_DEPARTURE_SLOTS,
-        'slot_size_minutes': C.DEPARTURE_CHOICE_STEP_MINUTES,
-        'first_departure_minute': first_minute,
-        'last_departure_minute': last_minute,
         'first_departure_time': minute_to_clock(first_minute),
         'last_departure_time': minute_to_clock(last_minute),
     }
 
 
 def apply_fixed_departure_schedules(session, matrix):
+    parameters = experiment_parameters_for_session(session)
+    fingerprints = {}
     for group_id, group_players in enumerate(matrix, start=1):
-        schedule = static_departure_schedule()
-        schedule['players_count'] = effective_group_actor_count(
+        actor_count = effective_group_actor_count(
             session,
             len(group_players),
             group_id,
         )
+        schedule = static_departure_schedule(actor_count, parameters=parameters)
         for player in group_players:
             player.participant.vars[DEPARTURE_SCHEDULE_VAR] = deepcopy(schedule)
+        if (parameters['version'] == EXPERIMENT_PARAMETERS_VERSION
+                and rl_agent_count_per_group(session, group_id) > 0):
+            bank = adaptive_bank_for_schedule(session, schedule)
+            fingerprints[str(group_id)] = {'bank_id': bank['bank_id'], 'sha256': bank['sha256']}
+    if fingerprints:
+        session.vars[ADAPTIVE_BANK_FINGERPRINTS_VAR] = fingerprints
+
+
+def adaptive_bank_for_schedule(session, schedule):
+    return build_adaptive_bank(actor_count=int(schedule['players_count']),
+        first_departure_minute=int(schedule['first_departure_minute']),
+        num_slots=int(schedule['num_slots']),
+        late_cost_per_minute=experiment_parameters_for_session(session)['late_cost_per_minute'])
 
 
 def departure_schedule_for_player(player):
     schedule = player.participant.vars.get(DEPARTURE_SCHEDULE_VAR, {})
     if isinstance(schedule, dict) and schedule.get('enabled'):
         return schedule
-    return static_departure_schedule()
+    return static_departure_schedule(parameters=experiment_parameters_for_session(
+        getattr(player, 'session', None)))
 
 
 def departure_slots(schedule=None):
@@ -1617,11 +1663,13 @@ def coarse_toll_description_for_player(player):
     return '当前未开启粗收费。'
 
 
-def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=0):
-    fixed_cost = float(C.FIXED_TRAVEL_TIME_COST)
-    queue_cost = float(C.QUEUE_COST_PER_MINUTE) * float(queue_delay)
-    early_cost = float(C.EARLY_COST_PER_MINUTE) * float(early_minutes)
-    late_cost = float(C.LATE_COST_PER_MINUTE) * float(late_minutes)
+def calculate_cost_components(*, queue_delay, early_minutes, late_minutes, toll=0,
+                              cost_parameters=None):
+    parameters = cost_parameters or new_experiment_parameters()
+    fixed_cost = float(parameters['fixed_travel_time_cost'])
+    queue_cost = float(parameters['queue_cost_per_minute']) * float(queue_delay)
+    early_cost = float(parameters['early_cost_per_minute']) * float(early_minutes)
+    late_cost = float(parameters['late_cost_per_minute']) * float(late_minutes)
     toll_cost = 0.0
     total_cost = fixed_cost + queue_cost + early_cost + late_cost
     return {
@@ -1658,6 +1706,10 @@ def creating_session(subsession):
     config = parse_stochastic_capacity_config(subsession.session.config)
     if subsession.round_number == 1:
         prompt_version_from_session(subsession.session.config)
+        subsession.session.vars[ROUND_TIMING_SESSION_VAR] = new_round_timing_rule()
+        subsession.session.vars[EXPERIMENT_PARAMETERS_VAR] = new_experiment_parameters(
+            mean_capacity=config.truncated_mean)
+        subsession.session.vars[RANKING_RULE_VAR] = RANKING_RULE_VERSION
         # Existing Sessions have no marker and continue the legacy timing path.
         if os.environ.get('DYNAMIC_ROOM_RELEASE_PROTOCOL') in {'1', '2'}:
             if not ingress_middleware_active():
@@ -1781,7 +1833,8 @@ def maybe_start_round(group, now_ts=None):
     effective_start_ts = now_ts if all_ready else group.round_start_deadline_ts
     group.round_started = True
     group.round_started_at_ts = effective_start_ts
-    group.decision_deadline_ts = effective_start_ts + C.DECISION_TIMEOUT_SECONDS
+    group.decision_deadline_ts = effective_start_ts + round_timing_for_session(
+        getattr(group, 'session', None), group.round_number)['decision_seconds']
     fill_suspended_choices(group)
     return True
 
@@ -1822,6 +1875,8 @@ def room_release_state(player, *, now_ts=None):
             round_number=player.round_number,
             now_ts=now_ts,
             expected_codes=expected_codes,
+            decision_seconds=round_timing_for_session(
+                player.session, player.round_number)['decision_seconds'],
         )
         state['drain_limit_seconds'] = player.session.vars.get(
             ROOM_RELEASE_DRAIN_VAR
@@ -2147,8 +2202,11 @@ def round_waiting_players(group):
 
 
 def fill_suspended_choices(group):
+    eligible = (set(sync_integration.state(group.get_players()[0])['expected_codes'])
+                if room_sync_v2_enabled(getattr(group, 'session', None)) else None)
     for player in group.get_players():
-        if not participant_dropout_suspended(player) or player_has_departure_choice(player):
+        if ((eligible is not None and player.participant.code in eligible)
+                or not participant_dropout_suspended(player) or player_has_departure_choice(player)):
             continue
         strategy = set_automatic_departure_choice(
             player,
@@ -2170,7 +2228,10 @@ def fill_missing_choices(group):
             player,
             DECISION_SOURCE_DISCONNECT_AUTO,
         )
-        mark_disconnect(player, strategy)
+        if room_sync_v2_enabled(group.session):
+            sync_integration.complete_disconnect(player, strategy)
+        else:
+            mark_disconnect(player, strategy)
 
 
 def service_batch_clear_minute(first_service_start_minute, load, capacity):
@@ -2302,6 +2363,7 @@ def _set_results_locked(group):
                 early_minutes=early_minutes,
                 late_minutes=late_minutes,
                 toll=toll,
+                cost_parameters=experiment_parameters_for_session(group.session),
             )
             total_cost = cost_components['total_cost']
             payoff = (
@@ -2345,6 +2407,8 @@ def _set_results_locked(group):
         update_independent_rl_states(group, rl_agent_records)
     if virtual_records:
         save_virtual_decisions_for_group(group, virtual_records)
+
+    save_cumulative_result_rankings(group, players=players, virtual_records=virtual_records)
 
     if group.round_number == C.NUM_ROUNDS:
         for player in players:
@@ -2704,6 +2768,7 @@ def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
     schedule = departure_schedule_for_player(reference_player)
     preview = choice_preview(reference_player)
     phase = round_phase_context(group.round_number)
+    parameters = experiment_parameters_for_session(group.session)
     capacity_context = public_capacity_context_for_group(group)
     capacity_context['experiment_phase'] = phase['phase_name']
     capacity_context['round_label'] = phase['round_label']
@@ -2719,10 +2784,10 @@ def api_agent_choice_set_for_group(group, reference_player, agent_id, persona):
             for item in preview
         ],
         cost_parameters={
-            'fixed_travel_time_cost': C.FIXED_TRAVEL_TIME_COST,
-            'queue_cost_per_minute': C.QUEUE_COST_PER_MINUTE,
-            'early_cost_per_minute': C.EARLY_COST_PER_MINUTE,
-            'late_cost_per_minute': C.LATE_COST_PER_MINUTE,
+            'fixed_travel_time_cost': parameters['fixed_travel_time_cost'],
+            'queue_cost_per_minute': parameters['queue_cost_per_minute'],
+            'early_cost_per_minute': parameters['early_cost_per_minute'],
+            'late_cost_per_minute': parameters['late_cost_per_minute'],
             'preferred_arrival_minute': C.PREFERRED_ARRIVAL_MINUTE,
             'preferred_arrival_time': minute_to_clock(C.PREFERRED_ARRIVAL_MINUTE),
             'free_flow_travel_minutes': C.FREE_FLOW_TRAVEL_MINUTES,
@@ -2779,14 +2844,28 @@ def independent_rl_records_for_group(group):
     ]
 
 
-def pretrained_independent_rl_state(states, agent_id, seat_index):
+def pretrained_independent_rl_state(states, agent_id, seat_index, *, session=None,
+                                   schedule=None, group_id=None):
     raw_state = states.get(agent_id)
-    frozen_state = load_pretraining_profile(seat_index)
+    adaptive = (session is not None and
+        experiment_parameters_for_session(session)['version'] == EXPERIMENT_PARAMETERS_VERSION)
+    if adaptive:
+        bank = adaptive_bank_for_schedule(session, schedule)
+        expected = session.vars.get(ADAPTIVE_BANK_FINGERPRINTS_VAR, {}).get(str(group_id))
+        if expected != {'bank_id': bank['bank_id'], 'sha256': bank['sha256']}:
+            raise ValueError('RL simulated experience differs from the saved market parameters')
+        frozen_state = load_adaptive_profile(seat_index,
+            actor_count=int(schedule['players_count']),
+            first_departure_minute=int(schedule['first_departure_minute']),
+            num_slots=int(schedule['num_slots']),
+            late_cost_per_minute=experiment_parameters_for_session(session)['late_cost_per_minute'])
+    else:
+        frozen_state = load_pretraining_profile(seat_index)
     if raw_state is None:
         return frozen_state
     state = valid_or_initial_independent_rl_state(raw_state)
     if (
-        state['pretraining_bank_id'] != PRETRAINING_BANK_ID
+        state['pretraining_bank_id'] != frozen_state['pretraining_bank_id']
         or state['pretraining_experiences'] != frozen_state['pretraining_experiences']
     ):
         raise ValueError(f'RL {agent_id} 缺少有效的冻结预训练经验；不能静默冷启动。')
@@ -2836,7 +2915,8 @@ def prepare_independent_rl_decisions_for_group(group):
             agent_id,
             persona,
         )
-        state = pretrained_independent_rl_state(states, agent_id, index)
+        state = pretrained_independent_rl_state(states, agent_id, index,
+            session=group.session, schedule=schedule, group_id=group.id_in_subsession)
         try:
             policy_kwargs = {
                 'state': state,
@@ -2916,7 +2996,10 @@ def prepare_independent_rl_decisions_for_group(group):
             'rounds_observed': int(choice.get('rounds_observed', 0)),
             'pretraining_count': int(choice.get('pretraining_count', 0)),
             'pretraining_bank_id': choice.get('pretraining_bank_id'),
-            'pretraining_bank_sha256': PRETRAINING_BANK_SHA256,
+            'pretraining_bank_sha256': (
+                adaptive_bank_for_schedule(group.session, schedule)['sha256']
+                if experiment_parameters_for_session(group.session)['version']
+                == EXPERIMENT_PARAMETERS_VERSION else PRETRAINING_BANK_SHA256),
         }
         if information_condition == INFO_I1 and not warmup:
             choice_audit['current_actual_capacity'] = float(
@@ -3003,7 +3086,10 @@ def update_independent_rl_states(group, records):
             seat_index = int(agent_id.rsplit('_RL_', 1)[1])
         except (IndexError, ValueError) as exc:
             raise ValueError(f'无法识别 RL 席位：{agent_id}') from exc
-        state = pretrained_independent_rl_state(states, agent_id, seat_index)
+        state = pretrained_independent_rl_state(states, agent_id, seat_index,
+            session=group.session,
+            schedule=departure_schedule_for_player(reference_player),
+            group_id=group.id_in_subsession)
         previous_count = len(state.get('experiences', []))
         updated = observe_independent_rl_outcome(
             state,
@@ -3483,12 +3569,78 @@ def create_api_agent_decisions_for_group(group):
         time.sleep(0.05)
 
 
+def save_cumulative_result_rankings(group, *, players, virtual_records):
+    """Freeze one private result per human inside the existing settlement lock."""
+    if is_warmup_round(group.round_number) or not ranking_enabled(getattr(group, 'session', None)):
+        return False
+    if not players:
+        return False
+    raw_round = int(group.round_number)
+    completed = formal_round_number(raw_round)
+    reference = players[0].participant
+    previous = saved_vars(reference).get(RANKING_STATE_VAR, {})
+    if not isinstance(previous, dict):
+        return False
+    if previous.get('round_number') == raw_round:
+        return True
+    if completed > 1 and (
+        previous.get('round_number') != raw_round - 1
+        or previous.get('completed_rounds') != completed - 1
+    ):
+        return False
+    costs = {f'human:{p.participant.code}': p.total_cost for p in players}
+    for record in virtual_records:
+        actor_type, identity = virtual_decision_identity(record)
+        key = f'{actor_type}:{identity}'
+        if not identity or key in costs:
+            return False
+        costs[key] = record.get('total_cost')
+    expected = int(departure_schedule_for_player(players[0])['players_count'])
+    if len(costs) != expected:
+        return False
+    try:
+        snapshot = accumulate_rankings(costs, completed_rounds=completed,
+            previous_totals=previous.get('totals') if completed > 1 else None)
+    except ValueError:
+        return False
+    reference.vars[RANKING_STATE_VAR] = dict(
+        round_number=raw_round, completed_rounds=completed, totals=snapshot['totals'])
+    for player in players:
+        personal = dict(
+            rule_version=RANKING_RULE_VERSION,
+            completed_rounds=completed, actor_count=snapshot['actor_count'],
+            includes_agents=bool(virtual_records),
+            **snapshot['rankings'][f'human:{player.participant.code}'],
+        )
+        stored = saved_vars(player.participant).get(RANKING_RESULTS_VAR, {})
+        history = deepcopy(stored) if isinstance(stored, dict) else {}
+        history[str(raw_round)] = personal
+        player.participant.vars[RANKING_RESULTS_VAR] = history
+    return True
+
+
+def cumulative_ranking_for_player(player):
+    if is_warmup_round(player.round_number) or not ranking_enabled(getattr(player, 'session', None)):
+        return {'enabled': False}
+    unavailable = {'enabled': True, 'available': False}
+    if not player.group.results_ready:
+        return unavailable
+    history = saved_vars(player.participant).get(RANKING_RESULTS_VAR, {})
+    personal = history.get(str(player.round_number)) if isinstance(history, dict) else None
+    if (not isinstance(personal, dict)
+            or personal.get('rule_version') != RANKING_RULE_VERSION
+            or personal.get('completed_rounds') != formal_round_number(player.round_number)):
+        return unavailable
+    return dict(enabled=True, available=True, **deepcopy(personal))
+
+
 def result_cost_components(player):
     return calculate_cost_components(
         queue_delay=player.queue_delay_minutes,
         early_minutes=player.early_minutes,
         late_minutes=player.late_minutes,
         toll=float(player.coarse_toll_charge),
+        cost_parameters=experiment_parameters_for_session(getattr(player, 'session', None)),
     )
 
 
@@ -3749,6 +3901,9 @@ ROOM_RELEASE_EXPORT_FIELDS = (
     'room_release_operative_ts', 'room_release_post_ingress_ts',
     'room_release_post_processing_ts', 'room_release_post_response_completed_ts',
     'room_release_receipt_ingress_ts', 'room_release_receipt_kind',
+    'room_release_admitted_kind', 'room_release_admitted_departure_minute',
+    'room_release_admitted_ingress_ts', 'room_release_admitted_shell_token',
+    'room_release_admitted_page_index',
 )
 
 
@@ -4266,6 +4421,7 @@ class Introduction(Page):
     def vars_for_template(player):
         config = capacity_config_for_player(player)
         schedule = departure_schedule_for_player(player)
+        parameters = experiment_parameters_for_session(getattr(player, 'session', None))
         return {
             'capacity_states': capacity_state_rows(config),
             'capacity_mu': number_display(config.capacity_mu),
@@ -4279,7 +4435,7 @@ class Introduction(Page):
             'fixed_travel_cost': number_display(C.FIXED_TRAVEL_TIME_COST),
             'queue_cost_per_minute': number_display(C.QUEUE_COST_PER_MINUTE),
             'early_cost_per_minute': number_display(C.EARLY_COST_PER_MINUTE),
-            'late_cost_per_minute': number_display(C.LATE_COST_PER_MINUTE),
+            'late_cost_per_minute': number_display(parameters['late_cost_per_minute']),
             'departure_time_min': schedule['first_departure_time'],
             'departure_time_max': schedule['last_departure_time'],
             'coarse_toll_description': coarse_toll_description_for_player(player),
@@ -4298,6 +4454,7 @@ class ComprehensionCheck(Page):
     @staticmethod
     def vars_for_template(player):
         config = capacity_config_for_player(player)
+        parameters = experiment_parameters_for_session(getattr(player, 'session', None))
         answer_key = comprehension_answer_key(config)
         queue_example = comprehension_queue_example(config)
         example_people = queue_example['people']
@@ -4332,7 +4489,7 @@ class ComprehensionCheck(Page):
             'free_flow_travel_minutes': number_display(C.FREE_FLOW_TRAVEL_MINUTES),
             'queue_cost_per_minute': number_display(C.QUEUE_COST_PER_MINUTE),
             'early_cost_per_minute': number_display(C.EARLY_COST_PER_MINUTE),
-            'late_cost_per_minute': number_display(C.LATE_COST_PER_MINUTE),
+            'late_cost_per_minute': number_display(parameters['late_cost_per_minute']),
             'example_queue_minutes': number_display(example_queue_minutes),
             'example_queue_cost': number_display(
                 example_queue_minutes * C.QUEUE_COST_PER_MINUTE
@@ -4458,6 +4615,8 @@ class RoundStartSync(Page):
             'round_started': group.round_started,
             'ready_count': ready_count,
             'group_size': len(waiting_players),
+            'decision_seconds': round_timing_for_session(
+                getattr(player, 'session', None), player.round_number)['decision_seconds'],
             'remaining_seconds': max(
                 0,
                 ceil(group.round_start_deadline_ts - now_ts),
@@ -4477,6 +4636,8 @@ class Decision(Page):
 
     @staticmethod
     def get_form_fields(player):
+        if room_sync_v2_enabled(player.session) and is_timeout_navigation():
+            return []
         if room_release_enabled(getattr(player, 'session', None)):
             preexisting = (
                 player.group.results_ready or player_has_departure_choice(player)
@@ -4554,6 +4715,10 @@ class Decision(Page):
     def is_displayed(player):
         if not access_allowed(player):
             return False
+        if room_sync_v2_enabled(player.session) and is_timeout_navigation():
+            # _increment_index_in_pages evaluates this during the previous
+            # Results timeout POST as well as its redirected GET.
+            return not (player.group.results_ready or player_has_departure_choice(player))
         if room_release_enabled(getattr(player, 'session', None)):
             room_release_state(player)
             if room_sync_v2_enabled(player.session) and participant_dropout_suspended(player):
@@ -4581,10 +4746,14 @@ class Decision(Page):
         maybe_prepare_results(player.group)
         if player.participant.vars.get('dropout_active'):
             return C.DROPOUT_TIMEOUT_SECONDS
-        return min(C.DECISION_TIMEOUT_SECONDS, remaining_decision_seconds(player.group))
+        return min(round_timing_for_session(
+            getattr(player, 'session', None), player.round_number)['decision_seconds'],
+            remaining_decision_seconds(player.group))
 
     @staticmethod
     def vars_for_template(player):
+        if is_timeout_navigation() and room_sync_v2_enabled(getattr(player, 'session', None)):
+            return {'system_navigation': True, 'has_live_method': False}
         context = public_capacity_context_for_group(player.group)
         release_status = None
         room_shell = room_release_enabled(getattr(player, 'session', None))
@@ -4610,6 +4779,7 @@ class Decision(Page):
         schedule = departure_schedule_for_player(player)
         preview = choice_preview(player)
         return {
+            'system_navigation': False,
             **context,
             'has_live_method': room_shell,
             'room_sync_control_endpoint': '/dynamic-room-sync' if room_v2 else '',
@@ -4617,6 +4787,7 @@ class Decision(Page):
             'room_release_shell': room_shell,
             'room_release_status': release_status or {},
             'room_release_shell_token': current_decision_shell_token() if room_shell else None,
+            **round_timing_for_session(getattr(player, 'session', None), player.round_number),
             **round_phase_context(player.round_number),
             'capacity_window_minutes': C.CAPACITY_WINDOW_MINUTES,
             'departure_time_min': schedule['first_departure_time'],
@@ -4644,6 +4815,8 @@ class Decision(Page):
             if state['technical_anomaly']:
                 return '本轮出现技术异常，请联系实验管理员。'
             receipt = sync_integration.receipt(player)
+            if sync_integration.native_decision_pending(player):
+                return '请等待服务器选择确认完成，再提交本轮选择。'
             if receipt or player.participant.code in state['excluded_codes']:
                 sync_integration.native_audit(player)
                 return None
@@ -4699,9 +4872,19 @@ class Decision(Page):
     def before_next_page(player, timeout_happened):
         if room_sync_v2_enabled(player.session):
             sync_integration.native_audit(player)
-            if player.group.results_ready or decision_preexisting_choice(player.participant.code, player.round_number):
+            if (player.group.results_ready
+                    or decision_preexisting_choice(player.participant.code, player.round_number)
+                    or (player_has_departure_choice(player)
+                        and not decision_form_was_empty(player.participant.code, player.round_number))):
                 return
-            sync_integration.import_manual(player)
+            sync_integration.import_manual(player, reconcile_form=True)
+            receipt = sync_integration.receipt(player)
+            if receipt and receipt['kind'] == 'late':
+                sync_integration.native_timeout(player)
+            elif ((receipt and receipt['kind'] == 'excluded')
+                  or (receipt is None and player.participant.code in
+                      room_release_state(player)['excluded_codes'])):
+                sync_integration.native_disconnect(player)
             # Late missing choices are finalized only by the result drain guard.
             return
         if room_release_enabled(getattr(player, 'session', None)):
@@ -4765,7 +4948,7 @@ class RecoveryGate(Page):
         return {
             **round_phase_context(player.round_number),
             'recovery_reason_label': '决策超时' if reason == 'timeout' else '未按时提交',
-            'automatic_departure_time': player.departure_time_label or '等待系统补选',
+            'automatic_departure_time': player.field_maybe_none('departure_time_label') or '等待系统补选',
         }
 
     @staticmethod
@@ -4841,12 +5024,16 @@ class Results(Page):
 
     @staticmethod
     def get_timeout_seconds(player):
+        if room_sync_v2_enabled(player.session) and not sync_integration.results_available(player):
+            return None
         if participant_dropout_active(player):
             return C.DROPOUT_TIMEOUT_SECONDS
-        return C.RESULTS_TIMEOUT_SECONDS
+        return round_timing_for_session(player.session, player.round_number)['results_seconds']
 
     @staticmethod
     def vars_for_template(player):
+        if room_sync_v2_enabled(player.session) and not sync_integration.results_available(player):
+            return dict(round_phase_context(player.round_number), results_unsettled=True)
         maybe_prepare_results(player.group)
         components = result_cost_components(player)
         public_snapshot = current_public_feedback_for_group(player.group)
@@ -4862,6 +5049,8 @@ class Results(Page):
             else phase['display_round_number'] > 1
         )
         return {
+            'results_unsettled': False,
+            'cumulative_ranking': cumulative_ranking_for_player(player),
             **phase,
             'dynamic_capacity': f'{player.dynamic_capacity:.2f}',
             'capacity_level': player.capacity_level,
@@ -4897,7 +5086,16 @@ class Results(Page):
         }
 
     @staticmethod
+    def error_message(player, values):
+        if room_sync_v2_enabled(player.session) and not sync_integration.results_available(player):
+            return '本轮尚未完成结算，请等待同步完成；若持续异常请联系管理员。'
+
+    @staticmethod
     def before_next_page(player, timeout_happened):
+        if room_sync_v2_enabled(player.session) and not sync_integration.results_available(player):
+            # Native timeout submissions skip error_message, so guard here too.
+            from starlette.exceptions import HTTPException
+            raise HTTPException(409, '本轮尚未完成结算，不能推进下一轮。')
         if player.round_number == C.NUM_ROUNDS and player.group.results_ready:
             settle_formal_totals(player, player.round_number)
 

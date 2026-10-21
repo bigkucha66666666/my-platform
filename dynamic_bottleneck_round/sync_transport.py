@@ -1,6 +1,6 @@
 """Separate HTTP control lane and one thread/event-loop for all oTree work."""
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 import contextvars
 import json
 import re
@@ -12,6 +12,8 @@ from . import sync_runtime as runtime
 from .sync_journal import SyncRequestRejected
 from .decision_ingress import (pending_participant_requests, pending_shell_acks,
     failed_participant_requests, completed_participant_requests_crossing)
+
+_admission_ticket = contextvars.ContextVar('control_admission_ticket', default=None)
 
 
 class ControlIdentityRejected(PermissionError):
@@ -143,6 +145,9 @@ class SyncControlASGI:
         self._fault_flush_scheduled = False
         self._closed = False
         runtime.set_control_transport_active(True)
+        self._accepted = 0
+        self._drained = threading.Event()
+        self._drained.set()
 
     def _schedule_fault_flush(self):
         # At most one extra queued/running persistence job beyond admission slots.
@@ -175,6 +180,9 @@ class SyncControlASGI:
     def _shutdown_workers(self):
         # Drain accepted writes and the owned coalesced job, then give any fault
         # added during shutdown one final best-effort worker-side persistence.
+        # Successors are submitted by completed heads. Keep the executor open
+        # until every accepted entry (including actor queues) has finished.
+        self._drained.wait()
         self.executor.shutdown(wait=True, cancel_futures=False)
         for session, number in runtime.pending_fault_rounds():
             runtime.persist_control_fault(session, number)
@@ -243,35 +251,70 @@ class SyncControlASGI:
                 runtime.latch_control_fault(payload, 'control_queue_admission_failure')
                 queue_rejected = True
             else:
+                ticket = None
                 try:
                     ticket = runtime.register_pending(payload, data['kind'], arrival)
+                    future = Future()
+                    dispatch = lambda: self._submit_admitted(ticket, payload, data, arrival, future)
+                    runnable = runtime.admit_control_work(ticket, payload, data, arrival, dispatch)
+                    self._accepted += 1
+                    self._drained.clear()
                 except Exception:
-                    self._slots.release()
                     runtime.latch_control_fault(payload, 'control_queue_admission_failure')
+                    if ticket is not None:
+                        runtime.finish_pending(ticket)
+                    self._slots.release()
                     queue_rejected = True
         if queue_rejected:
             self._schedule_fault_flush()
             return {'status': 503, 'body': {'technical_anomaly': 'control_unavailable'}}
-        try:
-            future = self.executor.submit(self._exchange, payload, data, arrival)
-            def completed(unused):
-                runtime.finish_pending(ticket)
+        if runnable is not None:
+            runnable()
+        return {'future': future, 'payload': payload, 'data': data}
+
+    def _submit_admitted(self, ticket, payload, data, arrival, result):
+        def run():
+            context = _admission_ticket.set(ticket)
+            try:
+                return self._exchange(payload, data, arrival)
+            finally:
+                _admission_ticket.reset(context)
+        def completed(work):
+            # _exchange installs faults before this pending release. No executor
+            # submission, callbacks, or disk work inside the registry boundary.
+            with runtime.control_body_boundary():
+                successor = runtime.finish_pending(ticket)
                 self._slots.release()
-                self._schedule_fault_flush()
-            future.add_done_callback(completed)
-            return {'future': future, 'payload': payload, 'data': data}
-        except Exception:
-            runtime.latch_control_fault(payload, 'control_queue_admission_failure')
+                self._accepted -= 1
+                if not self._accepted:
+                    self._drained.set()
+            try:
+                result.set_result(work.result())
+            except Exception as error:
+                result.set_exception(error)
+            if successor is not None:
+                successor()
             self._schedule_fault_flush()
-            runtime.finish_pending(ticket)
-            self._slots.release()
-            return {'status': 503, 'body': {'technical_anomaly': 'control_unavailable'}}
+        try:
+            work = self.executor.submit(run)
+        except Exception as error:
+            runtime.latch_control_fault(payload, 'control_queue_admission_failure')
+            work = Future()
+            work.set_exception(error)
+        work.add_done_callback(completed)
+
+    def _retain_admitted(self, payload, data, arrival):
+        ticket = _admission_ticket.get()
+        if data['kind'] == 'decision' and runtime.admitted_before_fault(ticket, payload, data, arrival):
+            runtime.get_journal().retain_admitted_decision(
+                payload, data, arrival, admission_ticket=ticket)
 
     def _exchange(self, payload, data, arrival):
         session, number = payload['session_code'], payload['round_number']
         try:
             reason = runtime.persist_control_fault(session, number)
             if reason:
+                self._retain_admitted(payload, data, arrival)
                 return {'technical_anomaly': reason}
             result = self._exchange_registered(payload, data, arrival)
             reason = runtime.persist_control_fault(session, number)
@@ -283,6 +326,13 @@ class SyncControlASGI:
             # Install the interlock before the done callback releases pending.
             runtime.latch_control_fault(payload, 'control_persistence_failure')
             runtime.persist_control_fault(session, number)
+            try:
+                # The failed head still owns its live admission capability.
+                # Preserve its evidence before a successor can retain another
+                # value; an unavailable audit must not replace this failure.
+                self._retain_admitted(payload, data, arrival)
+            except Exception:
+                pass
             raise
 
     def _exchange_registered(self, payload, data, arrival):
@@ -311,14 +361,33 @@ class SyncControlASGI:
             if completed_participant_requests_crossing(expected,
                     after_ts=state['prepare_started_ts'], deadline_ts=deadline, page_index=page):
                 crossed.append(expected)
-        reason = runtime.control_fault(session, number)
+        reason = runtime.control_fault(session, number) or state['technical_anomaly']
         if reason:
+            runtime.latch_control_fault(payload, reason)
+            self._retain_admitted(payload, data, arrival)
             return {'technical_anomaly': reason}
-        result, manual_overrun_limit = journal.exchange(session, number, code, payload['shell_token'],
-            kind=data['kind'], now_ts=arrival, processing_ts=time.time(),
-            departure_minute=data.get('departure_minute'), pending_codes=pending,
-            failed_codes=failed, crossed_codes=crossed,
-            _include_manual_overrun_limit=True)
+        try:
+            result, manual_overrun_limit = journal.exchange(session, number, code, payload['shell_token'],
+                kind=data['kind'], now_ts=arrival, processing_ts=time.time(),
+                departure_minute=data.get('departure_minute'), pending_codes=pending,
+                failed_codes=failed, crossed_codes=crossed,
+                _include_manual_overrun_limit=True)
+        except SyncRequestRejected:
+            # A fault can land after the precheck but before the transaction.
+            # Retain trusted evidence even when that transaction rejects manual.
+            reason = runtime.control_fault(session, number) or journal.state(session, number)['technical_anomaly']
+            if not reason:
+                raise
+            runtime.latch_control_fault(payload, reason)
+            self._retain_admitted(payload, data, arrival)
+            return {'technical_anomaly': reason}
+        # Replay/status can succeed after an anomaly lands inside exchange.
+        # Adopt that durable snapshot before the worker releases its admission;
+        # _exchange persists the interlock through the same completion path.
+        reason = result.get('technical_anomaly')
+        if reason:
+            runtime.latch_control_fault(payload, reason)
+            self._retain_admitted(payload, data, arrival)
         # The journal's processing sample precedes its SQLite UPDATE/commit.
         # Keep this worker's pending ticket until a late commit is faulted.
         if manual_overrun_limit is not None and time.time() > manual_overrun_limit:

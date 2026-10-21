@@ -1,0 +1,16 @@
+{% extends "otree/SessionMonitor.html" %}
+{% block content %}
+{% if protocol2_advance_blocked %}
+<div class="alert alert-warning" role="alert">{{ protocol2_advance_message }}</div>
+{% endif %}
+{{ super() }}
+{% if protocol2_advance_blocked %}
+<script>
+  const advance = document.getElementById('advance_users');
+  if (advance) { advance.disabled = true; advance.title = '不能绕过同步/结算屏障'; }
+  window.advanceUsers = window.advanceSlowestUsers = function () {
+    alert('不能绕过同步/结算屏障；请先核对 Room 监控与同步诊断。');
+  };
+</script>
+{% endif %}
+{% endblock %}

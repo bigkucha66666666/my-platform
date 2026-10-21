@@ -29,6 +29,12 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.env.stop)
         runtime.reset_runtime()
         self.addCleanup(runtime.reset_runtime)
+        # Each disposable journal reuses participant p; old HTTP failures from
+        # cancellation tests belong to their previous fixture, not this round.
+        from . import decision_ingress
+        failures = patch.dict(decision_ingress._failed, {}, clear=True)
+        failures.start()
+        self.addCleanup(failures.stop)
         self.journal = runtime.get_journal()
         now = time.time()
         self.journal.ensure_round('s', 1, expected_codes=['p'], now_ts=now,
@@ -69,7 +75,7 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(asyncio.to_thread(started.wait, 1), 1.2)
             self.assertTrue(started.is_set())
             output = await asyncio.wait_for(self.request(), .5)
-            self.assertEqual(output[0]['status'], 200)
+            self.assertEqual(output[0]['status'], 200, output[-1]['body'])
         finally:
             release.set()
             await task
@@ -244,7 +250,7 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         output = await self.request({'token': self.token, 'kind': 'status', 'clock_id': 3, 'clock_token': 'b' * 32})
         body = json.loads(output[-1]['body'])
         self.assertNotIn('actual_capacity_display', body)
-        self.assertEqual((body['clock_id'], body['clock_token']), (3, 'b' * 32))
+        self.assertEqual((body.get('clock_id'), body.get('clock_token')), (3, 'b' * 32), body)
         self.assertIn((b'cache-control', b'no-store'), output[0]['headers'])
 
     async def test_context_and_single_thread_and_worker_loop_send(self):
@@ -302,6 +308,332 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             record['state'].update(release_ts=now - 59, deadline_ts=now + 1,
                                    phase='RELEASED', ack_ts_by_code={'p': now - 60})
             self.journal._save(connection, 's', 1, record, original)
+
+    def allow_second_choice(self):
+        with self.journal._connection(write=True) as connection:
+            record, original = self.journal._load(connection, 's', 1)
+            record['private']['allowed_minutes'].append(475)
+            self.journal._save(connection, 's', 1, record, original)
+        self.token = runtime.sign_control_token('s', 1, 'p', self.shell, 9)
+
+    async def assert_first_arrival(self, *, refresh=False, cancel=False, fail=False):
+        self.arm_decision()
+        self.allow_second_choice()
+        second_token = self.token
+        if refresh:
+            shell = 'b' * 24
+            self.journal.register_shell('s', 1, 'p', shell, now_ts=time.time(), page_index=9)
+            second_token = runtime.sign_control_token('s', 1, 'p', shell, 9)
+        entered, release = threading.Event(), threading.Event()
+        registered = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        original = self.app._exchange_registered
+        register = runtime.register_pending
+        calls = []
+        def slow(payload, data, arrival):
+            calls.append(data['departure_minute'])
+            if data['departure_minute'] == 474:
+                entered.set()
+                if not release.wait(5):
+                    raise RuntimeError('test release timeout')
+                if fail:
+                    raise RuntimeError('first persistence failed')
+            return original(payload, data, arrival)
+        def observe(*args):
+            ticket = register(*args)
+            if len(runtime._pending) == 2:
+                loop.call_soon_threadsafe(registered.set)
+            return ticket
+        # Identical server timestamps must still use registration order.
+        arrival = time.time()
+        with patch.object(self.app, '_exchange_registered', side_effect=slow), \
+                patch.object(runtime, 'register_pending', side_effect=observe), \
+                patch('dynamic_bottleneck_round.sync_transport.time.time', return_value=arrival):
+            first = asyncio.create_task(self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474}))
+            self.assertTrue(await asyncio.to_thread(entered.wait, 2))
+            second = asyncio.create_task(self.request({'token': second_token, 'kind': 'decision', 'departure_minute': 475}))
+            try:
+                await asyncio.wait_for(registered.wait(), 2)
+                # An independent executor sentinel proves free workers can run.
+                await asyncio.wrap_future(self.app.executor.submit(lambda: None))
+                await asyncio.sleep(0)
+                self.assertFalse(second.done(), 'later arrival must not confirm before the first')
+                self.assertEqual(calls, [474], 'later persistence must not start before the first')
+                if cancel:
+                    first.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await first
+            finally:
+                release.set()
+                responses = await asyncio.gather(first, second, return_exceptions=True)
+        if fail:
+            self.assertTrue(all(response[0]['status'] == 503 for response in responses))
+            self.assertIsNone(self.journal.receipt('s', 1, 'p'))
+            self.assertFalse(runtime.close_control_round('s', 1))
+            audit = self.journal.audit('s', 1, 'p')['admitted_decision']
+            self.assertIsNotNone(audit, 'first failed admission should retain evidence when storage is writable')
+            self.assertEqual(audit['departure_minute'], 474, 'later queued value must not replace first failed evidence')
+            self.assertEqual(audit['ingress_ts'], arrival)
+            self.assertEqual(audit['kind'], 'manual')
+            self.assertEqual(audit['shell_token'], self.shell)
+        else:
+            for response in responses[1:] if cancel else responses:
+                self.assertEqual(json.loads(response[-1]['body'])['receipt']['departure_minute'], 474)
+            self.assertEqual(self.journal.receipt('s', 1, 'p')['departure_minute'], 474)
+        self.assertEqual(runtime.pending_control_codes('s', 1, kind='decision'), ())
+
+    async def test_first_registered_decision_wins_equal_timestamp(self):
+        await self.assert_first_arrival()
+
+    async def test_refreshed_shell_shares_first_arrival_order(self):
+        await self.assert_first_arrival(refresh=True)
+
+    async def test_cancelled_first_request_keeps_order_and_canonical(self):
+        await self.assert_first_arrival(cancel=True)
+
+    async def test_first_persistence_failure_never_confirms_second_value(self):
+        await self.assert_first_arrival(fail=True)
+
+    async def test_secondary_audit_failure_preserves_original_error_and_fault(self):
+        self.arm_decision()
+        observed = []
+        original = self.app._exchange
+        def exchange(*args):
+            try:
+                return original(*args)
+            except Exception as error:
+                observed.append(str(error))
+                raise
+        with patch.object(self.app, '_exchange', side_effect=exchange), \
+                patch.object(self.app, '_exchange_registered', side_effect=RuntimeError('first persistence failed')), \
+                patch.object(self.app, '_retain_admitted', side_effect=RuntimeError('secondary audit failed')) as retain:
+            output = await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474})
+        self.assertEqual(output[0]['status'], 503)
+        self.assertEqual(retain.call_count, 1, 'failure path must attempt admitted audit before releasing ticket')
+        self.assertEqual(observed, ['first persistence failed'])
+        self.assertIsNone(self.journal.receipt('s', 1, 'p'))
+        self.assertTrue(runtime.control_fault('s', 1))
+        self.assertFalse(runtime.close_control_round('s', 1))
+        self.assertEqual(runtime.pending_control_codes('s', 1, kind='decision'), ())
+
+    async def test_pre_fault_admitted_decision_retains_audit_without_receipt(self):
+        self.arm_decision()
+        entered, release = threading.Event(), threading.Event()
+        original = self.app._exchange
+        def paused(*args, **kwargs):
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError('test release timeout')
+            return original(*args, **kwargs)
+        with patch.object(self.app, '_exchange', side_effect=paused):
+            request = asyncio.create_task(self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474}))
+            self.assertTrue(await asyncio.to_thread(entered.wait, 2))
+            arrival = next(iter(runtime._pending.values()))[-1]
+            runtime.latch_control_fault(runtime.verify_control_token(self.token), 'decision_control_queue_overrun')
+            runtime.persist_control_fault('s', 1)
+            release.set()
+            output = await request
+        self.assertEqual(output[0]['status'], 503)
+        self.assertIsNone(self.journal.receipt('s', 1, 'p'))
+        audit = self.journal.audit('s', 1, 'p').get('admitted_decision')
+        self.assertIsNotNone(audit, 'pre-fault server admission must survive later fault')
+        self.assertEqual(audit['departure_minute'], 474)
+        self.assertEqual(audit['ingress_ts'], arrival)
+        self.assertEqual(audit['kind'], 'manual')
+        from .sync_journal import SyncJournal
+        self.assertEqual(SyncJournal(self.journal.path).audit('s', 1, 'p')['admitted_decision'], audit)
+        self.assertFalse(runtime.close_control_round('s', 1))
+        self.assertEqual(self.journal.state('s', 1)['technical_anomaly'], 'decision_control_queue_overrun')
+
+    async def test_fault_already_in_journal_does_not_grant_pre_fault_audit(self):
+        self.arm_decision()
+        self.journal.mark_anomaly('s', 1, 'decision_control_queue_overrun')
+        response = await self.request({'token': self.token, 'kind': 'decision',
+            'departure_minute': 474, 'admitted_before_fault': True, 'admission_ticket': 'forged'})
+        self.assertTrue(json.loads(response[-1]['body'])['technical_anomaly'])
+        self.assertIsNone(self.journal.audit('s', 1, 'p').get('admitted_decision'))
+        self.assertIsNone(self.journal.receipt('s', 1, 'p'))
+        self.assertFalse(runtime.close_control_round('s', 1), 'durable anomaly must retain close interlock')
+
+    async def test_fault_between_worker_precheck_and_transaction_retains_admitted_audit(self):
+        self.arm_decision()
+        original = self.journal.exchange
+        payload = runtime.verify_control_token(self.token)
+        def fault_then_exchange(*args, **kwargs):
+            runtime.latch_control_fault(payload, 'decision_control_queue_overrun')
+            runtime.persist_control_fault('s', 1)
+            return original(*args, **kwargs)
+        with patch.object(self.journal, 'exchange', side_effect=fault_then_exchange):
+            response = await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474})
+        self.assertEqual(response[0]['status'], 503)
+        self.assertIsNone(self.journal.receipt('s', 1, 'p'))
+        self.assertIsNotNone(self.journal.audit('s', 1, 'p')['admitted_decision'])
+
+    async def assert_successful_exchange_fault_interlock(self, kind):
+        self.arm_decision()
+        await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474})
+        canonical = self.journal.receipt('s', 1, 'p')
+        original = self.journal.exchange
+        observed = []
+        def fault_then_exchange(*args, **kwargs):
+            self.journal.mark_anomaly('s', 1, 'decision_control_queue_overrun')
+            result = original(*args, **kwargs)
+            observed.append(result[0]['technical_anomaly'])
+            return result
+        boundary = []
+        finish = runtime.finish_pending
+        def observe_finish(ticket):
+            boundary.append(runtime.control_fault('s', 1))
+            return finish(ticket)
+        with patch.object(self.journal, 'exchange', side_effect=fault_then_exchange), \
+                patch.object(runtime, 'finish_pending', side_effect=observe_finish):
+            response = await self.request({'token': self.token, 'kind': kind, 'departure_minute': 474})
+        self.assertEqual(observed, ['decision_control_queue_overrun'])
+        closed = runtime.close_control_round('s', 1)
+        self.assertEqual((boundary, closed), (['decision_control_queue_overrun'], False),
+                         'successful snapshot must interlock pending release and closure')
+        self.assertEqual(response[0]['status'], 503)
+        self.assertEqual(self.journal.receipt('s', 1, 'p'), canonical)
+        self.assertEqual(boundary, ['decision_control_queue_overrun'],
+                         'successful snapshot must install interlock before pending release')
+        self.assertFalse(closed)
+        self.assertEqual(self.journal.state('s', 1)['technical_anomaly'], 'decision_control_queue_overrun')
+        audit = self.journal.audit('s', 1, 'p').get('admitted_decision')
+        if kind == 'decision':
+            self.assertEqual(audit['departure_minute'], 474)
+            self.assertEqual(audit['kind'], 'manual')
+        else:
+            self.assertIsNone(audit)
+
+    async def test_successful_replay_snapshot_fault_interlocks_before_pending_release(self):
+        await self.assert_successful_exchange_fault_interlock('decision')
+
+    async def test_successful_status_snapshot_fault_interlocks_before_pending_release(self):
+        await self.assert_successful_exchange_fault_interlock('status')
+
+    async def test_faulted_round_rejects_json_audit_capability_and_direct_probe(self):
+        self.arm_decision()
+        payload = runtime.verify_control_token(self.token)
+        runtime.latch_control_fault(payload, 'decision_control_queue_overrun')
+        data = {'token': self.token, 'kind': 'decision', 'departure_minute': 474,
+                'admitted_before_fault': True, 'admission_ticket': 'forged'}
+        self.assertEqual((await self.request(data))[0]['status'], 503)
+        self.app._exchange_registered(payload, data, time.time())
+        self.assertIsNone(self.journal.audit('s', 1, 'p').get('admitted_decision'))
+
+    async def test_early_and_invalid_requests_do_not_own_later_manual(self):
+        self.arm_decision()
+        self.allow_second_choice()
+        state = self.journal.state('s', 1)
+        with patch('dynamic_bottleneck_round.sync_transport.time.time', return_value=state['release_ts'] - 1):
+            response = await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474})
+        self.assertEqual(response[0]['status'], 400)
+        self.assertEqual((await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': -1}))[0]['status'], 400)
+        response = await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 475})
+        self.assertEqual(json.loads(response[-1]['body'])['receipt']['departure_minute'], 475)
+        self.assertFalse(runtime._decision_queues)
+        self.assertFalse(runtime._admitted_requests)
+
+    async def test_actor_queue_does_not_block_other_actor_or_session(self):
+        self.arm_decision()
+        tokens = []
+        for session, code in [('s', 'q'), ('other', 'p')]:
+            if session == 'other':
+                self.journal.ensure_round(session, 1, expected_codes=[code], now_ts=time.time(),
+                    decision_page_index=9, drain_limit_seconds=10, information_condition='I0',
+                    allowed_minutes=[474], boot_id=runtime.PROCESS_BOOT_ID)
+            else:
+                with self.journal._connection(write=True) as connection:
+                    record, original = self.journal._load(connection, session, 1)
+                    record['state']['expected_codes'].append(code)
+                    self.journal._save(connection, session, 1, record, original)
+            self.journal.register_shell(session, 1, code, 'b' * 24, now_ts=time.time(), page_index=9)
+            with self.journal._connection(write=True) as connection:
+                record, original = self.journal._load(connection, session, 1)
+                record['state'].update(release_ts=time.time()-1, deadline_ts=time.time()+59,
+                                      phase='RELEASED', ack_ts_by_code={code: time.time()-2})
+                if session == 's':
+                    record['state']['ack_ts_by_code']['p'] = time.time()-2
+                self.journal._save(connection, session, 1, record, original)
+            tokens.append(runtime.sign_control_token(session, 1, code, 'b' * 24, 9))
+        entered, release = threading.Event(), threading.Event()
+        original = self.app._exchange_registered
+        def pause(payload, data, arrival):
+            if payload['session_code'] == 's' and payload['participant_code'] == 'p':
+                entered.set()
+                release.wait(5)
+            return original(payload, data, arrival)
+        with patch.object(self.app, '_exchange_registered', side_effect=pause):
+            first = asyncio.create_task(self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474}))
+            self.assertTrue(await asyncio.to_thread(entered.wait, 2))
+            try:
+                for token in tokens:
+                    response = await asyncio.wait_for(self.request({'token': token, 'kind': 'decision', 'departure_minute': 474}), 2)
+                    self.assertEqual(json.loads(response[-1]['body'])['receipt']['kind'], 'manual')
+            finally:
+                release.set()
+                await first
+
+    async def test_actor_queue_uses_admission_slots_and_shutdown_drains_successors(self):
+        self.arm_decision()
+        self.app._slots = threading.BoundedSemaphore(2)
+        entered, release = threading.Event(), threading.Event()
+        original = self.app._exchange_registered
+        def pause(*args):
+            entered.set()
+            release.wait(5)
+            return original(*args)
+        with patch.object(self.app, '_exchange_registered', side_effect=pause):
+            first = self.app._admit_body(json.dumps({'token': self.token, 'kind': 'decision', 'departure_minute': 474}).encode())
+            self.assertTrue(await asyncio.to_thread(entered.wait, 2))
+            second = self.app._admit_body(json.dumps({'token': self.token, 'kind': 'decision', 'departure_minute': 474}).encode())
+            self.assertEqual(len(runtime._pending), 2)
+            self.assertFalse(second['future'].done())
+            rejected = self.app._admit_body(json.dumps({'token': self.token, 'kind': 'decision', 'departure_minute': 474}).encode())
+            self.assertEqual(rejected['status'], 503)
+            closing = asyncio.create_task(self.app.aclose())
+            release.set()
+            await asyncio.wait_for(closing, 3)
+        self.assertTrue(first['future'].done())
+        self.assertTrue(second['future'].done())
+        self.assertFalse(runtime._pending)
+        self.assertFalse(runtime._decision_queues)
+        self.assertFalse(runtime._admitted_requests)
+        self.assertTrue(self.app._slots.acquire(blocking=False))
+        self.assertTrue(self.app._slots.acquire(blocking=False))
+        self.app._slots.release()
+        self.app._slots.release()
+
+    async def test_scheduler_admission_error_releases_ticket_and_slot(self):
+        self.arm_decision()
+        with patch.object(runtime, 'admit_control_work', side_effect=RuntimeError('queue bookkeeping failed')):
+            response = await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474})
+        pending = runtime.pending_control_codes('s', 1, kind='decision')
+        # Remove leaked tickets only after capturing the behavior, so a RED
+        # admission-cleanup test cannot contaminate subsequent fixtures.
+        for ticket in tuple(runtime._pending):
+            runtime.finish_pending(ticket)
+        self.assertEqual(response[0]['status'], 503)
+        self.assertEqual(pending, ())
+        self.assertFalse(runtime.close_control_round('s', 1))
+
+    async def test_control_scheduler_never_does_sql_or_submit_inside_boundary(self):
+        self.arm_decision()
+        owner = threading.get_ident()
+        connection, submit = self.journal._connection, self.app.executor.submit
+        @contextmanager
+        def checked_connection(*args, **kwargs):
+            self.assertNotEqual(threading.get_ident(), owner)
+            self.assertFalse(runtime._lock._is_owned())
+            with connection(*args, **kwargs) as value:
+                yield value
+        def checked_submit(*args, **kwargs):
+            self.assertFalse(runtime._lock._is_owned())
+            return submit(*args, **kwargs)
+        with patch.object(self.journal, '_connection', side_effect=checked_connection), \
+                patch.object(self.app.executor, 'submit', side_effect=checked_submit):
+            response = await self.request({'token': self.token, 'kind': 'decision', 'departure_minute': 474})
+        self.assertEqual(response[0]['status'], 200)
 
     async def test_failed_control_persistence_leaves_durable_fault_before_pending_clears(self):
         await self.assert_failed_control('decision')

@@ -1,22 +1,13 @@
 from otree.api import Bot, Submission, expect
 
-from . import PaymentInfo, payoff_source_var
+from . import PaymentInfo, payoff_source_var, dynamic_cash_payment_for_player
 
 
 class PlayerBot(Bot):
     def play_round(self):
         if self.session.config.get('cash_payment_rule'):
-            from payment_info.cash_payment import calculate_cash_payment
-
-            preview_payment = calculate_cash_payment(
-                rule_version=self.session.config['cash_payment_rule'],
-                total_cost=self.participant.vars[
-                    'dynamic_bottleneck_round_total_cost_decimal'
-                ],
-                formal_rounds=self.participant.vars[
-                    'dynamic_bottleneck_round_settled_formal_rounds'
-                ],
-            )
+            preview_payment = dynamic_cash_payment_for_player(self.player)
+            assert preview_payment is not None, 'Missing complete cash settlement inputs'
             expected_cash = f'¥{preview_payment.total_cents / 100:.2f}'
             expect(expected_cash, 'in', self.html)
             expect('基础', 'in', self.html)
@@ -33,17 +24,8 @@ class PlayerBot(Bot):
         )
         expect(self.player.final_total_payoff, '==', expected_payoff)
         if self.session.config.get('cash_payment_rule'):
-            from payment_info.cash_payment import calculate_cash_payment
-
-            payment = calculate_cash_payment(
-                rule_version=self.session.config['cash_payment_rule'],
-                total_cost=self.participant.vars[
-                    'dynamic_bottleneck_round_total_cost_decimal'
-                ],
-                formal_rounds=self.participant.vars[
-                    'dynamic_bottleneck_round_settled_formal_rounds'
-                ],
-            )
+            payment = dynamic_cash_payment_for_player(self.player)
+            assert payment is not None, 'Missing complete cash settlement inputs'
             expect(
                 self.participant.vars['dynamic_bottleneck_cash_payment_cents'],
                 '==',

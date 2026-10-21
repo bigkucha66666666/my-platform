@@ -32,7 +32,7 @@ def summary(samples):
                 max_ms=round(max(ordered) * 1000, 3))
 
 
-async def acceptance():
+async def acceptance(*, session_count=2):
     # run_child has already changed cwd before these imports (oTree 5 isolation).
     import otree
     import uvicorn
@@ -42,6 +42,9 @@ async def acceptance():
     from dynamic_bottleneck_round.room_release import DECISION_SECONDS
 
     assert DECISION_SECONDS == 60
+    assert session_count in (1, 2)
+    sessions = [('loadA', 'I0'), ('loadB', 'I1')][:session_count]
+    actor_count = 40 * session_count
 
     runtime.reset_runtime()
     journal = runtime.get_journal()
@@ -51,7 +54,7 @@ async def acceptance():
     tokens, shells, identities = {}, {}, {}
     samples = {kind: [] for kind in ('ack', 'status', 'decision', 'native', 'replay', 'late')}
     now = time.time()
-    for session, condition in [('loadA', 'I0'), ('loadB', 'I1')]:
+    for session, condition in sessions:
         codes = [f'{session}_{index:02d}' for index in range(40)]
         journal.ensure_round(session, 1, expected_codes=codes, now_ts=now,
             decision_page_index=9, drain_limit_seconds=10, information_condition=condition,
@@ -157,10 +160,11 @@ async def acceptance():
         b_codes = [code for code in tokens if code.startswith('loadB')]
         await asyncio.wait_for(asyncio.gather(*(control(c, 'ack', 'ack') for c in a_codes)), 5)
         assert journal.state('loadA', 1)['release_ts'] is not None
-        assert journal.state('loadB', 1)['release_ts'] is None
-        await asyncio.wait_for(asyncio.gather(*(control(c, 'ack', 'ack') for c in b_codes)), 5)
-        original_releases = [journal.state(s, 1)['release_ts'] for s in ('loadA', 'loadB')]
-        assert original_releases[0] != original_releases[1]
+        if session_count == 2:
+            assert journal.state('loadB', 1)['release_ts'] is None
+            await asyncio.wait_for(asyncio.gather(*(control(c, 'ack', 'ack') for c in b_codes)), 5)
+            original_releases = [journal.state(s, 1)['release_ts'] for s, unused in sessions]
+            assert original_releases[0] != original_releases[1]
         snapshots = await asyncio.wait_for(asyncio.gather(
             *(control(c, 'status', 'status') for c in tokens)), 5)
         assert all('actual_capacity_display' not in body for body in snapshots)
@@ -168,7 +172,7 @@ async def acceptance():
 
         # Boundary fixture keeps a full 60-second T/T+60 window; no production constant changes.
         # Both Sessions have independent journal records, deliberately armed to the same clock.
-        for session in ('loadA', 'loadB'):
+        for session, unused in sessions:
             with journal._connection(write=True) as connection:
                 record, original = journal._load(connection, session, 1)
                 record['state'].update(release_ts=1941.0, deadline_ts=2001.0, phase='ARMED')
@@ -184,14 +188,14 @@ async def acceptance():
             assert not slow_task.done() and not completed
             reopened = SyncJournal(journal.path)
             canonical = {c: reopened.receipt(*identities[c], c) for c in tokens}
-            assert len(canonical) == 80 and all(r == dict(kind='manual',
+            assert len(canonical) == actor_count and all(r == dict(kind='manual',
                 departure_minute=474, ingress_ts=2000.0) for r in canonical.values())
             clock.value = 2002.0  # T+61: business can now complete only after cutoff
             release.set()
             assert (await asyncio.wait_for(slow_task, 5))[0] == 204
             native_results = await asyncio.wait_for(asyncio.gather(*native_tasks), 5)
             assert all(status == 204 for status, body in native_results)
-            assert len(completed) == 80 and len({row[3] for row in completed}) == 1
+            assert len(completed) == actor_count and len({row[3] for row in completed}) == 1
             assert completed[0][3] != threading.get_ident()
             # Every retry opens a fresh TCP socket, sends a different second value,
             # and receives the original receipt. Lost response is replayable too.
@@ -217,18 +221,19 @@ async def acceptance():
                 kind='decision', departure_minute=474), category='late')
             assert status == 200 and late['decision_kind'] == 'late'
             assert journal.receipt('loadA', 2, late_code)['departure_minute'] is None
-        assert all(not journal.state(session, 1)['technical_anomaly'] for session in ('loadA', 'loadB'))
-        for category, expected in [('ack', 80), ('status', 80), ('decision', 80),
-                                    ('native', 80), ('replay', 80), ('late', 1)]:
+        assert all(not journal.state(session, 1)['technical_anomaly'] for session, unused in sessions)
+        for category, expected in [('ack', actor_count), ('status', actor_count),
+                                    ('decision', actor_count), ('native', actor_count),
+                                    ('replay', actor_count), ('late', 1)]:
             assert len(samples[category]) == expected, (category, samples[category])
         result = dict(otree_version=otree.__version__, otree_source=otree.__file__,
             transport='owned uvicorn loopback TCP, stdlib asyncio streams',
             business='single ThreadedASGI synchronous blocking fixture; no ORM commit benchmark',
-            workers=dict(business=1, control=2), sessions=2, actors_per_session=40,
+            workers=dict(business=1, control=2), sessions=session_count, actors_per_session=40,
             boundary=dict(arrival_ts=2000.0, release_ts=1941.0, deadline_ts=2001.0,
                 business_completion_ts=2002.0, test_clock=True, production_seconds=60),
-            completeness=dict(durable_manual=80, native_after_cutoff=80,
-                canonical_replays=80, lost_response_replayed=1, genuine_late=1),
+            completeness=dict(durable_manual=actor_count, native_after_cutoff=actor_count,
+                canonical_replays=actor_count, lost_response_replayed=1, genuine_late=1),
             timings={kind: summary(values) for kind, values in samples.items()})
     finally:
         release.set()
@@ -262,7 +267,9 @@ def legacy_on_v2_child():
     from otree.models import Session
     from otree.database import db
     runtime.get_journal()
-    assert isinstance(project_asgi.app, __import__(
+    from timeout_navigation import TimeoutOriginMiddleware
+    assert isinstance(project_asgi.app, TimeoutOriginMiddleware)
+    assert isinstance(project_asgi.app.app, __import__(
         'dynamic_bottleneck_round.sync_transport', fromlist=['SyncControlASGI']).SyncControlASGI)
     os.environ['DYNAMIC_ROOM_RELEASE_PROTOCOL'] = '1'
     original_request = helper.http_request
@@ -295,7 +302,7 @@ def legacy_on_v2_child():
         flush=True)
 
 
-def run_child(*, legacy=False):
+def run_child(*, legacy=False, session_count=2):
     with tempfile.TemporaryDirectory(prefix='room-sync-load-') as directory:
         os.chdir(directory)  # Must precede any application/oTree import.
         os.environ['DATABASE_URL'] = 'sqlite:///db.sqlite3'
@@ -319,7 +326,7 @@ def run_child(*, legacy=False):
         if legacy:
             legacy_on_v2_child()
         else:
-            asyncio.run(acceptance())
+            asyncio.run(acceptance(session_count=session_count))
 
 
 class RoomSyncLoadTests(unittest.TestCase):
@@ -341,6 +348,12 @@ class RoomSyncLoadTests(unittest.TestCase):
         self.assertIn('"durable_manual": 80', output)
         self.assertIn('"cleanup":', output)
 
+    def test_one_session_40_loopback_control_and_deadline_receipts(self):
+        output = self.run_isolated('--single-child')
+        self.assertIn('"durable_manual": 40', output)
+        self.assertIn('"sessions": 1', output)
+        self.assertIn('"cleanup":', output)
+
     def test_marker1_native_live_sessions_under_protocol2_wrapper(self):
         output = self.run_isolated('--legacy-child')
         self.assertIn('"human_manual": 80', output)
@@ -348,7 +361,9 @@ class RoomSyncLoadTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if '--child' in sys.argv:
+    if '--single-child' in sys.argv:
+        run_child(session_count=1)
+    elif '--child' in sys.argv:
         run_child()
     elif '--legacy-child' in sys.argv:
         run_child(legacy=True)

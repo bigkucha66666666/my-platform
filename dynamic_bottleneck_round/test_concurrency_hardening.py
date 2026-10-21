@@ -147,7 +147,7 @@ class ResultSnapshotReuseTests(unittest.TestCase):
         }})
         self.player = SimpleNamespace(
             participant=participant, departure_slot=1, departure_minute=473,
-            round_number=4, total_cost=16,
+            round_number=4, total_cost=16, session=SimpleNamespace(vars={}),
         )
         self.player.field_maybe_none = lambda field: getattr(self.player, field, None)
         self.group = SimpleNamespace(
@@ -265,7 +265,7 @@ class SyncTemplateRenderingTests(unittest.TestCase):
         context = {
             'round_label': '正式第 1 轮', 'display_round_number': 1,
             'display_total_rounds': 30, 'ready_count': 30, 'group_size': 30,
-            'remaining_seconds': 60, 'poll_interval_ms': 1500,
+            'remaining_seconds': 60, 'decision_seconds': 60, 'poll_interval_ms': 1500,
             'auto_continue_delay_ms': 200,
             'technical_anomaly': '',
         }

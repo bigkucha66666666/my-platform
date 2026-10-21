@@ -24,9 +24,12 @@
     const controlToken = gate.dataset.controlToken;
     const protocol2 = Boolean(controlEndpoint && controlToken);
     const form = submit.form;
-    let controlInFlight = false;
-    let retryTimer;
+    const lanes = {
+      decision: {inFlight: false, retryTimer: undefined},
+      other: {inFlight: false, retryTimer: undefined},
+    };
     let savedChoice;
+    let probeWaiter;
     const controlQueue = new Map();
     let active = false;
     let acknowledged = false;
@@ -89,26 +92,58 @@
     }
 
     function controlPump() {
-      if (technicalStopped || controlInFlight || retryTimer || !controlQueue.size) return;
-      const kind = ['decision', 'operative', 'ack', 'status'].find(k => controlQueue.has(k));
+      pumpLane('decision');
+      pumpLane('other');
+    }
+
+    function checkStatus() {
+      return new Promise((resolve, reject) => {
+        const waiter = {resolve, reject};
+        probeWaiter = waiter;
+        const timer = window.setTimeout(function () {
+          if (probeWaiter === waiter) probeWaiter = undefined;
+          reject(new Error('status probe timeout'));
+        }, CONTROL_TIMEOUT_MS);
+        waiter.resolve = status => {
+          window.clearTimeout(timer);
+          resolve(status);
+        };
+        waiter.reject = error => {
+          window.clearTimeout(timer);
+          reject(error);
+        };
+        controlQueue.set('status', {kind: 'status'});
+        controlPump();
+      });
+    }
+
+    function pumpLane(name) {
+      const lane = lanes[name];
+      if (technicalStopped || submitted || lane.inFlight || lane.retryTimer) return;
+      const kinds = name === 'decision' ? ['decision'] : ['operative', 'ack', 'status'];
+      const kind = kinds.find(k => controlQueue.has(k));
+      if (!kind) return;
       const data = controlQueue.get(kind);
       controlQueue.delete(kind);
       data.clock_id = ++clockId;
       data.clock_token = clockToken;
-      controlInFlight = true;
+      lane.inFlight = true;
       fetchControl(data, kind === 'decision' || kind === 'operative')
         .then(async ({response, status}) => {
+          if (kind === 'status' && probeWaiter) {
+            const waiter = probeWaiter;
+            probeWaiter = undefined;
+            waiter.resolve(status);
+          }
           if (status.technical_anomaly) window.liveRecv(status);
-          if (!response.ok && response.status === 400 && kind === 'decision') {
-            const probe = {kind: 'status',
-              clock_id: ++clockId, clock_token: clockToken};
-            const checked = await fetchControl(probe, false);
-            window.liveRecv(checked.status);
+          if (!response.ok && response.status === 400 && kind === 'decision' && !technicalStopped) {
+            window.liveRecv(await checkStatus());
           }
           if (!response.ok) throw new Error(status.error || 'control rejected');
           window.liveRecv(status);
           if (kind === 'decision') {
             if (!status.decision_received || technicalStopped) throw new Error('decision unconfirmed');
+            if (submitted) return;
             submitted = true;
             controlQueue.delete('decision');
             if (deadlineTimer) window.clearTimeout(deadlineTimer);
@@ -117,22 +152,28 @@
             form.submit();
           }
         }).catch(() => {
-          if (technicalStopped) return;
+          if (kind === 'status' && probeWaiter) {
+            const waiter = probeWaiter;
+            probeWaiter = undefined;
+            waiter.reject(new Error('status probe failed'));
+          }
+          if (technicalStopped || submitted) return;
           controlQueue.set(kind, data);
           message.textContent = '服务器确认暂未完成，正在重试，请保持页面打开。';
-          retryTimer = window.setTimeout(function () {
-            retryTimer = undefined;
+          lane.retryTimer = window.setTimeout(function () {
+            lane.retryTimer = undefined;
             controlPump();
           }, 1500);
         }).finally(() => {
-          controlInFlight = false;
+          lane.inFlight = false;
           controlPump();
         });
     }
 
     function send(kind) {
       if (protocol2) {
-        if (technicalStopped) return;
+        if (technicalStopped || submitted) return;
+        if (kind === 'decision' && (lanes.decision.inFlight || lanes.decision.retryTimer)) return;
         const data = {kind: kind};
         if (kind === 'decision') data.departure_minute = savedChoice;
         // Status is coalesced, and ACK supersedes a queued status.
@@ -241,12 +282,18 @@
       }
       if (status.technical_anomaly) {
         technicalStopped = true;
+        if (probeWaiter) {
+          probeWaiter.reject(new Error('technical anomaly'));
+          probeWaiter = undefined;
+        }
         content.hidden = true;
         gate.hidden = false;
         message.textContent = '本轮出现技术异常，请联系实验管理员。';
         if (pollTimer) window.clearTimeout(pollTimer);
         if (deadlineTimer) window.clearTimeout(deadlineTimer);
-        if (retryTimer) window.clearTimeout(retryTimer);
+        Object.values(lanes).forEach(lane => {
+          if (lane.retryTimer) window.clearTimeout(lane.retryTimer);
+        });
         controlQueue.clear();
         return;
       }
@@ -269,7 +316,8 @@
         return;
       }
       if (status.release_ts) {
-        message.textContent = '本房间已安排统一放行，即将开始 60 秒决策。';
+        const duration = Math.round(status.deadline_ts - status.release_ts);
+        message.textContent = `本房间已安排统一放行，即将开始 ${duration} 秒决策。`;
         // Use the calibrated current lower bound, not the response's old
         // timestamp. Send no earlier than T, without waiting reply age twice.
         const currentServerLower = (monotonicNow() + lowerOffsetMs) / 1000;

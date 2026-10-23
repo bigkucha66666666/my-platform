@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const script = fs.readFileSync(process.argv[2] || path.join(__dirname, '..', '_static',
   'dynamic_bottleneck_round', 'room_release.js'), 'utf8');
 
-function harness() {
+function harness(condition = 'I0') {
   let now = 0;
   let nextTimer = 0;
   let formHandler;
@@ -17,9 +17,9 @@ function harness() {
     if (kind === 'submit') formHandler = handler;
   }, submit() { nativePosts++; }};
   const elements = {
-    'room-release-gate': {dataset: {condition: 'I0', shellToken: 'a'.repeat(24),
+    'room-release-gate': {dataset: {condition, shellToken: 'a'.repeat(24),
       controlToken: 'signed', controlEndpoint: '/dynamic-room-sync'}},
-    'decision-content': {}, 'room-release-message': {},
+    'decision-content': {hidden: true, querySelector() { return null; }}, 'room-release-message': {},
     'decision-submit': {form, addEventListener() {},
       click() { formHandler({preventDefault() {}}); }},
     'departure-minute': {value: '474'},
@@ -68,6 +68,50 @@ function harness() {
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 (async () => {
+  for (const condition of ['I0', 'I1']) {
+    const h = harness(condition);
+    const ack = h.calls[0];
+    ack.resolve({ok: true, json: async () => ({acknowledged: true,
+      release_ts: 103, deadline_ts: 133, server_now_ts: 100,
+      clock_id: ack.data.clock_id, clock_token: ack.data.clock_token})});
+    await flush();
+    assert.match(h.elements['room-release-message'].textContent, /3 秒后/);
+    await h.advance(1000);
+    assert.match(h.elements['room-release-message'].textContent, /2 秒后/);
+    assert.equal(h.elements['decision-content'].hidden, true);
+    await h.advance(1000);
+    assert.match(h.elements['room-release-message'].textContent, /1 秒后/);
+    await h.advance(1000);
+    assert.equal(h.elements['decision-content'].hidden, true,
+      'countdown reaching T cannot authorize decisions locally');
+    assert.match(h.elements['room-release-message'].textContent, /正在确认/);
+    await h.advance(51);
+    const status = h.calls.at(-1);
+    assert.equal(status.data.kind, 'status');
+    status.resolve({ok: true, json: async () => ({acknowledged: true,
+      release_ts: 103, deadline_ts: 133, server_now_ts: 103.051,
+      clock_id: status.data.clock_id, clock_token: status.data.clock_token})});
+    await flush();
+    if (condition === 'I1') {
+      assert.equal(h.elements['decision-content'].hidden, true,
+        'I1 still waits for server-released capacity');
+      h.window.liveRecv({release_ts: 103, deadline_ts: 133,
+        server_now_ts: 103.051, actual_capacity_display: '2.67', capacity_level_label: 'medium'});
+    }
+    assert.equal(h.elements['decision-content'].hidden, false);
+  }
+  const stoppedCountdown = harness();
+  const countdownAck = stoppedCountdown.calls[0];
+  countdownAck.resolve({ok: true, json: async () => ({acknowledged: true,
+    release_ts: 103, deadline_ts: 133, server_now_ts: 100,
+    clock_id: countdownAck.data.clock_id, clock_token: countdownAck.data.clock_token})});
+  await flush();
+  await stoppedCountdown.advance(1000);
+  stoppedCountdown.window.liveRecv({technical_anomaly: 'test_fault'});
+  await stoppedCountdown.advance(5000);
+  assert.match(stoppedCountdown.elements['room-release-message'].textContent, /技术异常/);
+  assert.equal(stoppedCountdown.elements['decision-content'].hidden, true);
+
   for (const seconds of [40, 30]) {
     const h = harness();
     const ack = h.calls[0];

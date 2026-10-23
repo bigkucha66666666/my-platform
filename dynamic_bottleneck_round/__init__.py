@@ -89,6 +89,7 @@ from .result_ranking import (
 )
 from timeout_navigation import is_timeout_navigation
 from .room_release import (
+    RELEASE_TIMING_SESSION_VAR, new_release_timing_rule, release_lead_for_session,
     admission_kind,
     acknowledge_shell,
     expire_preparation,
@@ -773,6 +774,8 @@ def configure_formal_treatments(session):
         session.vars.pop(GROUP_TREATMENTS_SESSION_VAR, None)
         return {}
 
+    from instance_config import validate_session_condition
+    validate_session_condition(session.config, parsed)
     session.vars[GROUP_TREATMENTS_SESSION_VAR] = deepcopy(parsed)
     session.vars[GROUP_AGENT_COUNTS_SESSION_VAR] = {
         label: {'api': values['api'], 'rl': values['rl']}
@@ -1707,6 +1710,7 @@ def creating_session(subsession):
     if subsession.round_number == 1:
         prompt_version_from_session(subsession.session.config)
         subsession.session.vars[ROUND_TIMING_SESSION_VAR] = new_round_timing_rule()
+        subsession.session.vars[RELEASE_TIMING_SESSION_VAR] = new_release_timing_rule()
         subsession.session.vars[EXPERIMENT_PARAMETERS_VAR] = new_experiment_parameters(
             mean_capacity=config.truncated_mean)
         subsession.session.vars[RANKING_RULE_VAR] = RANKING_RULE_VERSION
@@ -1877,6 +1881,7 @@ def room_release_state(player, *, now_ts=None):
             expected_codes=expected_codes,
             decision_seconds=round_timing_for_session(
                 player.session, player.round_number)['decision_seconds'],
+            release_lead_seconds=release_lead_for_session(player.session),
         )
         state['drain_limit_seconds'] = player.session.vars.get(
             ROOM_RELEASE_DRAIN_VAR

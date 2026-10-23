@@ -75,6 +75,11 @@ def run_scenario(scenario):
         elif scenario == 'staged_timing':
             from dynamic_bottleneck_round.test_staged_timing import check_frozen_staged_timing
             check_frozen_staged_timing(http_request, control_request)
+        elif scenario == 'cohort_query':
+            check_cohort_query()
+        elif scenario == 'release_lead':
+            from dynamic_bottleneck_round.test_release_lead import check_release_lead_http
+            check_release_lead_http(http_request, control_request)
         elif scenario == 'edges':
             check_edges()
         elif scenario == 'decision_failure':
@@ -105,6 +110,117 @@ def run_scenario(scenario):
             check_dual_session_live_flow(conditions=('I0',) if scenario == 'mixed' else ('I0', 'I1'),
                 round_numbers=tuple(range(1, 34)) if scenario == 'full_flow' else (4,),
                 full_flow=scenario == 'full_flow', mixed_conditions=scenario == 'mixed')
+
+
+def check_cohort_query():
+    """One code-only lookup per request, preserving every seat's fault guard."""
+    from otree.main import setup
+    setup()
+    import project_asgi
+    from otree.database import db, engine
+    from otree.models import Participant, Session
+    from otree.session import create_session
+    from otree.lookup import _get_session_lookups
+    from sqlalchemy import event
+    from unittest.mock import patch
+    import dynamic_bottleneck_round as e
+    from dynamic_bottleneck_round import sync_integration, sync_runtime
+    from dynamic_bottleneck_round.decision_ingress import DecisionIngressMiddleware
+
+    fixtures = []
+    for count in (40, 40, 1):
+        session = create_session('dynamic_bottleneck_round_prod' if count == 40
+                                 else 'dynamic_bottleneck_round_demo', num_participants=count)
+        participants = session.get_participants()
+        codes = {p.code for p in participants}
+        for p in participants:
+            p.vars['query_test_payload'] = 'x' * 20000
+        player = session.get_subsessions()[0].get_players()[0]
+        sync_integration.state(player)
+        eligible = set(sorted(codes)[:30]) if count == 40 else codes
+        journal = sync_runtime.get_journal()
+        with journal._connection(write=True) as connection:
+            record, original = journal._load(connection, session.code, 1)
+            record['state']['expected_codes'] = sorted(eligible)
+            journal._save(connection, session.code, 1, record, original)
+        fixtures.append((session.code, codes, eligible, sorted(eligible)[0]))
+    db.commit()
+    for session_code, codes, eligible, participant_code in fixtures:
+        db.new_session()
+        session = Session.objects_get(code=session_code)
+        player = session.get_subsessions()[0].get_players()[0]
+        selects, loaded, bindings = [], [], []
+
+        def select(_conn, _cursor, statement, _parameters, _context, _many):
+            if statement.lstrip().upper().startswith('SELECT'):
+                selects.append(statement)
+
+        def load(_participant, _context):
+            loaded.append(True)
+
+        async def body(scope, receive, send):
+            with patch.object(sync_runtime, 'bind_native_round', wraps=sync_runtime.bind_native_round) as bound:
+                for _ in range(7):
+                    state = sync_integration.state(player)
+                    assert set(state['expected_codes']) == eligible
+                bindings.extend(set(call.args[2]) for call in bound.call_args_list)
+            await send({'type': 'http.response.start', 'status': 200})
+            await send({'type': 'http.response.body', 'body': b''})
+
+        async def send(message):
+            pass
+
+        event.listen(engine, 'before_cursor_execute', select)
+        event.listen(Participant, 'load', load)
+        try:
+            app = DecisionIngressMiddleware(body)
+            scope = {'type': 'http', 'method': 'GET',
+                     'path': f'/p/{participant_code}/dynamic_bottleneck_round/Decision/9'}
+            asyncio.run(app(scope, None, send))
+            first_count = len(selects)
+            assert first_count == 1, f'{first_count} SELECTs for 7 state calls, N={len(codes)}'
+            assert not loaded, 'identity binding must not materialize large Participant vars'
+            assert all('_vars' not in sql.lower() for sql in selects)
+            assert len(bindings) == 7 and all(bound == codes for bound in bindings)
+            asyncio.run(app(scope, None, send))
+            assert len(selects) == 2, 'a new HTTP request must perform its own fresh lookup'
+            assert not loaded
+        finally:
+            event.remove(engine, 'before_cursor_execute', select)
+            event.remove(Participant, 'load', load)
+        # Exercise the actual native page through ThreadedASGI as well: its
+        # repeated callbacks must share the request cache across worker hops.
+        index = next(i for i, info in _get_session_lookups(session_code).items()
+                     if info.round_number == 1 and info.page_class.__name__ == 'Decision')
+        db.new_session()
+        pp = Participant.objects_get(code=participant_code)
+        pp._index_in_pages = index
+        pp.visited = True
+        pp.vars['access_granted'] = True
+        pp.time_started_utc = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+        pp._last_page_timestamp = int(time.time())
+        db.commit()
+        selects.clear()
+        event.listen(engine, 'before_cursor_execute', select)
+        try:
+            status, content, error = asyncio.run(http_request(project_asgi.app,
+                f'/p/{participant_code}/dynamic_bottleneck_round/Decision/{index}'))
+            assert status == 200 and 'room-release-gate' in content, (status, error)
+        finally:
+            event.remove(engine, 'before_cursor_execute', select)
+        code_only = [sql for sql in selects if 'otree_participant.code' in sql.partition('FROM')[0]
+                     and 'otree_participant._vars' not in sql.partition('FROM')[0]
+                     and 'otree_participant.id' not in sql.partition('FROM')[0]]
+        assert len(code_only) == 1, f'{len(code_only)} code-only roster queries in one real page GET'
+        if codes - eligible:
+            excluded = next(iter(codes - eligible))
+            current = journal.state(session_code, 1)
+            ticket = sync_runtime.begin_native_request(excluded, current['decision_page_index'])
+            sync_runtime.finish_native_request(ticket, failed=True)
+            assert sync_runtime.control_fault(session_code, 1) == 'decision_page_http_failure'
+        print(f'COHORT_QUERY N={len(codes)} state_calls=7 selects={first_count} '
+              f'Participant_loads=0; actual_GET_SQL={len(selects)} code_queries={len(code_only)}; '
+              'fresh request; full fault roster; eligibility unchanged', flush=True)
 
 
 def check_edges(*, failure=False, pending=False, race=False, control_fault=None, native_case=None):
@@ -866,6 +982,12 @@ def check_readonly_export():
 
 
 class RoomSyncFrameworkTests(unittest.TestCase):
+    def test_initialized_cohort_binding_avoids_per_participant_queries(self):
+        self.run_check('cohort_query')
+
+    def test_new_three_second_and_legacy_five_second_release_over_actual_http(self):
+        self.run_check('release_lead')
+
     def test_real_timeout_post_redirect_does_not_become_browser_shell(self):
         self.run_check('timeout_redirect')
 
@@ -941,6 +1063,8 @@ class RoomSyncFrameworkTests(unittest.TestCase):
         else:
             result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=150)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            if scenario in {'cohort_query', 'release_lead'}:
+                print(result.stdout, end='', flush=True)
 
     def test_v2_get_ack_receipt_native_post_and_h_ha_results(self):
         self.run_check('smoke')

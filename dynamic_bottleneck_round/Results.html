@@ -512,7 +512,7 @@
     <h3 id="cumulative-ranking-title">你的累计排名</h3>
     {{ if cumulative_ranking.available }}
     <dl class="ranking-summary">
-      <div><dt>组内排名</dt><dd>{{ if cumulative_ranking.tied_count > 1 }}并列{{ endif }}第 {{ cumulative_ranking.rank }} 名<small>组内共 {{ cumulative_ranking.actor_count }} 个主体{{ if cumulative_ranking.includes_agents }}，含真人和 Agent{{ endif }}</small></dd></div>
+      <div><dt>组内排名</dt><dd>{{ if cumulative_ranking.tied_count > 1 }}并列 {{ endif }}<span class="rank-position">{{ cumulative_ranking.rank }}/{{ cumulative_ranking.actor_count }}</span><small>组内共 {{ cumulative_ranking.actor_count }} 个主体{{ if cumulative_ranking.includes_agents }}，含真人和 Agent{{ endif }}</small></dd></div>
       <div><dt>截至本轮平均成本</dt><dd>{{ cumulative_ranking.mean_cost }}<small>已完成 {{ cumulative_ranking.completed_rounds }} 轮正式实验</small></dd></div>
     </dl>
     <p class="card-note">按截至本轮的正式累计成本由低到高排名，同成本并列；热身轮不计入。平均成本显示值已四舍五入。</p>

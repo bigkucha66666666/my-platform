@@ -370,7 +370,7 @@
                 </div>
                 {{ if is_dynamic_cash }}
                     {{ if cash_is_rank_based and cash_settlement_ready }}
-                    <p class="text-sub" id="cash-rank-breakdown">最终组内{{ if cash_rank_tied }}并列{{ endif }}第 {{ cash_rank }} 名 / {{ cash_rank_actor_count }} 个主体（{{ if cash_rank_includes_agents }}含真人和 Agent；{{ endif }}计奖平均名次 {{ cash_rank_midpoint }}）。成本奖金 ¥{{ cash_cost_bonus_label }} + 排名奖金 ¥{{ cash_rank_bonus_label }} = 绩效 ¥{{ cash_bonus_label }}。</p>
+                    <p class="text-sub" id="cash-rank-breakdown">最终组内排名：{{ if cash_rank_tied }}并列 {{ endif }}<strong>{{ cash_rank }}/{{ cash_rank_actor_count }}</strong>（{{ if cash_rank_includes_agents }}含真人和 Agent；{{ endif }}计奖平均名次 {{ cash_rank_midpoint }}）。成本奖金 ¥{{ cash_cost_bonus_label }} + 排名奖金 ¥{{ cash_rank_bonus_label }} = 绩效 ¥{{ cash_bonus_label }}。</p>
                     {{ endif }}
                     <p class="text-sub">仅正式 30 轮结算记录用于计奖，热身轮不计入。报酬规则：{{ payment_rule_version }}。实验积分与人民币报酬分开记录。</p>
                     <p class="text-sub">{{ cash_payment_description }}</p>

@@ -37,6 +37,7 @@
     let technicalStopped = false;
     let pollTimer;
     let deadlineTimer;
+    let countdownTimer;
     const monotonicNow = function () { return window.performance.now(); };
     let lastReplyMs = monotonicNow();
     let clockId = 0;
@@ -47,6 +48,30 @@
     let upperOffsetMs = Infinity;
     let decisionWindow;
     const CONTROL_TIMEOUT_MS = 10000;
+
+    function stopCountdown() {
+      if (countdownTimer !== undefined) window.clearTimeout(countdownTimer);
+      countdownTimer = undefined;
+    }
+
+    function showCountdown(status) {
+      stopCountdown();
+      if (active || submitted || technicalStopped) return;
+      const remaining = status.release_ts * 1000 - (monotonicNow() + lowerOffsetMs);
+      if (remaining > 0 && Number.isFinite(remaining)) {
+        const seconds = Math.ceil(remaining / 1000);
+        const duration = Math.round(status.deadline_ts - status.release_ts);
+        message.textContent = `本房间已就绪，将在 ${seconds} 秒后开始 ${duration} 秒决策。`;
+        countdownTimer = window.setTimeout(function () {
+          countdownTimer = undefined;
+          showCountdown(status);
+        }, Math.min(250, remaining));
+      } else {
+        // This is display only. A fresh server response still authorizes T
+        // and supplies I1 capacity; the local countdown cannot open controls.
+        message.textContent = '正在确认本轮开始时间，请稍候。';
+      }
+    }
 
     async function fetchControl(data, keepalive) {
       const controller = new window.AbortController();
@@ -145,6 +170,7 @@
             if (!status.decision_received || technicalStopped) throw new Error('decision unconfirmed');
             if (submitted) return;
             submitted = true;
+            stopCountdown();
             controlQueue.delete('decision');
             if (deadlineTimer) window.clearTimeout(deadlineTimer);
             // Durable receipt is canonical; native oTree remains responsible
@@ -158,6 +184,7 @@
             waiter.reject(new Error('status probe failed'));
           }
           if (technicalStopped || submitted) return;
+          stopCountdown();
           controlQueue.set(kind, data);
           message.textContent = '服务器确认暂未完成，正在重试，请保持页面打开。';
           lane.retryTimer = window.setTimeout(function () {
@@ -197,6 +224,7 @@
       pollTimer = window.setTimeout(function () {
         if (!active && !submitted &&
             connectionStalled(monotonicNow() - lastReplyMs)) {
+          stopCountdown();
           message.textContent = '与服务器的确认连接暂时无响应。请保持页面打开，并联系实验管理员。';
         }
         if (!active && !submitted) send(acknowledged ? 'status' : 'ack');
@@ -226,6 +254,7 @@
 
     function closeWindow(status) {
       if (submitted) return;
+      stopCountdown();
       content.hidden = true;
       gate.hidden = false;
       message.textContent = '本轮时间已结束，正在进入结果页面。';
@@ -249,6 +278,7 @@
     function activate(status) {
       if (active) return;
       active = true;
+      stopCountdown();
       showCapacity(status);
       gate.hidden = true;
       content.hidden = false;
@@ -268,6 +298,7 @@
     } else {
       submit.addEventListener('click', function () {
         submitted = true;
+        stopCountdown();
         if (deadlineTimer) window.clearTimeout(deadlineTimer);
       });
     }
@@ -282,6 +313,7 @@
       }
       if (status.technical_anomaly) {
         technicalStopped = true;
+        stopCountdown();
         if (probeWaiter) {
           probeWaiter.reject(new Error('technical anomaly'));
           probeWaiter = undefined;
@@ -316,14 +348,15 @@
         return;
       }
       if (status.release_ts) {
-        const duration = Math.round(status.deadline_ts - status.release_ts);
-        message.textContent = `本房间已安排统一放行，即将开始 ${duration} 秒决策。`;
+        showCountdown(status);
         // Use the calibrated current lower bound, not the response's old
         // timestamp. Send no earlier than T, without waiting reply age twice.
         const currentServerLower = (monotonicNow() + lowerOffsetMs) / 1000;
         schedulePoll(Math.max(80,
           (status.release_ts - currentServerLower) * 1000 + 50));
       } else {
+        stopCountdown();
+        message.textContent = '正在等待本房间就绪，尚未开始决策计时。';
         schedulePoll(1500 + Math.floor(window.Math.random() * 500));
       }
     };

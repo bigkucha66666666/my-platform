@@ -226,6 +226,7 @@ def check_hybrid_payment_orm():
                         assert context['cash_total_label'] == f'{expected:.2f}'
                     html = receipt.render(context)
                     assert 'id="cash-rank-breakdown"' in html and '最高 30 元' in html
+                    assert f'<strong>{rank}/9</strong>' in html
                     assert f'¥{expected:.2f}' in html
                     disclosure = formal_template.render(app.FormalStart.vars_for_template(final.in_round(4)))
                     assert '成本奖金 0–12 元' in disclosure and '排名奖金 0–3 元' in disclosure

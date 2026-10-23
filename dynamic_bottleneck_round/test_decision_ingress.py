@@ -17,6 +17,39 @@ from dynamic_bottleneck_round.decision_ingress import (
 
 
 class DecisionIngressTests(unittest.TestCase):
+    def test_identity_cache_is_request_local_and_keys_separate_database_session_round(self):
+        lookup = getattr(ingress, 'request_cohort_codes', None)
+        self.assertIsNotNone(lookup, 'repeat state reads need request-local identity reuse')
+        calls = []
+        async def app(scope, receive, send):
+            for key in (('db-a', 'S1', 1), ('db-b', 'S1', 1),
+                        ('db-a', 'S2', 1), ('db-a', 'S1', 2)):
+                def loader():
+                    calls.append(key)
+                    return ['a', 'b']
+                value = await asyncio.to_thread(lookup, key, loader)
+                self.assertEqual(value, ('a', 'b'))
+                self.assertIs(lookup(key, lambda: self.fail('duplicate load')), value)
+            await send({'type': 'http.response.start', 'status': 200})
+            if scope.get('fail'):
+                raise RuntimeError('request rollback')
+            await send({'type': 'http.response.body', 'body': b''})
+        async def send(message):
+            pass
+        scope = {'type': 'http', 'method': 'GET',
+                 'path': '/p/CACHE_TEST/dynamic_bottleneck_round/Decision/9'}
+        middleware = DecisionIngressMiddleware(app)
+        asyncio.run(middleware(scope, None, send))
+        self.assertEqual(len(calls), 4)
+        with self.assertRaisesRegex(RuntimeError, 'request rollback'):
+            asyncio.run(middleware(dict(scope, fail=True), None, send))
+        asyncio.run(middleware(scope, None, send))
+        self.assertEqual(len(calls), 12)
+        outside = []
+        for _ in range(2):
+            lookup(('db-a', 'S1', 1), lambda: outside.append(True) or ['a'])
+        self.assertEqual(len(outside), 2, 'no global or leaked cache outside HTTP')
+
     def test_native_registry_is_storage_free_and_isolates_sessions_and_pages(self):
         from . import sync_runtime as runtime
         from unittest.mock import patch

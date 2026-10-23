@@ -222,6 +222,8 @@ def check_cumulative_ranking_orm(http_request):
             own = players[0]
             html = asyncio.run(results_html(own))
             assert 'id="cumulative-ranking"' in html, 'formal Results must render personal cumulative ranking'
+            own_ranking = app.cumulative_ranking_for_player(own)
+            assert f'<span class="rank-position">{own_ranking["rank"]}/{own_ranking["actor_count"]}</span>' in html
             assert '截至本轮平均成本' in html and '9 个主体' in html
             assert ('含真人和 Agent' in html) == bool(virtual)
             assert all(r['agent_id'] not in html for r in virtual), 'result page must not expose other identities'

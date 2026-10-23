@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "mode": "production",
+  "instances": {
+    "i0": {
+      "port": 8001,
+      "runtime_dir": "/srv/econlab-instances/releases/20261023/i0/runtime",
+      "state_dir": "/srv/econlab-instances/i0/state",
+      "tmp_dir": "/srv/econlab-instances/i0/state/tmp",
+      "journal_path": "/srv/econlab-instances/i0/state/room_sync.sqlite3",
+      "database_url": "postgresql://REPLACE_USER:REPLACE_PASSWORD@127.0.0.1:5432/econlab_i0_acceptance",
+      "secret_key": "REPLACE_I0_WITH_RANDOM_SECRET_AT_LEAST_32_CHARS",
+      "rest_key": "REPLACE_I0_WITH_RANDOM_REST_KEY_AT_LEAST_32_CHARS",
+      "admin_password": "REPLACE_WITH_PRIVATE_ADMIN_PASSWORD",
+      "environment": {
+        "OTREE_PROD_PARTICIPANT_PASSWORD": "REPLACE_WITH_PRIVATE_PARTICIPANT_PASSWORD",
+        "DYNAMIC_ROOM_RELEASE_PROTOCOL": "2",
+        "DYNAMIC_ROOM_RELEASE_DRAIN_SECONDS": "10"
+      }
+    },
+    "i1": {
+      "port": 8002,
+      "runtime_dir": "/srv/econlab-instances/releases/20261023/i1/runtime",
+      "state_dir": "/srv/econlab-instances/i1/state",
+      "tmp_dir": "/srv/econlab-instances/i1/state/tmp",
+      "journal_path": "/srv/econlab-instances/i1/state/room_sync.sqlite3",
+      "database_url": "postgresql://REPLACE_USER:REPLACE_PASSWORD@127.0.0.1:5432/econlab_i1_acceptance",
+      "secret_key": "REPLACE_I1_WITH_RANDOM_SECRET_AT_LEAST_32_CHARS",
+      "rest_key": "REPLACE_I1_WITH_RANDOM_REST_KEY_AT_LEAST_32_CHARS",
+      "admin_password": "REPLACE_WITH_PRIVATE_ADMIN_PASSWORD",
+      "environment": {
+        "OTREE_PROD_PARTICIPANT_PASSWORD": "REPLACE_WITH_PRIVATE_PARTICIPANT_PASSWORD",
+        "DYNAMIC_ROOM_RELEASE_PROTOCOL": "2",
+        "DYNAMIC_ROOM_RELEASE_DRAIN_SECONDS": "10"
+      }
+    }
+  }
+}

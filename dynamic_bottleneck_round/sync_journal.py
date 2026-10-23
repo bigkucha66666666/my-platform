@@ -12,7 +12,7 @@ import re
 import sqlite3
 
 from .room_release import (
-    DECISION_SECONDS, acknowledge_shell, admission_kind, expire_preparation, make_round_state,
+    DECISION_SECONDS, RELEASE_LEAD_SECONDS, acknowledge_shell, admission_kind, expire_preparation, make_round_state,
     mark_shell_rendered, release_if_ready,
 )
 
@@ -101,14 +101,16 @@ class SyncJournal:
                      decision_page_index, drain_limit_seconds, information_condition,
                      allowed_minutes, actual_capacity_display=None,
                      capacity_level_label=None, boot_id=None,
-                     decision_seconds=DECISION_SECONDS):
+                     decision_seconds=DECISION_SECONDS,
+                     release_lead_seconds=RELEASE_LEAD_SECONDS):
         with self._connection(write=True) as connection:
             row = connection.execute('SELECT record FROM sync_rounds '
                 'WHERE session_code=? AND round_number=?', (session_code, round_number)).fetchone()
             if row is None:
                 state = make_round_state(round_number=round_number, now_ts=now_ts,
                                          expected_codes=expected_codes,
-                                         decision_seconds=decision_seconds)
+                                         decision_seconds=decision_seconds,
+                                         release_lead_seconds=release_lead_seconds)
                 state.update(protocol=SYNC_PROTOCOL_VERSION,
                              decision_page_index=decision_page_index,
                              drain_limit_seconds=drain_limit_seconds,

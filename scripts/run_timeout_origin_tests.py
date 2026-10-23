@@ -15,6 +15,8 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'output/timeout_origin_repair_20261019'
 MODULES = [
+    'test_instance_config',
+    'dynamic_bottleneck_round.test_release_lead',
     'payment_info.test_rank_payment',
     'dynamic_bottleneck_round.test_result_ranking',
     'dynamic_bottleneck_round.test_adaptive_window',

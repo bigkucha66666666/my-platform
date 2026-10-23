@@ -12,6 +12,9 @@ if not hasattr(Player, '_setattr_fields'):
         '请使用 python project_prodserver.py [地址:端口] 启动。'
     )
 
+from instance_session import install_session_guard
+install_session_guard()
+
 from otree.asgi import app as otree_app
 from session_data_export_views import register_session_export_routes
 

@@ -343,7 +343,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function defaultPresetForRoom(roomName) {
     return roomName === 'prod_room_i1' ? 'PAIR-I1' : 'PAIR-I0';
   }
-  const roomName = document.querySelector('[name="room_name"]')?.value || '';
+  const instanceCondition = document.querySelector(
+    '[name="dynamic_bottleneck_round_prod.instance_information_condition"]'
+  )?.value || '';
+  const roomName = document.querySelector('[name="room_name"]')?.value
+    || (instanceCondition ? `prod_room_${instanceCondition.toLowerCase()}` : '');
   const roomDefaultPreset = defaultPresetForRoom(roomName);
   const isConditionRoom = ['prod_room_i0', 'prod_room_i1'].includes(roomName);
   let roomPresetApplied = false;
@@ -406,6 +410,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  const availableConfigNames = new Set([...dropdown.options].map(option => option.value));
+  for (const configSet of [activeAgentConfigs, dynamicAgentConfigs, formalDynamicConfigs]) {
+    for (const configName of configSet) {
+      if (!availableConfigNames.has(configName)) configSet.delete(configName);
+    }
+  }
   const fieldSuffixes = [
     'api_agent_count_per_group', 'api_agent_mode', 'rl_fallback_enabled',
     'rl_agent_enabled', 'rl_agent_count_per_group', 'cohort_size',
@@ -467,9 +477,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentConfig = '';
   let applyingPreset = false;
-  let selectedPreset = 'PAIR-I0';
-  let customSelections = ['H-I0', 'HA-I0'];
-  let pilotGroups = [{treatment: 'H-I0', human: 1, api: 0, rl: 0}];
+  const defaultH = `H-${instanceCondition || 'I0'}`;
+  let selectedPreset = roomDefaultPreset;
+  let customSelections = [defaultH, `HA-${instanceCondition || 'I0'}`];
+  let pilotGroups = [{treatment: defaultH, human: 1, api: 0, rl: 0}];
   const presets = {
     'PAIR-I0': {
       humans: 40,
@@ -509,7 +520,20 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   };
   const formalScenarioConfig = 'dynamic_bottleneck_round_prod';
-  const treatmentOptions = ['H-I0', 'H-I1', 'HA-I0', 'HA-I1'];
+  const treatmentOptions = ['H-I0', 'H-I1', 'HA-I0', 'HA-I1'].filter(
+    value => !instanceCondition || value.endsWith(instanceCondition)
+  );
+  if (instanceCondition) {
+    document.querySelectorAll('[data-preset]').forEach(button => {
+      const preset = button.dataset.preset;
+      button.hidden = preset !== 'CUSTOM' && !preset.endsWith(instanceCondition);
+      button.disabled = button.hidden;
+    });
+    flowPreviewInformationCondition.value = instanceCondition;
+    flowPreviewInformationCondition.disabled = true;
+    document.querySelector('[name="dynamic_bottleneck_round_prod.instance_information_condition"]')
+      ?.closest('tr')?.setAttribute('hidden', 'hidden');
+  }
   const capacitySequenceSeeds = {
     S01: 2026091101,
     S02: 2026091102,
@@ -549,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const values = raw.split(';').map(item => item.split(':')[1]).filter(
       value => treatmentOptions.includes(value)
     );
-    return values.length ? values : ['H-I0'];
+    return values.length ? values : [defaultH];
   }
   function humanCountForTreatment(treatment) {
     return treatment.startsWith('HA-') ? 10 : 30;
@@ -579,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
         api: Number(match[3]), rl: Number(match[4]),
       } : null;
     }).filter(Boolean);
-    return rows.length ? rows : [{treatment: 'H-I0', human: 1, api: 0, rl: 0}];
+    return rows.length ? rows : [{treatment: defaultH, human: 1, api: 0, rl: 0}];
   }
   function pilotGroupInputIsValid(report = false) {
     const rows = [...pilotGroupRows.querySelectorAll('.pilot-group-row')];
@@ -669,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const count = Math.min(100, Math.max(1, requested));
     pilotGroupCount.value = String(count);
     pilotGroups = pilotGroups.slice(0, count);
-    while (pilotGroups.length < count) pilotGroups.push({treatment: 'H-I0', human: 1, api: 0, rl: 0});
+    while (pilotGroups.length < count) pilotGroups.push({treatment: defaultH, human: 1, api: 0, rl: 0});
     pilotGroupRows.innerHTML = pilotGroups.map((group, index) => `
       <div class="pilot-group-row">
         <b>G${String(index + 1).padStart(2, '0')}</b>
@@ -692,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ? Math.max(1, Number.parseInt(customGroupCount.value, 10) || 1)
       : 1;
     customSelections = customSelections.slice(0, count);
-    while (customSelections.length < count) customSelections.push('H-I0');
+    while (customSelections.length < count) customSelections.push(defaultH);
     const spec = customSelections.map(
       (treatment, index) => `G${String(index + 1).padStart(2, '0')}:${treatment}`
     ).join(';');
@@ -768,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : 1;
     customGroupCount.value = String(count);
     customSelections = customSelections.slice(0, count);
-    while (customSelections.length < count) customSelections.push('H-I0');
+    while (customSelections.length < count) customSelections.push(defaultH);
     customGroupRows.innerHTML = customSelections.map((selected, index) => (
       `<div class="custom-group-row"><label for="custom-group-${index + 1}">G${String(index + 1).padStart(2, '0')}</label><select id="custom-group-${index + 1}" class="form-select custom-group-treatment" data-index="${index}">${treatmentOptions.map(value => `<option value="${value}"${value === selected ? ' selected' : ''}>${value}</option>`).join('')}</select></div>`
     )).join('');

@@ -9,10 +9,36 @@ from math import isfinite
 PROTOCOL_VERSION = 1
 DECISION_SECONDS = 60
 RELEASE_LEAD_SECONDS = 5
+RELEASE_TIMING_SESSION_VAR = 'dynamic_bottleneck_release_timing_v1'
+RELEASE_TIMING_VERSION = 'ready_lead_v1'
+
+
+def _valid_release_lead(value):
+    if (isinstance(value, bool) or not isinstance(value, (int, float))
+            or not isfinite(value) or not 1 <= value <= 10):
+        raise ValueError('Release lead must be a finite number between 1 and 10 seconds')
+    return float(value)
+
+
+def new_release_timing_rule():
+    return dict(version=RELEASE_TIMING_VERSION, release_lead_seconds=3)
+
+
+def release_lead_for_session(session):
+    stored = getattr(session, '_vars', None)
+    if stored is None:
+        stored = getattr(session, 'vars', {})
+    if RELEASE_TIMING_SESSION_VAR not in stored:
+        return RELEASE_LEAD_SECONDS
+    rule = stored[RELEASE_TIMING_SESSION_VAR]
+    if not isinstance(rule, dict) or rule.get('version') != RELEASE_TIMING_VERSION:
+        raise ValueError('Invalid saved release timing rule')
+    return _valid_release_lead(rule.get('release_lead_seconds'))
 
 
 def make_round_state(*, round_number, now_ts, expected_codes,
-                     decision_seconds=DECISION_SECONDS):
+                     decision_seconds=DECISION_SECONDS,
+                     release_lead_seconds=RELEASE_LEAD_SECONDS):
     decision_seconds = float(decision_seconds)
     if not isfinite(decision_seconds) or decision_seconds <= 0:
         raise ValueError('Decision duration must be finite and positive')
@@ -21,6 +47,7 @@ def make_round_state(*, round_number, now_ts, expected_codes,
         'protocol': PROTOCOL_VERSION,
         'round_number': int(round_number),
         'decision_seconds': decision_seconds,
+        'release_lead_seconds': _valid_release_lead(release_lead_seconds),
         'phase': 'SHELL_LOADING',
         'prepare_started_ts': float(now_ts),
         'prepare_deadline_ts': float(now_ts) + (120 if int(round_number) == 1 else 60),
@@ -70,7 +97,7 @@ def release_if_ready(state, *, now_ts):
         return False
     if not all(code in state['ack_ts_by_code'] for code in state['expected_codes']):
         return False
-    release_ts = float(now_ts) + RELEASE_LEAD_SECONDS
+    release_ts = float(now_ts) + _valid_release_lead(state.get('release_lead_seconds', RELEASE_LEAD_SECONDS))
     state['release_ts'] = release_ts
     state['deadline_ts'] = release_ts + state.get('decision_seconds', DECISION_SECONDS)
     state['phase'] = 'ARMED'
@@ -101,7 +128,7 @@ def expire_preparation(state, *, now_ts, pending_codes, drain_limit_seconds=None
         state['phase'] = 'TECHNICAL_ANOMALY'
         return False
     state['excluded_codes'] = sorted(missing)
-    release_ts = float(now_ts) + RELEASE_LEAD_SECONDS
+    release_ts = float(now_ts) + _valid_release_lead(state.get('release_lead_seconds', RELEASE_LEAD_SECONDS))
     state['release_ts'] = release_ts
     state['deadline_ts'] = release_ts + state.get('decision_seconds', DECISION_SECONDS)
     state['phase'] = 'ARMED'

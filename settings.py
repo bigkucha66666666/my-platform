@@ -18,7 +18,12 @@ def load_local_env():
         environ.setdefault(key, value)
 
 
-load_local_env()
+if 'OTREE_INSTANCE_ID' in environ or 'OTREE_INSTANCE_CONFIG' in environ:
+    from instance_config import validate_environment
+    _INSTANCE = validate_environment()
+else:
+    _INSTANCE = None
+    load_local_env()
 
 # oTree computes its default DEBUG before importing this project settings file.
 # Re-declare DEBUG here so values loaded from .env can hide participant debug info.
@@ -697,5 +702,22 @@ DEMO_PAGE_INTRO_HTML = """
 
 
 SECRET_KEY = environ.get('OTREE_SECRET_KEY', 'dev-secret-key-change-me')
+
+if _INSTANCE is not None:
+    ROOMS = [room for room in ROOMS if room['name'] == _INSTANCE.room_name]
+    SESSION_CONFIGS = [config for config in SESSION_CONFIGS
+                       if config['name'] == 'dynamic_bottleneck_round_prod']
+    SESSION_CONFIGS[0].update(
+        instance_information_condition=_INSTANCE.condition,
+        capacity_information_condition=_INSTANCE.condition,
+        group_treatment_spec=f'G01:H-{_INSTANCE.condition};G02:HA-{_INSTANCE.condition}',
+        doc=(f'{_INSTANCE.condition} 独立实例；默认 H + HA、40 名真人。'
+             '新建 Session 的所有组均使用本实例信息条件。'),
+    )
+    DEMO_PAGE_INTRO_HTML = (
+        f'<p>{_INSTANCE.condition} 独立实验实例。通过 {_INSTANCE.room_name} 创建并组织实验；'
+        '默认 40 名真人（H 30 人，HA 10 人 + 10 LLM + 10 RL）。'
+        '对比场次请在两个实例选择相同的 S01–S05 服务率序列。</p>'
+    )
 
 INSTALLED_APPS = ['otree']

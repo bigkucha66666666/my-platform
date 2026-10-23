@@ -6,10 +6,22 @@ from .decision_ingress import (after_success, current_decision_shell_token,
     page_ingress_ts, request_ingress_ts, completed_shell_response_ts,
     completed_decision_response_ts, pending_participant_requests,
     pending_shell_acks, failed_participant_requests, completed_participant_requests_crossing,
-    decision_form_was_empty)
+    decision_form_was_empty, request_cohort_codes)
+from .room_release import release_lead_for_session
 
 IDENTITY_VAR = 'dynamic_room_sync_journal_identity_v2'
 ROUNDS_VAR = 'dynamic_room_sync_initialized_rounds_v2'
+
+
+def _native_cohort_codes(session, round_number):
+    from otree.models import Participant
+    from sqlalchemy.orm import object_session
+    engine = object_session(session).get_bind()
+    # Every round in this app contains the full Session cohort, including
+    # suspended seats. Only code strings are needed for native fault mapping.
+    return request_cohort_codes((id(engine), session.code, round_number), lambda: (
+        row[0] for row in Participant.objects_filter(session=session)
+        .with_entities(Participant.code)))
 
 
 def journal(session):
@@ -51,12 +63,13 @@ def state(player, *, now_ts=None):
             information_condition=conditions, actual_capacity_display=capacities,
             capacity_level_label=levels, allowed_minutes=[int(item['minute']) for item in e.choice_preview(player)],
             boot_id=runtime.PROCESS_BOOT_ID,
-            decision_seconds=e.round_timing_for_session(session, number)['decision_seconds'])
+            decision_seconds=e.round_timing_for_session(session, number)['decision_seconds'],
+            release_lead_seconds=release_lead_for_session(session))
         session.vars[ROUNDS_VAR] = [*stored.get(ROUNDS_VAR, []), number]
     reason = runtime.persist_control_fault(session.code, number)
     result = j.state(session.code, number)
     runtime.bind_native_round(session.code, number,
-        [p.participant.code for p in player.subsession.get_players()],
+        _native_cohort_codes(session, number),
         result['decision_page_index'], settled=result['settled'])
     if reason and not result['settled']:
         result.update(technical_anomaly=reason, phase='TECHNICAL_ANOMALY')

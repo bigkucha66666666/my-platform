@@ -29,6 +29,7 @@ _ack_request_id = ContextVar('dynamic_shell_ack_request_id', default=None)
 _shell_token = ContextVar('dynamic_shell_get_token', default=None)
 _decision_form_choices = ContextVar('dynamic_decision_form_choices', default=None)
 _success_callbacks = ContextVar('dynamic_business_success_callbacks', default=None)
+_cohort_codes = ContextVar('dynamic_request_cohort_codes', default=None)
 _pending_lock = Lock()
 _pending = {}
 _failed = {}
@@ -46,6 +47,21 @@ def ingress_middleware_active():
 def request_ingress_ts():
     """Trusted request-arrival timestamp for the current Decision POST."""
     return _ingress_ts.get()
+
+
+def request_cohort_codes(key, loader):
+    """Reuse immutable identity strings within one HTTP request only.
+
+    The caller keys by database engine, Session and round. oTree's copied
+    worker context shares this request dictionary, but never a global cache.
+    Failed loads are not cached; eligibility and sync state never enter it.
+    """
+    cached = _cohort_codes.get()
+    if cached is None:
+        return tuple(loader())
+    if key not in cached:
+        cached[key] = tuple(loader())
+    return cached[key]
 
 
 def after_success(callback, *, key):
@@ -269,6 +285,7 @@ class DecisionIngressMiddleware:
             # Keep post-commit settlement callbacks, but no browser evidence,
             # ingress deadlines, native tickets or shell credentials.
             context = _success_callbacks.set({})
+            cohort_context = _cohort_codes.set({})
             status = None
             async def system_send(message):
                 nonlocal status
@@ -282,6 +299,7 @@ class DecisionIngressMiddleware:
                         await asyncio.to_thread(callback)
             finally:
                 _success_callbacks.reset(context)
+                _cohort_codes.reset(cohort_context)
             return
         code = match.group(1)
         is_decision_post = bool(
@@ -312,6 +330,7 @@ class DecisionIngressMiddleware:
         response_status = None
         raised = False
         success_context = _success_callbacks.set({})
+        cohort_context = _cohort_codes.set({})
 
         async def send_observed(message):
             nonlocal response_status
@@ -327,6 +346,7 @@ class DecisionIngressMiddleware:
         finally:
             callbacks = _success_callbacks.get()
             _success_callbacks.reset(success_context)
+            _cohort_codes.reset(cohort_context)
             _ingress_ts.reset(token)
             _page_ingress_ts.reset(page_token)
             _shell_token.reset(shell_token_context)
